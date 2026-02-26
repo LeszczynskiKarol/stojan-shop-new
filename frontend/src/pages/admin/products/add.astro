@@ -1,0 +1,12 @@
+---
+// frontend/src/pages/admin/products/add.astro
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AddProductForm from '../../../components/admin/AddProductForm';
+---
+<AdminLayout title="Dodaj produkt">
+  <div class="toolbar">
+    <h1>Dodaj nowy produkt</h1>
+    <a href="/admin/products" class="btn btn-outline">← Powrót do listy</a>
+  </div>
+  <AddProductForm client:load />
+</AdminLayout>

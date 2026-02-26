@@ -1,0 +1,232 @@
+/* frontend/src/styles/globals.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+    --primary: 45 100% 47%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 45 100% 47%;
+    --secondary-foreground: 0 0% 9%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+    --border: 220 13% 91%;
+  }
+
+  .dark {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 93%;
+    --primary: 45 100% 47%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 45 100% 47%;
+    --secondary-foreground: 0 0% 9%;
+    --accent: 0 0% 12%;
+    --accent-foreground: 0 0% 93%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 220 9% 65%;
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 93%;
+    --border: 0 0% 15%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* ============================================
+   BLOG / PROSE STYLES
+   ============================================ */
+.prose {
+  @apply text-foreground;
+}
+
+.prose .wp-block-paragraph {
+  @apply mb-6 leading-relaxed;
+}
+
+.prose .wp-block-heading {
+  @apply font-bold text-foreground mt-8 mb-4;
+}
+
+.prose h2.wp-block-heading {
+  @apply text-3xl mt-12 mb-6;
+}
+
+.prose h3.wp-block-heading {
+  @apply text-2xl mt-8 mb-4;
+}
+
+.prose .wp-block-list,
+.prose ul,
+.prose ol {
+  @apply my-6 space-y-2;
+}
+
+.prose ul {
+  @apply list-disc pl-6;
+}
+
+.prose ol {
+  @apply list-decimal pl-6;
+}
+
+.prose li {
+  @apply leading-relaxed;
+}
+
+.prose li strong {
+  @apply text-foreground font-semibold;
+}
+
+.prose a {
+  @apply text-primary no-underline hover:underline transition-colors;
+}
+
+.prose strong {
+  @apply text-foreground font-semibold;
+}
+
+.prose img {
+  @apply rounded-lg my-8 shadow-lg;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-primary pl-4 italic my-6 text-muted-foreground;
+}
+
+.prose code {
+  @apply bg-muted text-primary px-2 py-1 rounded text-sm font-mono;
+}
+
+.prose pre {
+  @apply bg-muted border border-border rounded-lg p-4 overflow-x-auto my-6;
+}
+
+.prose pre code {
+  @apply bg-transparent p-0;
+}
+
+.prose p:empty {
+  @apply hidden;
+}
+
+/* Dark mode prose */
+.dark .prose {
+  @apply text-foreground;
+}
+
+.dark .prose a {
+  @apply text-primary;
+}
+
+.dark .prose strong {
+  @apply text-foreground;
+}
+
+.dark .prose code {
+  @apply bg-muted text-primary;
+}
+
+.dark .prose pre {
+  @apply bg-muted border-border;
+}
+
+.dark .prose blockquote {
+  @apply text-muted-foreground border-primary;
+}
+
+.dark .prose h1,
+.dark .prose h2,
+.dark .prose h3,
+.dark .prose h4,
+.dark .prose h5,
+.dark .prose h6 {
+  @apply text-foreground;
+}
+
+/* ============================================
+   RESPONSIVE TYPOGRAPHY
+   ============================================ */
+@media (max-width: 640px) {
+  .prose {
+    @apply text-base;
+  }
+  .prose h2 {
+    @apply text-2xl;
+  }
+  .prose h3 {
+    @apply text-xl;
+  }
+}
+
+/* ============================================
+   CART WIDGET
+   ============================================ */
+:root {
+  --cart-widget-height: 0px;
+  --header-height: 64px;
+}
+
+body.cart-widget-visible {
+  --cart-widget-height: 52px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --header-height: 56px;
+  }
+  body.cart-widget-visible {
+    --cart-widget-height: 48px;
+  }
+}
+
+/* ============================================
+   UTILITY ANIMATIONS
+   ============================================ */
+@keyframes slideDown {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-slide-down {
+  animation: slideDown 0.2s ease-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}

@@ -1,0 +1,41 @@
+---
+// frontend/src/pages/[...slug].astro
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { getLegalPage } from '@/lib/api';
+
+const slug = Astro.params.slug;
+
+// Only handle known legal/info page slugs
+const LEGAL_SLUGS = new Set([
+  'kontakt',
+  'formy-platnosci',
+  'koszty-i-czas-wysylki',
+  'odstapienie-od-umowy',
+  'regulamin-sklepu',
+  'warunki-zwrotu',
+  'polityka-prywatnosci',
+  'przetwarzanie-danych-osobowych',
+  'skup-silnikow',
+  'o-nas',
+]);
+
+if (!slug || slug.includes('/') || !LEGAL_SLUGS.has(slug)) {
+  return new Response(null, { status: 404, statusText: 'Not Found' });
+}
+
+const page = await getLegalPage(slug);
+
+if (!page) {
+  return new Response(null, { status: 404, statusText: 'Not Found' });
+}
+---
+
+<BaseLayout
+  title={`${page.title} | Silniki Elektryczne`}
+  description={page.title}
+>
+  <div class="container mx-auto px-4 py-12 max-w-4xl">
+    <h1 class="text-3xl font-bold mb-8 text-foreground">{page.title}</h1>
+    <div class="prose dark:prose-invert max-w-none" set:html={page.content} />
+  </div>
+</BaseLayout>

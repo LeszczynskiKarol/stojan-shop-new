@@ -1,0 +1,113 @@
+---
+// frontend/src/pages/blog/index.astro
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { getBlogPosts } from '@/lib/api';
+
+const posts = await getBlogPosts(1) || [];
+
+function stripHtml(html: string | null | undefined): string {
+  if (!html) return '';
+  return html
+    .replace(/<[^>]+>/g, '')
+    .replace(/&oacute;/g, 'ó').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—')
+    .replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&[a-z]+;/gi, '')
+    .replace(/&#\d+;/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function excerpt(post: any): string {
+  if (post.excerpt) return stripHtml(post.excerpt).slice(0, 200);
+  return stripHtml(post.content).slice(0, 200) + '…';
+}
+
+function formatDate(d: string): string {
+  return new Date(d).toLocaleDateString('pl-PL', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+// Extract first image from content as fallback
+function extractImage(content: string): string | null {
+  const match = content?.match(/<img[^>]+src=["']([^"']+)["']/);
+  return match?.[1] || null;
+}
+
+const title = 'Blog - silniki elektryczne, poradniki, aktualności | Stojan Shop';
+const description = 'Artykuły o silnikach elektrycznych — poradniki, historia, konserwacja, budowa i dobór napędów. Wiedza od ekspertów Stojan.';
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Blog",
+  "name": "Blog Stojan - Silniki Elektryczne",
+  "description": description,
+  "url": "https://www.silniki-elektryczne.com.pl/blog",
+  "publisher": {
+    "@type": "Organization",
+    "name": "Stojan S.C.",
+    "url": "https://www.silniki-elektryczne.com.pl"
+  }
+};
+---
+
+<BaseLayout title={title} description={description} canonical="/blog" jsonLd={jsonLd}>
+
+  <div class="container mx-auto px-4 py-8 max-w-5xl">
+    <nav class="text-sm text-muted-foreground mb-6" aria-label="Ścieżka nawigacji">
+      <a href="/" class="hover:text-primary transition-colors">Strona główna</a>
+      <span class="mx-2">›</span>
+      <span class="text-foreground">Blog</span>
+    </nav>
+
+    <h1 class="text-3xl md:text-4xl font-bold mb-3 text-foreground">Blog</h1>
+    <p class="text-muted-foreground mb-10 max-w-2xl">
+      Artykuły o silnikach elektrycznych — poradniki, historia, konserwacja i dobór napędów
+    </p>
+
+    {posts.length > 0 ? (
+      <div class="grid gap-6">
+        {posts.map((post: any) => {
+          const image = post.featuredImage || extractImage(post.content);
+          return (
+            <a
+              href={`/blog/${post.slug}`}
+              class="group flex flex-col sm:flex-row gap-5 bg-card border border-border rounded-xl overflow-hidden hover:border-primary/30 hover:shadow-lg transition-all duration-200"
+            >
+              {image && (
+  <div class="sm:w-48 shrink-0 overflow-hidden bg-accent max-h-44 sm:max-h-none">
+    <img
+      src={image}
+      alt={post.title}
+      class="w-full h-44 sm:h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+      loading="lazy"
+    />
+  </div>
+)}
+              <div class="flex flex-col justify-center p-5 sm:py-5 sm:pr-6 sm:pl-0">
+                <time class="text-xs text-muted-foreground mb-2" datetime={post.createdAt}>
+                  {formatDate(post.createdAt)}
+                </time>
+                <h2 class="text-lg font-bold text-foreground group-hover:text-primary transition-colors mb-2 leading-snug">
+                  {post.title}
+                </h2>
+                <p class="text-sm text-muted-foreground line-clamp-2">
+                  {excerpt(post)}
+                </p>
+                {post.tags && post.tags.length > 0 && (
+                  <div class="flex flex-wrap gap-1.5 mt-3">
+                    {post.tags.slice(0, 3).map((tag: string) => (
+                      <span class="px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary font-medium">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    ) : (
+      <div class="text-center py-16 text-muted-foreground">
+        <p class="text-lg">Brak wpisów na blogu</p>
+      </div>
+    )}
+  </div>
+
+</BaseLayout>

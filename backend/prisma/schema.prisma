@@ -1,0 +1,375 @@
+// Stojan Shop - Prisma Schema
+// Migracja z TypeORM entities
+
+generator client {
+provider = "prisma-client-js"
+}
+
+datasource db {
+provider = "postgresql"
+url      = env("DATABASE_URL")
+}
+
+// ============================================
+// PRODUCTS & CATALOG
+// ============================================
+
+model Product {
+id                String   @id @default(uuid())
+name              String
+manufacturer      String
+manufacturerId    String?  @map("manufacturer_id")
+manufacturerRel   Manufacturer? @relation(fields: [manufacturerId], references: [id])
+price             Decimal  @db.Decimal(10, 2)
+
+// Parametry techniczne
+power             Json     // { value: string, range: string }
+rpm               Json     // { value: string, range: string }
+condition         ProductCondition
+shaftDiameter     Decimal  @db.Decimal
+sleeveDiameter    Decimal? @db.Decimal
+flangeSize        Decimal? @db.Decimal
+flangeBoltCircle  Decimal? @db.Decimal
+mechanicalSize    Int
+weight            Decimal? @db.Decimal
+legSpacing        String?
+
+// Flagi
+hasEx             Boolean  @default(false)
+hasBreak          Boolean  @default(false)
+hasForeignCooling Boolean  @default(false)
+
+// Rozruch
+startType         String?
+
+// Zdjęcia
+images            String[]
+mainImage         String?
+galleryImages     String[] @default([])
+
+// Stan magazynowy
+stock             Int
+
+// Opisy
+description       String?  @db.Text
+technicalDetails  String?  @db.Text
+
+// Pliki
+dataSheets        String[] @default([])
+
+// Marketplace integrations
+marketplaces      Json     // Allegro, OLX, ownStore - cały JSON
+
+// Dodatkowe atrybuty
+attributes        Json?    // { weight, voltage, ... }
+customParameters  Json?    // [{ name, value }]
+
+// Matching
+matchedStoreProduct Json?  @map("matched_store_product")
+matchedOlxAdvert    Json?  @map("matched_olx_advert")
+
+// Statystyki
+viewCount         Int      @default(0)
+purchaseCount     Int      @default(0)
+
+// Relacje
+categories        ProductCategory[]
+
+createdAt         DateTime @default(now())
+updatedAt         DateTime @updatedAt
+
+@@map("products")
+}
+
+enum ProductCondition {
+nowy
+uzywany
+nieuzywany
+}
+
+model Category {
+id              String   @id @default(uuid())
+name            String
+slug            String
+description     String?
+order           Int      @default(0)
+image           String?
+
+// SEO metadata
+metadata        Json?    // { title, description, keywords }
+
+// Filtry produktów
+productFilters  Json?    // { powerRange, specificCategories, manufacturers }
+
+// Relacje - drzewo (materialized path)
+parentId        String?  @map("parent_id")
+parent          Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+children        Category[] @relation("CategoryTree")
+
+// Materialized path - ścieżka w drzewie
+mpath           String?  @default("")
+
+products        ProductCategory[]
+
+createdAt       DateTime @default(now())
+updatedAt       DateTime @updatedAt
+
+@@map("categories")
+}
+
+// Tabela pośrednia product <-> category (Many-to-Many)
+model ProductCategory {
+productId   String   @map("product_id")
+categoryId  String   @map("category_id")
+product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+@@id([productId, categoryId])
+@@map("product_categories")
+}
+
+model Manufacturer {
+id          String   @id @default(uuid())
+name        String
+slug        String
+description String?
+seo         Json?    // { title, description, keywords }
+images      String[] @default([])
+products    Product[]
+
+createdAt   DateTime @default(now())
+updatedAt   DateTime @updatedAt
+
+@@map("manufacturers")
+}
+
+// ============================================
+// ORDERS
+// ============================================
+
+model Order {
+id                String      @id @default(uuid())
+orderNumber       String?     @unique @map("order_number")
+items             Json        // [{ productId, quantity, name, price, image, ... }]
+shipping          Json        // { firstName, lastName, email, phone, street, ... }
+shippingDate      DateTime?   @map("shipping_date")
+
+subtotal          Decimal     @db.Decimal(10, 2)
+shippingCost      Decimal     @db.Decimal(10, 2) @map("shipping_cost")
+total             Decimal     @db.Decimal(10, 2)
+totalWeight       Decimal     @default(0) @db.Decimal(10, 2) @map("total_weight")
+
+status            OrderStatus @default(pending)
+paymentMethod     PaymentMethod @default(prepaid) @map("payment_method")
+paymentDetails    Json?       @map("payment_details")
+paymentIntentId   String?     @map("payment_intent_id")
+
+isStockReserved   Boolean     @default(false) @map("is_stock_reserved")
+stripeSessionId   String?     @map("stripe_session_id")
+invoiceUrls       Json        @default("[]") @map("invoice_urls")
+
+// Anulowanie
+cancellationReason String?    @db.Text @map("cancellation_reason")
+cancelledAt       DateTime?   @map("cancelled_at")
+cancelledBy       String?     @map("cancelled_by")
+
+expiresAt         DateTime?   @map("expires_at")
+createdAt         DateTime    @default(now())
+updatedAt         DateTime    @updatedAt
+
+@@index([stripeSessionId])
+@@map("orders")
+}
+
+enum OrderStatus {
+pending
+paid
+shipped
+delivered
+cancelled
+}
+
+enum PaymentMethod {
+prepaid
+cod
+}
+
+// ============================================
+// CMS / CONTENT
+// ============================================
+
+model BlogPost {
+id            String   @id @default(uuid())
+title         String
+slug          String   @unique
+content       String   @db.Text
+excerpt       String   @db.Text
+author        String
+tags          String[] @default([])
+featuredImage String?  @db.Text @map("featured_image")
+
+createdAt     DateTime @default(now())
+updatedAt     DateTime @updatedAt
+
+@@map("blog_posts")
+}
+
+model Page {
+id               String   @id @default(uuid())
+title            String
+slug             String   @unique
+seo              Json     // { title, description, keywords }
+content          String   @db.Text
+type             PageType
+filters          Json?
+isActive         Boolean  @default(true) @map("is_active")
+
+// Pola zależne od typu
+categoryId       String?  @map("category_id")
+manufacturerName String?  @map("manufacturer_name")
+powerValue       Float?   @map("power_value")
+
+createdAt        DateTime @default(now())
+updatedAt        DateTime @updatedAt
+
+@@map("pages")
+}
+
+enum PageType {
+category
+manufacturer
+power
+legal
+}
+
+// LegalPage - jeśli masz osobną tabelę
+model LegalPage {
+id        String   @id @default(uuid())
+title     String
+slug      String   @unique
+content   String   @db.Text
+isActive  Boolean  @default(true) @map("is_active")
+
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+
+@@map("legal_pages")
+}
+
+// ============================================
+// USERS & AUTH
+// ============================================
+
+model User {
+id                   String    @id @default(uuid())
+email                String    @unique
+name                 String
+password             String
+role                 UserRole  @default(employee)
+isActive             Boolean   @default(true) @map("is_active")
+receiveEmails        Boolean   @default(true) @map("receive_emails")
+
+// 2FA
+twoFactorSecret      String?   @map("two_factor_secret")
+isTwoFactorEnabled   Boolean   @default(false) @map("is_two_factor_enabled")
+twoFactorTempSecret  String?   @map("two_factor_temp_secret")
+
+// Consent
+consentSettings      Json?     @map("consent_settings")
+
+lastLoginAt          DateTime? @map("last_login_at")
+
+// Relacje
+tasks                Task[]    @relation("TaskAssignee")
+taskComments         TaskComment[]
+
+createdAt            DateTime  @default(now())
+updatedAt            DateTime  @updatedAt
+
+@@map("users")
+}
+
+enum UserRole {
+admin
+manager
+employee
+}
+
+// ============================================
+// TASKS (wewnętrzny system zadań)
+// ============================================
+
+model Task {
+id           String      @id @default(uuid())
+title        String
+description  String?     @db.Text
+status       TaskStatus  @default(todo)
+priority     TaskPriority @default(medium)
+
+assignedToId String?     @map("assigned_to_id")
+assignedTo   User?       @relation("TaskAssignee", fields: [assignedToId], references: [id])
+
+dueDate      DateTime?   @map("due_date")
+comments     TaskComment[]
+
+createdAt    DateTime    @default(now())
+updatedAt    DateTime    @updatedAt
+
+@@map("tasks")
+}
+
+enum TaskStatus {
+todo
+in_progress
+done
+cancelled
+}
+
+enum TaskPriority {
+low
+medium
+high
+urgent
+}
+
+model TaskComment {
+id        String   @id @default(uuid())
+content   String   @db.Text
+taskId    String   @map("task_id")
+task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+authorId  String   @map("author_id")
+author    User     @relation(fields: [authorId], references: [id])
+
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+
+@@map("task_comments")
+}
+
+// ============================================
+// ALLEGRO / OLX TOKENS
+// ============================================
+
+model AllegroToken {
+id           String   @id @default(uuid())
+accessToken  String   @db.Text @map("access_token")
+refreshToken String   @db.Text @map("refresh_token")
+expiresAt    DateTime @map("expires_at")
+
+createdAt    DateTime @default(now())
+updatedAt    DateTime @updatedAt
+
+@@map("allegro_tokens")
+}
+
+model OlxToken {
+id           String   @id @default(uuid())
+accessToken  String   @db.Text @map("access_token")
+refreshToken String   @db.Text @map("refresh_token")
+expiresAt    DateTime @map("expires_at")
+
+createdAt    DateTime @default(now())
+updatedAt    DateTime @updatedAt
+
+@@map("olx_tokens")
+}

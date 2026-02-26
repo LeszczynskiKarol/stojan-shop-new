@@ -1,0 +1,115 @@
+---
+// frontend/src/components/shop/ProductCard.astro
+interface Props {
+  product: any;
+}
+
+const { product } = Astro.props;
+
+// Skip out-of-stock products
+if (product.stock <= 0) return null;
+
+const mp = product.marketplaces as any;
+const slug = mp?.ownStore?.slug || '';
+const categorySlug = product.categories?.[0]?.category?.slug || product.categories?.[0]?.slug || 'trojfazowe';
+const href = `/${categorySlug}/${slug}`;
+const rawPower = typeof product.power === 'object' ? product.power?.value : product.power;
+const rpm = typeof product.rpm === 'object' ? product.rpm?.value : product.rpm;
+const image = product.mainImage || product.images?.[0] || null;
+const price = Number(product.price);
+
+// First letter of first word uppercase, rest lowercase
+function formatName(name: string): string {
+  if (!name) return '';
+  const lower = name.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+// Hide ",00" when price is a whole number
+function formatPrice(p: number): string {
+  if (p % 1 === 0) {
+    return p.toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+  return p.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Remove duplicate unit from power value, e.g. "4 kW kW" → "4 kW", "5,5kW" → "5,5"
+function cleanPower(val: string | undefined | null): string | null {
+  if (!val || val === '0') return null;
+  // Strip all occurrences of "kW" (case-insensitive) and extra spaces
+  const stripped = val.replace(/\s*kw\s*/gi, ' ').trim();
+  return stripped || null;
+}
+
+const power = cleanPower(rawPower);
+const displayName = formatName(product.name);
+const displayPrice = formatPrice(price);
+
+const COND_LABELS: Record<string, string> = { nowy: 'Nowy', uzywany: 'Używany', nieuzywany: 'Nieużywany' };
+const COND_COLORS: Record<string, { bg: string; text: string }> = {
+  nowy: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
+  uzywany: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-400' },
+  nieuzywany: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400' },
+};
+const condition = COND_LABELS[product.condition] || product.condition;
+const cc = COND_COLORS[product.condition] || COND_COLORS.nowy;
+---
+
+<a
+  href={href}
+  class="group block bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all duration-200"
+  itemscope
+  itemtype="https://schema.org/Product"
+>
+  <meta itemprop="name" content={product.name} />
+  <meta itemprop="brand" content={product.manufacturer} />
+  <div itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+    <meta itemprop="priceCurrency" content="PLN" />
+    <meta itemprop="price" content={String(price)} />
+    <meta itemprop="availability" content="https://schema.org/InStock" />
+    <meta itemprop="itemCondition" content={product.condition === 'nowy' ? 'https://schema.org/NewCondition' : 'https://schema.org/UsedCondition'} />
+  </div>
+
+  <div class="aspect-square overflow-hidden bg-accent relative">
+    {image ? (
+      <img
+        src={image}
+        alt={product.name}
+        class="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+        loading="lazy"
+        width="300"
+        height="300"
+        itemprop="image"
+      />
+    ) : (
+      <div class="w-full h-full flex items-center justify-center text-muted-foreground text-xs">Brak zdjęcia</div>
+    )}
+    <!-- Condition badge -->
+    <span class={`absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${cc.bg} ${cc.text}`}>
+      {condition}
+    </span>
+  </div>
+
+  <div class="p-3">
+    {product.manufacturer && product.manufacturer !== 'silnik' && (
+      <p class="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{product.manufacturer}</p>
+    )}
+    <h3 class="text-sm font-medium text-card-foreground line-clamp-2 mb-1.5 group-hover:text-primary transition-colors leading-snug">
+      {displayName}
+    </h3>
+
+    <div class="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+      {power && <span class="bg-accent px-1.5 py-0.5 rounded">{power} kW</span>}
+      {rpm && rpm !== '0' && <span class="bg-accent px-1.5 py-0.5 rounded">{rpm} obr</span>}
+    </div>
+
+    <div class="flex items-center justify-between">
+      <span class="text-lg font-bold text-primary">
+        {displayPrice} zł
+      </span>
+      <span class="text-[10px] text-green-600 dark:text-green-400 font-medium">
+        {product.stock} szt.
+      </span>
+    </div>
+  </div>
+</a>

@@ -1,0 +1,101 @@
+---
+// frontend/src/pages/szukaj.astro
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import CategoryProducts from '@/components/shop/CategoryProducts';
+import { getProducts } from '@/lib/api';
+
+const query = Astro.url.searchParams.get('q') || '';
+
+let products: any[] = [];
+let total = 0;
+
+if (query.trim().length > 0) {
+  const data = await getProducts(`search=${encodeURIComponent(query)}&limit=2000`);
+  if (data) {
+    products = data.products || [];
+    total = data.pagination?.total || 0;
+  }
+}
+
+const inStockCount = products.filter((p: any) => p.stock > 0).length;
+
+const title = query
+  ? `Wyniki wyszukiwania: "${query}" | Stojan Shop`
+  : 'Wyszukiwarka silników elektrycznych | Stojan Shop';
+const description = query
+  ? `Wyniki wyszukiwania "${query}" - ${inStockCount} silników elektrycznych dostępnych w sklepie Stojan.`
+  : 'Wyszukaj silnik elektryczny w sklepie Stojan.';
+---
+
+<BaseLayout title={title} description={description} canonical={`/szukaj${query ? `?q=${encodeURIComponent(query)}` : ''}`} noIndex={true}>
+  <div class="container mx-auto px-4 py-8">
+    <nav class="text-sm text-muted-foreground mb-6">
+      <a href="/" class="hover:text-primary transition-colors">Strona główna</a>
+      <span class="mx-2">›</span>
+      <span class="text-foreground">Wyniki wyszukiwania</span>
+    </nav>
+
+    <h1 class="text-2xl md:text-3xl font-bold mb-2 text-foreground">
+      {query ? (
+        <>Wyniki wyszukiwania: <span class="text-primary">„{query}"</span></>
+      ) : (
+        'Wyszukiwarka'
+      )}
+    </h1>
+
+    {query && inStockCount > 0 ? (
+      <CategoryProducts
+        client:load
+        showCategoryFilter={true}
+        products={products.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          manufacturer: p.manufacturer,
+          price: Number(p.price),
+          power: p.power,
+          rpm: p.rpm,
+          condition: p.condition,
+          stock: p.stock,
+          mainImage: p.mainImage,
+          images: p.images || [],
+          shaftDiameter: Number(p.shaftDiameter || 0),
+          mechanicalSize: p.mechanicalSize,
+          weight: p.weight ? Number(p.weight) : null,
+          marketplaces: p.marketplaces,
+          categories: p.categories?.map((pc: any) => ({
+            id: pc.category?.id || pc.id,
+            name: pc.category?.name || pc.name,
+            slug: pc.category?.slug || pc.slug,
+          })) || [],
+          customParameters: p.customParameters || [],
+          technicalDetails: p.technicalDetails || '',
+          }))}
+        }))}
+        categoryName={`Wyniki: „${query}"`}
+      />
+    ) : query ? (
+      <div class="text-center py-16">
+        <div class="text-6xl mb-4">🔍</div>
+        <p class="text-lg text-muted-foreground mb-2">
+          Nie znaleziono dostępnych produktów dla „{query}"
+        </p>
+        <p class="text-sm text-muted-foreground mb-6">
+          Spróbuj innej frazy lub skorzystaj z kategorii
+        </p>
+        <div class="flex flex-wrap justify-center gap-3">
+          <a href="/trojfazowe" class="px-4 py-2 bg-accent text-accent-foreground rounded-lg hover:bg-primary hover:text-primary-foreground text-sm font-medium transition-colors">Trójfazowe</a>
+          <a href="/jednofazowe" class="px-4 py-2 bg-accent text-accent-foreground rounded-lg hover:bg-primary hover:text-primary-foreground text-sm font-medium transition-colors">Jednofazowe</a>
+          <a href="/z-hamulcem" class="px-4 py-2 bg-accent text-accent-foreground rounded-lg hover:bg-primary hover:text-primary-foreground text-sm font-medium transition-colors">Z hamulcem</a>
+          <a href="/motoreduktory" class="px-4 py-2 bg-accent text-accent-foreground rounded-lg hover:bg-primary hover:text-primary-foreground text-sm font-medium transition-colors">Motoreduktory</a>
+          <a href="/kontakt" class="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors">Kontakt — pomożemy!</a>
+        </div>
+      </div>
+    ) : (
+      <div class="text-center py-16">
+        <p class="text-lg text-muted-foreground">
+          Wpisz frazę w wyszukiwarce powyżej
+        </p>
+      </div>
+    )}
+  </div>
+</BaseLayout>

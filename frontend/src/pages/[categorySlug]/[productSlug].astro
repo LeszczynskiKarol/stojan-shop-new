@@ -1,0 +1,327 @@
+---
+// frontend/src/pages/[categorySlug]/[productSlug].astro
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { OrderButton } from '@/components/shop/OrderButton';
+import BackToList from '@/components/shop/BackToList';
+import RelatedProducts from '@/components/shop/RelatedProducts';
+import { getProduct } from '@/lib/api';
+import { ShippingHint } from '@/components/shop/ShippingHint';
+
+const { categorySlug, productSlug } = Astro.params;
+const data = await getProduct(categorySlug!, productSlug!);
+
+if (!data?.product) return Astro.redirect('/404');
+
+const product = data.product;
+const related = (data.related || []).filter((r: any) => r.stock > 0);
+const mp = product.marketplaces as any;
+const seo = mp?.ownStore?.seo || {};
+const categoryName = product.categories?.[0]?.category?.name || product.categories?.[0]?.name || '';
+const power = typeof product.power === 'object' ? product.power.value : product.power;
+const rpm = typeof product.rpm === 'object' ? product.rpm.value : product.rpm;
+
+const price = mp?.ownStore?.price ?? product.price ?? 0;
+const priceNum = Number(price);
+const priceNetto = (priceNum / 1.23).toFixed(2);
+const fmtPrice = (v: number) => v.toLocaleString('pl-PL', { minimumFractionDigits: v % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 });
+
+const COND_LABELS: Record<string, string> = { nowy: 'Nowy', uzywany: 'Używany', nieuzywany: 'Nieużywany' };
+const COND_TOOLTIPS: Record<string, string> = {
+  nowy: 'Produkt fabrycznie nowy, prosto od producenta. Nigdy nie użytkowany, w oryginalnym opakowaniu, objęty 24-miesięczną gwarancją.',
+  uzywany: 'Produkt po profesjonalnym remoncie, kompleksowo sprawdzony i przetestowany. Gotowy do natychmiastowego użycia, objęty 1-miesięczną gwarancją rozruchową.',
+  nieuzywany: 'Produkt fabrycznie nowy, który nie był używany, ale był przechowywany w magazynie. Może nosić minimalne ślady składowania, zachowuje pełną sprawność techniczną i 12-miesięczną gwarancję.',
+};
+const condition = COND_LABELS[product.condition] || product.condition;
+const conditionTooltip = COND_TOOLTIPS[product.condition] || '';
+const conditionColor = product.condition === 'nowy'
+  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+  : product.condition === 'uzywany'
+    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400';
+
+const title = seo.title || `${product.name} | Stojan Shop`;
+const description = seo.description
+  || `${product.name} - silnik elektryczny ${power} kW ${rpm} obr. ${product.manufacturer}. Stan: ${condition}. Cena: ${fmtPrice(priceNum)} zł brutto.`;
+
+const SITE_URL = 'https://www.silniki-elektryczne.com.pl';
+const productUrl = `${SITE_URL}/${categorySlug}/${productSlug}`;
+const mainImage = product.mainImage || product.images?.[0] || '/logo_dark.png';
+const allImages = [mainImage, ...(product.galleryImages || [])].filter((img: string, i: number, arr: string[]) => img && arr.indexOf(img) === i);
+
+// Specs
+const specs: [string, string][] = [];
+if (power && power !== '0') specs.push(['Moc', `${String(power).replace(/\s*kW/i, '').trim()} kW`]);
+if (rpm && rpm !== '0') specs.push(['Obroty', `${String(rpm).replace(/\s*obr.*/i, '').trim()} obr/min`]);
+specs.push(['Stan', condition]);
+if (product.mechanicalSize) specs.push(['Wielkość mechaniczna', String(product.mechanicalSize)]);
+if (product.shaftDiameter) specs.push(['Średnica wału', `${product.shaftDiameter} mm`]);
+if (product.sleeveDiameter) specs.push(['Średnica tulei', `${product.sleeveDiameter} mm`]);
+if (product.flangeSize) specs.push(['Średnica kołnierza', `${product.flangeSize} mm`]);
+if (product.flangeBoltCircle) specs.push(['Śr. podziałowa otworów', `${product.flangeBoltCircle} mm`]);
+if (product.weight) specs.push(['Waga', `${String(product.weight).replace('.', ',')} kg`]);
+if (product.legSpacing) specs.push(['Rozstaw łap', product.legSpacing]);
+if (product.startType) specs.push(['Typ rozruchu', product.startType]);
+if (product.hasBreak) specs.push(['Hamulec', 'Tak']);
+if (product.hasForeignCooling) specs.push(['Obce chłodzenie', 'Tak']);
+if (product.hasEx) specs.push(['Wykonanie Ex', 'Tak']);
+if (product.manufacturer && !['silnik', 'stojan'].includes(product.manufacturer.toLowerCase())) specs.push(['Producent', product.manufacturer]);
+
+const customParams = product.customParameters || [];
+const dataSheets = product.dataSheets || [];
+
+// JSON-LD
+const productLd = {
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": product.name,
+  "description": description,
+  "image": allImages.map((img: string) => img.startsWith('http') ? img : `${SITE_URL}${img}`),
+  "brand": { "@type": "Brand", "name": product.manufacturer },
+  "sku": product.id,
+  "mpn": product.name.replace(/\s+/g, '-').substring(0, 50),
+  "offers": {
+    "@type": "Offer",
+    "url": productUrl,
+    "priceCurrency": "PLN",
+    "price": priceNum,
+    "priceValidUntil": new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0],
+    "availability": product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+    "itemCondition": product.condition === 'nowy' ? "https://schema.org/NewCondition" : "https://schema.org/UsedCondition",
+    "seller": { "@type": "Organization", "name": "Stojan S.C." },
+    "shippingDetails": {
+      "@type": "OfferShippingDetails",
+      "shippingRate": { "@type": "MonetaryAmount", "value": "15", "currency": "PLN" },
+      "deliveryTime": { "@type": "ShippingDeliveryTime", "handlingTime": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 3, "unitCode": "DAY" }, "transitTime": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 2, "unitCode": "DAY" } },
+      "shippingDestination": { "@type": "DefinedRegion", "addressCountry": "PL" }
+    }
+  },
+  "additionalProperty": specs.map(([name, value]) => ({ "@type": "PropertyValue", "name": name, "value": value }))
+};
+
+const breadcrumbLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Strona główna", "item": SITE_URL },
+    { "@type": "ListItem", "position": 2, "name": categoryName, "item": `${SITE_URL}/${categorySlug}` },
+    { "@type": "ListItem", "position": 3, "name": product.name, "item": productUrl },
+  ]
+};
+---
+
+<BaseLayout title={title} description={description} canonical={`/${categorySlug}/${productSlug}`} ogImage={mainImage} ogType="product" jsonLd={productLd}>
+  <script type="application/ld+json" set:html={JSON.stringify(breadcrumbLd)} />
+
+  <div class="container mx-auto px-4 py-6 max-w-7xl">
+    <!-- Breadcrumb -->
+    <nav class="text-sm text-muted-foreground mb-3" aria-label="Ścieżka nawigacji">
+      <a href="/" class="hover:text-primary transition-colors">Strona główna</a>
+      <span class="mx-1.5">›</span>
+      <a href={`/${categorySlug}`} class="hover:text-primary transition-colors">{categoryName}</a>
+      <span class="mx-1.5">›</span>
+      <span class="text-foreground">{product.name}</span>
+    </nav>
+
+    <!-- BACK TO LIST — reads saved filter URL from sessionStorage -->
+    <BackToList client:load categorySlug={categorySlug!} categoryName={categoryName} />
+
+    <!-- MAIN GRID -->
+    <div class="grid lg:grid-cols-2 gap-8 lg:gap-12 mb-12">
+
+      <!-- LEFT: GALLERY -->
+      <div class="lg:sticky lg:top-20 lg:self-start">
+        <div id="mainImgWrap" class="bg-card rounded-xl border border-border overflow-hidden cursor-zoom-in relative group">
+          <img id="mainImg" src={mainImage} alt={product.name} class="w-full object-contain aspect-square p-4" width="600" height="600" loading="eager" />
+        </div>
+        {allImages.length > 1 && (
+          <div class="flex gap-2 mt-3 overflow-x-auto pb-1" id="thumbs">
+            {allImages.map((img: string, i: number) => (
+              <button class:list={['shrink-0 w-16 h-16 rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:border-primary/50', i === 0 ? 'border-primary ring-1 ring-primary/20' : 'border-border']} data-img={img} data-idx={i}>
+                {/* SEO: descriptive alt for gallery thumbnails — helps Google Images indexing */}
+                <img src={img} alt={`${product.name} - zdjęcie ${i + 1}`} class="w-full h-full object-contain p-1" loading="lazy" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <!-- RIGHT: INFO -->
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold mb-3 text-foreground leading-tight">{product.name}</h1>
+
+        <!-- Badges -->
+        <div class="flex flex-wrap items-center gap-2 mb-5">
+          <span class={`condition-badge inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold cursor-help relative ${conditionColor}`} data-tooltip={conditionTooltip}>
+            {condition}
+          </span>
+          {product.stock > 0 ? (
+            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">✓ Dostępne: {product.stock} szt.</span>
+          ) : (
+            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">✕ Niedostępny</span>
+          )}
+          {product.manufacturer && !['silnik', 'stojan'].includes(product.manufacturer.toLowerCase()) && (
+            <span class="text-sm text-muted-foreground">Producent: <strong class="text-foreground">{product.manufacturer}</strong></span>
+          )}
+        </div>
+
+        <!-- PRICE -->
+        <div class="bg-card border border-border rounded-xl p-5 mb-6">
+          <div class="flex items-baseline gap-3 mb-1">
+            <span class="text-3xl md:text-4xl font-extrabold text-primary">{fmtPrice(priceNum)} zł</span>
+            <span class="text-sm text-muted-foreground">brutto</span>
+          </div>
+          <div class="text-sm text-muted-foreground">{fmtPrice(Number(priceNetto))} zł netto</div>
+          <div class="mt-2">
+  <ShippingHint client:load productId={product.id} weight={product.weight} />
+</div>          
+{product.stock > 0 && (
+            <div class="mt-5 pt-5 border-t border-border">
+              <OrderButton product={product} categorySlug={categorySlug!} productSlug={productSlug!} client:load />
+            </div>
+          )}
+        </div>
+
+        <!-- SPECS -->
+        {specs.length > 0 && (
+          <div class="bg-card border border-border rounded-xl overflow-hidden mb-6">
+            <div class="px-5 py-3 border-b border-border bg-accent/30"><h2 class="font-semibold text-foreground text-sm uppercase tracking-wide">Parametry techniczne</h2></div>
+            <table class="w-full text-sm">
+              <tbody>
+                {specs.map(([label, value], i) => (
+                  <tr class={i % 2 === 0 ? 'bg-card' : 'bg-accent/20'}>
+                    <td class="px-5 py-2.5 text-muted-foreground w-1/2">{label}</td>
+                    <td class="px-5 py-2.5 font-medium text-foreground">{value}</td>
+                  </tr>
+                ))}
+                {customParams.map((p: any, i: number) => (
+                  <tr class={(specs.length + i) % 2 === 0 ? 'bg-card' : 'bg-accent/20'}>
+                    <td class="px-5 py-2.5 text-muted-foreground w-1/2">{p.name}</td>
+                    <td class="px-5 py-2.5 font-medium text-foreground">{p.value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <!-- DATA SHEETS -->
+        {dataSheets.length > 0 && (
+          <div class="mb-6">
+            <h2 class="font-semibold text-foreground text-sm uppercase tracking-wide mb-3">Dokumentacja</h2>
+            <div class="flex flex-wrap gap-2">
+              {dataSheets.map((url: string, i: number) => (
+                <a href={url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-4 py-2.5 bg-card border border-border rounded-lg text-sm font-medium text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  Karta katalogowa {dataSheets.length > 1 ? i + 1 : ''}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+
+<!-- DESCRIPTION -->
+    {product.description && String(product.description).replace(/<[^>]*>/g, '').trim().length >= 3 && (
+      <section class="mb-12">
+        <div class="bg-card border border-border rounded-xl overflow-hidden">
+          <div class="px-6 py-4 border-b border-border bg-accent/30"><h2 class="font-semibold text-foreground">Opis produktu</h2></div>
+          <div class="px-6 py-5 prose dark:prose-invert max-w-none text-sm leading-relaxed" id="desc-wrap">
+            <div id="desc-content" style="overflow:hidden;"><Fragment set:html={product.description} /></div>
+            <button id="desc-toggle" class="hidden mt-3 text-primary text-sm font-medium hover:underline cursor-pointer" style="background:none;border:none;padding:0;"></button>
+          </div>
+        </div>
+      </section>
+    )}
+
+    <!-- TECHNICAL DETAILS -->
+    {product.technicalDetails && String(product.technicalDetails).replace(/<[^>]*>/g, '').trim().length >= 3 && (
+      <section class="mb-12">
+        <div class="bg-card border border-border rounded-xl overflow-hidden">
+          <div class="px-6 py-4 border-b border-border bg-accent/30"><h2 class="font-semibold text-foreground">Szczegóły techniczne</h2></div>
+          <div class="px-6 py-5 prose dark:prose-invert max-w-none text-sm leading-relaxed"><Fragment set:html={product.technicalDetails} /></div>
+        </div>
+      </section>
+    )}
+
+<!-- RELATED -->
+    {related.length > 0 && (
+      <RelatedProducts client:load products={related} />
+    )}
+  </div>
+
+  <!-- FULLSCREEN MODAL -->
+  <div id="imgModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-8 cursor-zoom-out">
+    <button id="imgModalClose" class="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-xl transition-colors">✕</button>
+    <img id="imgModalImg" src="" alt="Podgląd" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
+  </div>
+
+  <style>
+    h1 { display: block; }
+    h1::first-letter { text-transform: uppercase; }
+    .condition-badge { position: relative; }
+    .condition-badge::after {
+      content: attr(data-tooltip);
+      position: absolute; top: calc(100% + 8px); left: 0; width: 280px;
+      padding: 10px 12px; background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+      border-radius: 8px; font-size: 12px; font-weight: 400; line-height: 1.5;
+      color: hsl(var(--muted-foreground)); box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      z-index: 20; opacity: 0; pointer-events: none; transition: opacity 0.15s; white-space: normal;
+    }
+    .condition-badge:hover::after { opacity: 1; }
+  </style>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const mainImg = document.getElementById('mainImg') as HTMLImageElement;
+      const thumbs = document.querySelectorAll('#thumbs button');
+      const modal = document.getElementById('imgModal');
+      const modalImg = document.getElementById('imgModalImg') as HTMLImageElement;
+
+      thumbs.forEach(thumb => {
+        thumb.addEventListener('click', () => {
+          thumbs.forEach(t => { t.classList.remove('border-primary', 'ring-1', 'ring-primary/20'); t.classList.add('border-border'); });
+          thumb.classList.remove('border-border');
+          thumb.classList.add('border-primary', 'ring-1', 'ring-primary/20');
+          if (mainImg) mainImg.src = (thumb as HTMLElement).dataset.img || '';
+        });
+      });
+
+      document.getElementById('mainImgWrap')?.addEventListener('click', () => {
+        if (mainImg && modal && modalImg) { modalImg.src = mainImg.src; modal.classList.remove('hidden'); modal.classList.add('flex'); }
+      });
+
+      const closeModal = () => { modal?.classList.add('hidden'); modal?.classList.remove('flex'); };
+      modal?.addEventListener('click', (e) => { if (e.target === modal || (e.target as Element).id === 'imgModalClose') closeModal(); });
+      document.getElementById('imgModalClose')?.addEventListener('click', closeModal);
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeModal();
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          const active = document.querySelector('#thumbs button.border-primary') as HTMLElement;
+          if (!active) return;
+          const idx = parseInt(active.dataset.idx || '0');
+          const next = e.key === 'ArrowRight' ? idx + 1 : idx - 1;
+          const target = document.querySelector(`#thumbs button[data-idx="${next}"]`) as HTMLElement;
+          if (target) target.click();
+        }
+      });
+      // Expandable description
+      const descContent = document.getElementById('desc-content');
+      const descToggle = document.getElementById('desc-toggle');
+      if (descContent && descToggle) {
+        const fullText = descContent.textContent || '';
+        if (fullText.length > 500) {
+          descContent.style.maxHeight = '120px';
+          descToggle.textContent = 'Pokaż więcej ↓';
+          descToggle.classList.remove('hidden');
+          let expanded = false;
+          descToggle.addEventListener('click', function() {
+            expanded = !expanded;
+            descContent.style.maxHeight = expanded ? 'none' : '120px';
+            descToggle.textContent = expanded ? 'Pokaż mniej ↑' : 'Pokaż więcej ↓';
+          });
+        }
+      }
+    });
+  </script>
+</BaseLayout>

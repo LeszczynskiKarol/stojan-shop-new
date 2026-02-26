@@ -1,0 +1,201 @@
+---
+// frontend/src/pages/admin/login.astro
+// Standalone login page - no AdminLayout (user is not authenticated yet)
+---
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Logowanie | Admin Panel</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --bg-card: #1a1d27;
+      --border: #2d3348;
+      --text: #e4e6ef;
+      --text-muted: #8b8fa3;
+      --primary: #6366f1;
+      --primary-hover: #818cf8;
+      --danger: #ef4444;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .login-logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .login-logo h1 {
+      font-size: 24px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .login-logo p {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-top: 4px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+    .btn-login {
+      width: 100%;
+      padding: 12px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-login:hover { background: var(--primary-hover); }
+    .btn-login:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .error-msg {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: var(--danger);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .error-msg.visible { display: block; }
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid transparent;
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-logo">
+      <h1>⚡ Stojan Admin</h1>
+      <p>Panel zarządzania sklepem</p>
+    </div>
+
+    <div id="error" class="error-msg"></div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="username">Login</label>
+        <input type="text" id="username" name="username" autocomplete="username" required autofocus />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Hasło</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required />
+      </div>
+
+      <button type="submit" class="btn-login" id="submitBtn">
+        Zaloguj się
+      </button>
+    </form>
+  </div>
+
+  <script define:vars={{ API_URL: import.meta.env.PUBLIC_API_URL || 'http://localhost:4000' }}>
+    const form = document.getElementById('loginForm');
+    const errorEl = document.getElementById('error');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // Check if already logged in
+    fetch(`${API_URL}/api/admin/auth/verify`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) window.location.href = '/admin/products';
+      })
+      .catch(() => {});
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.classList.remove('visible');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner"></span> Logowanie...';
+
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      try {
+        const res = await fetch(`${API_URL}/api/admin/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', // IMPORTANT: sends/receives cookies
+          body: JSON.stringify({ username, password }),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          window.location.href = '/admin/products';
+        } else {
+          errorEl.textContent = data.error || 'Błąd logowania';
+          errorEl.classList.add('visible');
+        }
+      } catch (err) {
+        errorEl.textContent = 'Błąd połączenia z serwerem';
+        errorEl.classList.add('visible');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Zaloguj się';
+      }
+    });
+  </script>
+</body>
+</html>

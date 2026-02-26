@@ -1,0 +1,252 @@
+---
+// frontend/src/pages/[categorySlug]/index.astro
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import CategoryProducts from '@/components/shop/CategoryProducts';
+import ExpandableDescription from '@/components/shop/ExpandableDescription';
+import { getCategory, getProducts, getProductsByPower, getLegalPage } from '@/lib/api';
+
+const { categorySlug } = Astro.params;
+
+// Guard: don't handle static file requests
+if (categorySlug?.includes('.')) return new Response(null, { status: 404 });
+
+const powerMatch = categorySlug?.match(
+  /^silniki-elektryczne-([\d-]+)-kw(?:-([\d]+)-obr)?$/
+);
+
+let isPowerPage = false;
+let isLegalPage = false;
+let legalPage: any = null;
+let powerRaw = '';
+let rpmStr: string | null = null;
+let powerFormatted = '';
+let powerProducts: any[] = [];
+let category: any = null;
+let categoryProducts: any[] = [];
+
+const SITE_URL = 'https://www.silniki-elektryczne.com.pl';
+
+if (powerMatch) {
+  isPowerPage = true;
+  powerRaw = powerMatch[1].replace(/-/g, '.');
+  // Handle sub-1kW slugs: "037" → "0.37", "075" → "0.75", "009" → "0.09"
+  if (/^0\d{2}$/.test(powerRaw)) {
+    powerRaw = powerRaw[0] + '.' + powerRaw.slice(1);
+  }
+  const power = parseFloat(powerRaw);
+  rpmStr = powerMatch[2] || null;
+  powerFormatted = powerRaw.replace('.', ',');
+  if (isNaN(power)) return Astro.redirect('/404');
+  const data = await getProductsByPower(powerRaw, rpmStr || undefined);
+  powerProducts = (data?.products || []).filter((p: any) => p.stock > 0);
+} else {
+  const [cat, productsData] = await Promise.all([
+    getCategory(categorySlug!),
+    getProducts(`category=${categorySlug}&limit=2000`),
+  ]);
+  if (!cat) {
+    // Fallback: try legal/info page from DB
+    legalPage = await getLegalPage(categorySlug!);
+    if (!legalPage) return Astro.redirect('/404');
+    isLegalPage = true;
+  } else {
+    category = cat;
+    categoryProducts = productsData?.products || [];
+  }
+}
+
+// SEO: Detect filtered pages (query params) → noindex to prevent duplicate content
+const FILTER_PARAMS = ['q', 'cat', 'mfr', 'cond', 'kw', 'kwmin', 'kwmax', 'rpm', 'rpmr', 'obrmin', 'obrmax', 'pmin', 'pmax', 'sort', 'page'];
+const urlSearchParams = Astro.url.searchParams;
+const hasFilterParams = FILTER_PARAMS.some(param => urlSearchParams.has(param));
+
+// Strip HTML for meta description
+function stripHtml(html: string | null | undefined): string {
+  if (!html) return '';
+  let text = html.replace(/<[^>]+>/g, '')
+    .replace(/&oacute;/g, 'ó').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—')
+    .replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&[a-z]+;/gi, '')
+    .replace(/&#\d+;/g, '').replace(/\s+/g, ' ').trim();
+  if (text.length > 160) text = text.slice(0, 160).replace(/\s+\S*$/, '') + '…';
+  return text;
+}
+
+// ── Legal page render ──
+if (isLegalPage && legalPage) {
+  const legalTitle = `${legalPage.title} | Silniki Elektryczne`;
+  const legalDescription = stripHtml(legalPage.content).slice(0, 160) || legalPage.title;
+  // Early return with legal page layout
+}
+
+const inStockCount = isPowerPage
+  ? powerProducts.length
+  : categoryProducts.filter((p: any) => p.stock > 0).length;
+
+const title = isPowerPage
+  ? (rpmStr
+    ? `Silniki elektryczne ${powerFormatted} kW ${rpmStr} - sklep, hurtownia, oferta, ceny, sprzedaż`
+    : `Silniki elektryczne ${powerFormatted} kW - sklep, hurtownia, oferta, ceny, sprzedaż`)
+  : (category?.metadata?.title || `${category?.name} - sklep, hurtownia, oferta, ceny, sprzedaż`);
+
+const description = isPowerPage
+  ? (rpmStr
+    ? `Silniki elektryczne o mocy ${powerFormatted} kW i prędkości ${rpmStr} obr/min. ${powerProducts.length} produktów w magazynie.`
+    : `Silniki elektryczne o mocy ${powerFormatted} kW. ${powerProducts.length} napędów różnych producentów w atrakcyjnych cenach.`)
+  : (category?.metadata?.description || stripHtml(category?.description) || `${category?.name} - ${inStockCount} produktów dostępnych od ręki w sklepie Stojan.`);
+
+const canonical = isPowerPage
+  ? (rpmStr ? `/silniki-elektryczne-${powerMatch![1]}-kw-${rpmStr}-obr` : `/silniki-elektryczne-${powerMatch![1]}-kw`)
+  : `/${categorySlug}`;
+
+const breadcrumbLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": isPowerPage
+    ? [
+        { "@type": "ListItem", "position": 1, "name": "Strona główna", "item": SITE_URL },
+        { "@type": "ListItem", "position": 2, "name": `Silniki ${powerFormatted} kW`, "item": `${SITE_URL}/silniki-elektryczne-${powerMatch![1]}-kw` },
+        ...(rpmStr ? [{ "@type": "ListItem", "position": 3, "name": `${rpmStr} obr/min`, "item": `${SITE_URL}${canonical}` }] : []),
+      ]
+    : [
+        { "@type": "ListItem", "position": 1, "name": "Strona główna", "item": SITE_URL },
+        { "@type": "ListItem", "position": 2, "name": category?.name, "item": `${SITE_URL}/${categorySlug}` },
+      ]
+};
+
+const inStockItems = isPowerPage ? powerProducts : categoryProducts.filter((p: any) => p.stock > 0);
+const collectionLd = {
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": isPowerPage ? `Silniki elektryczne ${powerFormatted} kW${rpmStr ? ` ${rpmStr} obr/min` : ''}` : category?.name,
+  "description": description,
+  "url": `${SITE_URL}${canonical}`,
+  "numberOfItems": inStockCount,
+  "mainEntity": {
+    "@type": "ItemList",
+    "numberOfItems": inStockCount,
+    "itemListElement": inStockItems.slice(0, 30).map((p: any, i: number) => ({
+      "@type": "ListItem",
+      "position": i + 1,
+      "item": {
+        "@type": "Product",
+        "name": p.name,
+        "url": `${SITE_URL}/${p.categories?.[0]?.category?.slug || p.categories?.[0]?.slug || categorySlug}/${p.marketplaces?.ownStore?.slug || ''}`,
+        "image": p.mainImage || p.images?.[0],
+        "brand": { "@type": "Brand", "name": p.manufacturer },
+        "offers": {
+          "@type": "Offer",
+          "priceCurrency": "PLN",
+          "price": Number(p.price),
+          "availability": "https://schema.org/InStock",
+          "itemCondition": p.condition === 'nowy' ? "https://schema.org/NewCondition" : "https://schema.org/UsedCondition",
+        }
+      }
+    }))
+  }
+};
+
+// Helper: map product for CategoryProducts component
+function mapProductForFilter(p: any) {
+  return {
+    id: p.id,
+    name: p.name,
+    manufacturer: p.manufacturer,
+    price: Number(p.price),
+    power: p.power,
+    rpm: p.rpm,
+    condition: p.condition,
+    stock: p.stock,
+    mainImage: p.mainImage,
+    images: p.images || [],
+    shaftDiameter: Number(p.shaftDiameter || 0),
+    mechanicalSize: p.mechanicalSize,
+    weight: p.weight ? Number(p.weight) : null,
+    marketplaces: p.marketplaces,
+    categories: p.categories?.map((pc: any) => ({
+      id: pc.category?.id || pc.id,
+      name: pc.category?.name || pc.name,
+      slug: pc.category?.slug || pc.slug,
+    })) || [],
+    customParameters: p.customParameters || [],
+    technicalDetails: p.technicalDetails || '',
+  };
+}
+---
+
+{/* ── LEGAL PAGE RENDER ── */}
+{isLegalPage && legalPage ? (
+  <BaseLayout
+    title={`${legalPage.title} | Silniki Elektryczne`}
+    description={legalPage.title}
+    canonical={`/${categorySlug}`}
+  >
+    <div class="container mx-auto px-4 py-12 max-w-4xl">
+      <nav class="text-sm text-muted-foreground mb-6" aria-label="Ścieżka nawigacji">
+        <a href="/" class="hover:text-primary transition-colors">Strona główna</a>
+        <span class="mx-2">›</span>
+        <span class="text-foreground">{legalPage.title}</span>
+      </nav>
+      <h1 class="text-3xl font-bold mb-8 text-foreground">{legalPage.title}</h1>
+      <div class="prose dark:prose-invert max-w-none" set:html={legalPage.content} />
+    </div>
+  </BaseLayout>
+) : (
+  <BaseLayout title={title} description={description} canonical={canonical} jsonLd={breadcrumbLd} noIndex={hasFilterParams}>
+    <script type="application/ld+json" set:html={JSON.stringify(collectionLd)} />
+
+    <div class="container mx-auto px-4 py-8">
+      <nav class="text-sm text-muted-foreground mb-6" aria-label="Ścieżka nawigacji">
+        <a href="/" class="hover:text-primary transition-colors">Strona główna</a>
+        <span class="mx-2">›</span>
+        {isPowerPage ? (
+          rpmStr ? (
+            <>
+              <a href={`/silniki-elektryczne-${powerMatch![1]}-kw`} class="hover:text-primary transition-colors">Silniki {powerFormatted} kW</a>
+              <span class="mx-2">›</span>
+              <span class="text-foreground">{rpmStr} obr/min</span>
+            </>
+          ) : <span class="text-foreground">Silniki {powerFormatted} kW</span>
+        ) : <span class="text-foreground">{category?.name}</span>}
+      </nav>
+
+      <h1 class="text-3xl font-bold mb-3 text-foreground">
+        {isPowerPage ? `Silniki elektryczne ${powerFormatted} kW${rpmStr ? ` ${rpmStr} obr/min` : ''}` : category?.name}
+      </h1>
+
+      {/* Description: expandable for categories, static for power pages */}
+      {isPowerPage ? (
+        <p class="text-sm text-muted-foreground mb-6 max-w-3xl leading-relaxed">
+          {rpmStr
+            ? `Silniki elektryczne o mocy ${powerFormatted} kW i prędkości ${rpmStr} obr/min. Wszystkie sprawdzone i gotowe do pracy.`
+            : `Silniki elektryczne o mocy ${powerFormatted} kW w ofercie sklepu Stojan.`}
+        </p>
+      ) : category?.description ? (
+        <div class="max-w-3xl mb-4">
+          <ExpandableDescription client:load html={category.description} maxHeight={80} />
+        </div>
+      ) : (
+        <p class="text-sm text-muted-foreground mb-6">{category?.name} dostępne w sklepie Stojan. Szeroki wybór w atrakcyjnych cenach.</p>
+      )}
+
+      {!isPowerPage ? (
+        <CategoryProducts
+          client:load
+          products={categoryProducts.map(mapProductForFilter)}
+          categoryName={category?.name || ''}
+        />
+      ) : powerProducts.length > 0 ? (
+        <CategoryProducts
+          client:load
+          showCategoryFilter={true}
+          products={powerProducts.map(mapProductForFilter)}
+          categoryName={`Silniki ${powerFormatted} kW${rpmStr ? ` ${rpmStr} obr/min` : ''}`}
+        />
+      ) : (
+        <div class="text-center py-12 text-muted-foreground">
+          <p class="text-lg mb-2">Brak silników o tych parametrach w magazynie</p>
+          <p><a href="/kontakt" class="text-primary hover:underline">Skontaktuj się z nami</a> — pomożemy znaleźć odpowiedni silnik.</p>
+        </div>
+      )}
+    </div>
+  </BaseLayout>
+)}

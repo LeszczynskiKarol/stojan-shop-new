@@ -1,0 +1,8 @@
+---
+// frontend/src/pages/admin/products.astro
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import ProductsTable from '../../components/admin/ProductsTable';
+---
+<AdminLayout title="Produkty">
+  <ProductsTable client:load />
+</AdminLayout>

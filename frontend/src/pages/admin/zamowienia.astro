@@ -1,0 +1,67 @@
+---
+// frontend/src/pages/admin/zamowienia.astro
+// Admin panel - zamówienia + analityka (tab switch)
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { AdminOrders } from '../../components/admin/AdminOrders';
+import OrdersAnalytics from '../../components/admin/OrdersAnalytics';
+---
+
+<AdminLayout title="Zamówienia | Admin">
+  <div>
+    <!-- Tab navigation -->
+    <div style="display:flex; gap:4px; margin-bottom:20px; border-bottom:2px solid var(--border); padding-bottom:0;">
+      <button id="tab-orders" class="admin-tab active" data-tab="orders">
+        📦 Zamówienia
+      </button>
+      <button id="tab-analytics" class="admin-tab" data-tab="analytics">
+        📊 Analityka
+      </button>
+    </div>
+
+    <!-- Orders tab -->
+    <div id="panel-orders">
+      <AdminOrders client:only="react" />
+    </div>
+
+    <!-- Analytics tab -->
+    <div id="panel-analytics" style="display:none;">
+      <OrdersAnalytics client:only="react" />
+    </div>
+  </div>
+
+  <style>
+    .admin-tab {
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .admin-tab:hover {
+      color: var(--text);
+    }
+    .admin-tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+  </style>
+
+  <script>
+    document.querySelectorAll('.admin-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.getAttribute('data-tab');
+        // Toggle panels
+        document.getElementById('panel-orders')!.style.display = tab === 'orders' ? 'block' : 'none';
+        document.getElementById('panel-analytics')!.style.display = tab === 'analytics' ? 'block' : 'none';
+        // Toggle active class
+        document.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+  </script>
+</AdminLayout>

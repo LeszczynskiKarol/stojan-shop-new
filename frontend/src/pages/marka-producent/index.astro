@@ -1,0 +1,82 @@
+---
+// frontend/src/pages/marka-producent/index.astro
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { getManufacturers } from '@/lib/api';
+
+const allManufacturers = await getManufacturers() || [];
+
+// Filter: at least 2 products, skip placeholder names
+interface MfrDisplay {
+  name: string;
+  slug: string;
+  productCount: number;
+}
+
+const SKIP_SLUGS = new Set(['silnik', 'wal', 'wal-zdawczy', 'ramie-reakcyjne', 'kolnierz-boczny', 'wentylator', 'syojan']);
+
+const mfrList: MfrDisplay[] = allManufacturers
+  .filter((m: any) => {
+    if (!m.name || SKIP_SLUGS.has(m.slug)) return false;
+    const count = m._count?.products ?? m.productCount ?? 0;
+    return count >= 2;
+  })
+  .map((m: any) => ({
+    name: m.name,
+    slug: m.slug,
+    productCount: m._count?.products ?? m.productCount ?? 0,
+  }))
+  .sort((a: MfrDisplay, b: MfrDisplay) => a.name.localeCompare(b.name, 'pl'));
+
+const SITE_URL = 'https://www.silniki-elektryczne.com.pl';
+const title = 'Producenci silników elektrycznych | Stojan Shop';
+const description = `Silniki elektryczne ${mfrList.length} producentów. ABB, Siemens, SEW, Celma, Tamel, EMIT i wielu innych. Sprawdź ofertę!`;
+
+const breadcrumbLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Strona główna", "item": SITE_URL },
+    { "@type": "ListItem", "position": 2, "name": "Producenci", "item": `${SITE_URL}/marka-producent` },
+  ]
+};
+---
+
+<BaseLayout title={title} description={description} canonical="/marka-producent" jsonLd={breadcrumbLd}>
+  <div class="container mx-auto px-4 py-8">
+    <nav class="text-sm text-muted-foreground mb-6" aria-label="Ścieżka nawigacji">
+      <a href="/" class="hover:text-primary transition-colors">Strona główna</a>
+      <span class="mx-2">›</span>
+      <span class="text-foreground">Producenci</span>
+    </nav>
+
+    <h1 class="text-3xl font-bold mb-3 text-foreground">Producenci silników elektrycznych</h1>
+    <p class="text-sm text-muted-foreground mb-8 max-w-3xl">
+      Przeglądaj silniki elektryczne według producenta. W ofercie mamy napędy {mfrList.length} marek — od renomowanych europejskich producentów po sprawdzonych dostawców z całego świata.
+    </p>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+      {mfrList.map((mfr) => (
+        <a
+          href={`/marka-producent/${mfr.slug.replace(/^marka-producent\//, '')}`}
+          class="group flex items-center gap-3 p-3 bg-card border border-border rounded-xl hover:border-primary/30 hover:shadow-md transition-all"
+        >
+          <div class="flex-1 min-w-0">
+            <div class="font-medium text-sm text-card-foreground group-hover:text-primary transition-colors truncate">
+              {mfr.name}
+            </div>
+            <div class="text-xs text-muted-foreground">
+              {mfr.productCount} {mfr.productCount === 1 ? 'produkt' : mfr.productCount < 5 ? 'produkty' : 'produktów'}
+            </div>
+          </div>
+          <svg class="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </a>
+      ))}
+    </div>
+
+    {mfrList.length === 0 && (
+      <div class="text-center py-12 text-muted-foreground">
+        <p>Brak producentów do wyświetlenia.</p>
+      </div>
+    )}
+  </div>
+</BaseLayout>

@@ -1,0 +1,11 @@
+---
+// frontend/src/pages/admin/allegro.astro
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import AllegroPanel from '../../components/admin/AllegroPanel';
+---
+<AdminLayout title="Allegro - Synchronizacja">
+  <div class="toolbar">
+    <h1>Panel Allegro</h1>
+  </div>
+  <AllegroPanel client:load />
+</AdminLayout>

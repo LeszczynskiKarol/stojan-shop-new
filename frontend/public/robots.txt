@@ -1,0 +1,116 @@
+# robots.txt — silniki-elektryczne.com.pl
+# Blokuje duplikaty z filtrów, paginacji i wyszukiwania
+# Kanoniczne URL-e kategorii i produktów pozostają indeksowalne
+
+User-agent: *
+
+# ── Strona wyszukiwania (ma noindex, ale blokujemy też crawl) ──
+Disallow: /szukaj
+
+# ── Filtrowane warianty kategorii (query params z CategoryProducts) ──
+# Każdy z tych parametrów tworzy duplikat strony kategorii
+Disallow: /*?*q=
+Disallow: /*?*cat=
+Disallow: /*?*mfr=
+Disallow: /*?*cond=
+Disallow: /*?*kw=
+Disallow: /*?*kwmin=
+Disallow: /*?*kwmax=
+Disallow: /*?*rpm=
+Disallow: /*?*rpmr=
+Disallow: /*?*obrmin=
+Disallow: /*?*obrmax=
+Disallow: /*?*pmin=
+Disallow: /*?*pmax=
+Disallow: /*?*sort=
+
+# ── Paginacja (strona 2+ to duplikat z innym zakresem) ──
+Disallow: /*?*page=
+
+# ── API / wewnętrzne endpointy ──
+Disallow: /api/
+Disallow: /_astro/
+Disallow: /_image
+
+# ── Pliki techniczne ──
+Disallow: /*.json$
+Disallow: /tsconfig
+Disallow: /package
+
+# ── Pozwól na zasoby statyczne (CSS/JS/obrazy — potrzebne do renderingu) ──
+Allow: /_astro/*.css$
+Allow: /_astro/*.js$
+Allow: /*.png$
+Allow: /*.jpg$
+Allow: /*.jpeg$
+Allow: /*.webp$
+Allow: /*.svg$
+
+# ── Sitemap ──
+Sitemap: https://www.silniki-elektryczne.com.pl/sitemap_index.xml
+
+# ── Googlebot — identyczne reguły + crawl-delay jako sugestia ──
+User-agent: Googlebot
+Disallow: /szukaj
+Disallow: /*?*q=
+Disallow: /*?*cat=
+Disallow: /*?*mfr=
+Disallow: /*?*cond=
+Disallow: /*?*kw=
+Disallow: /*?*kwmin=
+Disallow: /*?*kwmax=
+Disallow: /*?*rpm=
+Disallow: /*?*rpmr=
+Disallow: /*?*obrmin=
+Disallow: /*?*obrmax=
+Disallow: /*?*pmin=
+Disallow: /*?*pmax=
+Disallow: /*?*sort=
+Disallow: /*?*page=
+Disallow: /api/
+
+# ── Bingbot — z crawl-delay ──
+User-agent: Bingbot
+Crawl-delay: 2
+Disallow: /szukaj
+Disallow: /*?*q=
+Disallow: /*?*cat=
+Disallow: /*?*mfr=
+Disallow: /*?*cond=
+Disallow: /*?*kw=
+Disallow: /*?*kwmin=
+Disallow: /*?*kwmax=
+Disallow: /*?*rpm=
+Disallow: /*?*rpmr=
+Disallow: /*?*obrmin=
+Disallow: /*?*obrmax=
+Disallow: /*?*pmin=
+Disallow: /*?*pmax=
+Disallow: /*?*sort=
+Disallow: /*?*page=
+Disallow: /api/
+
+# ── Blokuj agresywne boty AI/scrapery ──
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: PetalBot
+Disallow: /
+
+User-agent: Amazonbot
+Disallow: /

@@ -1,0 +1,385 @@
+---
+// frontend/src/pages/index.astro
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import ProductCard from '@/components/shop/ProductCard.astro';
+import { GlobalSearch } from '@/components/search/GlobalSearch';
+import { getPopularProducts, getLatestProducts, getCategories, getProducts } from '@/lib/api';
+
+const [popular, latest, categories] = await Promise.all([
+  getPopularProducts(8),
+  getLatestProducts(8),
+  getCategories(),
+]);
+
+// ============================================
+// CATEGORIES — fixed order with cover product images
+// ============================================
+const CATEGORY_ORDER = [
+  'trojfazowe',
+  'motoreduktory',
+  'jednofazowe',
+  'z-hamulcem',
+  'dwubiegowe',
+  'pompy',
+  'wentylatory-przemyslowe',
+  'akcesoria',
+];
+
+const CATEGORY_LABELS: Record<string, string> = {
+  'trojfazowe': 'Silniki trójfazowe',
+  'motoreduktory': 'Motoreduktory',
+  'jednofazowe': 'Silniki jednofazowe',
+  'z-hamulcem': 'Silniki z hamulcem',
+  'dwubiegowe': 'Silniki dwubiegowe',
+  'pompy': 'Pompy',
+  'wentylatory-przemyslowe': 'Wentylatory',
+  'akcesoria': 'Akcesoria',
+};
+
+// Build ordered categories with product count and cover image
+const catMap = new Map<string, any>();
+if (categories) {
+  for (const cat of categories) {
+    catMap.set(cat.slug, cat);
+  }
+}
+
+// Fetch one product per category for cover image
+const categoryCovers: Record<string, string> = {};
+for (const slug of CATEGORY_ORDER) {
+  const cat = catMap.get(slug);
+  if (cat) {
+    try {
+      const result = await getProducts(`category=${slug}&inStock=true&limit=1&sort=purchaseCount&order=desc`);
+      const firstProduct = result?.products?.[0];
+      if (firstProduct) {
+        categoryCovers[slug] = firstProduct.mainImage || firstProduct.images?.[0] || '';
+      }
+    } catch {}
+  }
+}
+
+const orderedCategories = CATEGORY_ORDER
+  .map((slug) => {
+    const cat = catMap.get(slug);
+    if (!cat) return null;
+    return {
+      slug,
+      name: CATEGORY_LABELS[slug] || cat.name,
+      description: cat.description,
+      productCount: cat._count?.products ?? cat.productCount ?? 0,
+      coverImage: categoryCovers[slug] || cat.image || null,
+    };
+  })
+  .filter(Boolean) as { slug: string; name: string; description: string | null; productCount: number; coverImage: string | null }[];
+
+// Count total in-stock products
+const totalProducts = orderedCategories.reduce((sum, cat) => sum + cat.productCount, 0);
+const totalDisplay = totalProducts > 100 ? `${Math.floor(totalProducts / 100) * 100}+` : `${totalProducts}`;
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Stojan - Silniki Elektryczne",
+  "url": "https://www.silniki-elektryczne.com.pl",
+  "description": "Sklep internetowy z silnikami elektrycznymi — trójfazowe, jednofazowe, z hamulcem, motoreduktory",
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": "https://www.silniki-elektryczne.com.pl/szukaj?q={search_term_string}",
+    "query-input": "required name=search_term_string"
+  }
+};
+
+const orgJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Stojan S.C.",
+  "url": "https://www.silniki-elektryczne.com.pl",
+  "logo": "https://www.silniki-elektryczne.com.pl/logo_dark.png",
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "telephone": "+48500385112",
+    "contactType": "sales",
+    "availableLanguage": "Polish"
+  },
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "Wojewódzka 2",
+    "addressLocality": "Pigża",
+    "postalCode": "87-152",
+    "addressCountry": "PL"
+  }
+};
+
+// SEO: FAQ Schema — based on existing content sections
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Jak działa silnik elektryczny?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Silnik elektryczny składa się ze stojana z cewkami i wirnika. Gdy przez cewki przepływa prąd, generowane jest pole magnetyczne, które oddziałuje na wirnik. W wirniku indukuje się prąd tworzący własne pole magnetyczne — wzajemne oddziaływanie obu pól powoduje obrót wirnika, który napędza maszyny i urządzenia."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Gdzie stosuje się silniki elektryczne?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Silniki elektryczne są stosowane w przemyśle (linie produkcyjne, maszyny CNC, pompy, wentylatory), rolnictwie (systemy nawadniające, maszyny rolnicze), transporcie (pojazdy elektryczne, suwnice, taśmy przenośnikowe) oraz w energetyce odnawialnej i systemach medycznych."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Jakie silniki elektryczne oferuje sklep Stojan?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Oferujemy silniki trójfazowe, jednofazowe, z hamulcem, dwubiegowe, motoreduktory, pompy i wentylatory przemysłowe. W asortymencie mamy napędy o mocy od 0,09 kW do ponad 200 kW, od producentów takich jak EMIT, Celma, ABB, Nidec, OMEC czy SEW."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Jaka jest gwarancja na silniki elektryczne?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Silniki nowe objęte są 24-miesięczną gwarancją. Silniki nieużywane (magazynowe) mają 12-miesięczną gwarancję. Silniki po remoncie posiadają 1-miesięczną gwarancję rozruchową. Wszystkie napędy są w 100% sprawne i gotowe do pracy."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Jak szybko realizujecie wysyłkę silników?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Większość zamówień realizujemy w ciągu 24 godzin. Współpracujemy z renomowanymi firmami kurierskimi. Koszt wysyłki zaczyna się od 15 zł, a niektóre silniki dostarczamy z darmową dostawą."
+      }
+    }
+  ]
+};
+
+const quickLinks = [
+  { label: 'Trójfazowe', href: '/trojfazowe' },
+  { label: 'Jednofazowe', href: '/jednofazowe' },
+  { label: 'Z hamulcem', href: '/z-hamulcem' },
+  { label: 'Używane', href: '/trojfazowe?cond=uzywany' },
+  { label: 'Do 2000 zł', href: '/trojfazowe?pmax=2000' },
+];
+
+function stripHtml(html: string | null | undefined): string {
+  if (!html) return '';
+  return html
+    .replace(/<[^>]+>/g, '')
+    .replace(/&oacute;/g, 'ó').replace(/&ndash;/g, '–').replace(/&amp;/g, '&')
+    .replace(/&nbsp;/g, ' ').replace(/&[a-z]+;/gi, '').replace(/&#\d+;/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
+---
+
+<BaseLayout
+  title="Silniki elektryczne - sklep, hurtownia | Oferta, ceny, sprzedaż"
+  description="Największy wybór silników elektrycznych. Trójfazowe, jednofazowe, z hamulcem, motoreduktory. Szybka dostawa, konkurencyjne ceny. Sprawdź ofertę!"
+  canonical="/"
+  jsonLd={jsonLd}
+>
+  <script type="application/ld+json" set:html={JSON.stringify(orgJsonLd)} />
+  {/* SEO: FAQ Schema for rich snippets */}
+  <script type="application/ld+json" set:html={JSON.stringify(faqJsonLd)} />
+
+  <!-- ======== HERO ======== -->
+  <section class="relative">
+    <div class="absolute inset-0 bg-gradient-to-br from-primary/8 via-primary/3 to-transparent" />
+    <div class="absolute -top-40 -right-40 w-96 h-96 bg-primary/8 rounded-full blur-3xl" />
+    <div class="absolute -bottom-40 -left-40 w-96 h-96 bg-primary/4 rounded-full blur-3xl" />
+
+    <div class="relative max-w-4xl mx-auto px-4 py-14 md:py-20 text-center">
+      {/* SEO: H1 contains primary keyword "silniki elektryczne" */}
+      <h1 class="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-foreground leading-tight">
+        <span class="text-primary">Silniki elektryczne</span> &mdash; znajdź i&nbsp;zamów
+      </h1>
+      <p class="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
+        Wyszukaj spośród setek silników elektrycznych dostępnych od ręki
+      </p>
+
+      <!-- Search with high z-index so dropdown shows above everything -->
+      <div class="relative z-40">
+
+        <GlobalSearch client:load variant="hero" />
+      </div>
+
+      <!-- Quick category pills -->
+      <div class="flex flex-wrap justify-center gap-2 mt-6">
+        {quickLinks.map(({ label, href }) => (
+          <a
+            href={href}
+            class="px-4 py-2 text-sm font-medium rounded-full bg-card border border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-all"
+          >
+            {label}
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ======== TRUST BAR ======== -->
+  <section class="border-y border-border bg-card/50">
+    <div class="container mx-auto px-4 py-4">
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          </div>
+          <div>
+            <div class="text-sm font-bold text-foreground">{totalDisplay} silników</div>
+            <div class="text-xs text-muted-foreground">w ofercie</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div>
+            <div class="text-sm font-bold text-foreground">Gwarancja</div>
+            <div class="text-xs text-muted-foreground">do 24 miesięcy</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          </div>
+          <div>
+            <div class="text-sm font-bold text-foreground">Wysyłka 24 godz.</div>
+            <div class="text-xs text-muted-foreground">od 15 zł</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======== KATEGORIE ======== -->
+  <section class="container mx-auto px-4 py-12">
+    <div class="flex items-baseline justify-between mb-8">
+      <h2 class="text-2xl font-bold text-foreground">Kategorie produktów</h2>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      {orderedCategories.map((cat, idx) => (
+        <a
+          href={`/${cat.slug}`}
+          class="group block bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all duration-200"
+        >
+          <div class="aspect-[16/10] overflow-hidden bg-accent relative">
+            {cat.coverImage ? (
+              <img
+                src={cat.coverImage}
+                alt={cat.name}
+                class="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+                loading={idx < 4 ? "eager" : "lazy"}
+                width="400"
+                height="250"
+              />
+            ) : (
+              <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5">
+                <svg class="w-12 h-12 text-primary/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+              </div>
+            )}
+            
+          </div>
+          <div class="p-4">
+            <h3 class="font-semibold text-card-foreground group-hover:text-primary transition-colors text-base">
+              {cat.name}
+            </h3>
+            
+          </div>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <!-- ======== POPULARNE ======== -->
+  {popular && popular.length > 0 && (
+    <section class="container mx-auto px-4 py-12">
+      <div class="flex items-baseline justify-between mb-8">
+        <h2 class="text-2xl font-bold text-foreground">Popularne silniki elektryczne</h2>
+        <a href="/trojfazowe?sort=price-asc" class="text-sm text-primary hover:underline hidden sm:inline">
+          Zobacz wszystkie →
+        </a>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {popular.map((product: any) => (
+          <ProductCard product={product} />
+        ))}
+      </div>
+    </section>
+  )}
+
+  <!-- ======== NAJNOWSZE ======== -->
+  {latest && latest.length > 0 && (
+    <section class="container mx-auto px-4 py-12">
+      <div class="flex items-baseline justify-between mb-8">
+        <h2 class="text-2xl font-bold text-foreground">Najnowsze w ofercie</h2>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {latest.map((product: any) => (
+          <ProductCard product={product} />
+        ))}
+      </div>
+    </section>
+  )}
+
+  <!-- ======== SEO CONTENT ======== -->
+  <section class="container mx-auto px-4 py-12 max-w-4xl">
+    <div class="prose dark:prose-invert max-w-none">
+      <h2><strong>Silniki elektryczne &ndash; szeroka oferta</strong></h2>
+<p>Jesteśmy przekonani, że niezależnie od planowanego przeznaczenia i interesujących Cię parametr&oacute;w znajdziesz u nas odpowiedni napęd. Możesz przebierać w r&oacute;żnego rodzaju silnikach elektrycznych &ndash; mamy na sprzedaż setki wariant&oacute;w tr&oacute;jfazowych, dziesiątki jednofazowych, a także wiele z hamulcem, pierścieniowych i dwubiegowych. R&oacute;żnorodność parametr&oacute;w sprawia, że z łatwością dobierzesz napęd idealnie spełniający Twoje wymagania.</p>
+<p>Działamy na maksymalnych obrotach, aby spełnić Twoje oczekiwania. Włączamy najwyższy bieg i z pełną mocą pracujemy nad ciągłym wzbogacaniem i usprawnianiem oferty. Chcemy mieć pewność, że składając zam&oacute;wienie na silniki elektryczne, kt&oacute;rych sprzedaż proponujemy, podejmujesz najlepszą możliwą decyzję.</p>
+<p>Oddajemy do Twojej dyspozycji rozbudowaną i zarazem intuicyjną wyszukiwarkę, dzięki kt&oacute;rej w kilka chwil precyzyjnie wskażesz parametry, kt&oacute;re powinien spełniać silnik elektryczny. Określ interesującą Cię moc, prędkość obrotową i pozostałe właściwości i sprawdź, czy obecnie w naszym asortymencie mamy na sprzedaż napędy pasujące do Twoich wymagań.</p>
+<h2><strong>Znaczenie silnik&oacute;w elektrycznych w gospodarce</strong></h2>
+<p>Indukcyjne silniki elektryczne są nie tylko sercem maszyn, ale r&oacute;wnież kręgosłupem nowoczesnej gospodarki i przemysłu. Co napędza fabryki, elektrownie, urządzenia rolnicze czy lokalne browary? Właśnie napędy, kt&oacute;rych sprzedaż oferujemy. Dzięki wytrzymałości, wydajności i wszechstronności są one wszechobecne w każdym sektorze przemysłu, a także w rolnictwie, transporcie i wielu innych branżach.</p>
+<p>Od precyzyjnych urządzeń CNC, po maszyny gospodarcze, skończywszy na gigantycznych prasach hydraulicznych &ndash; nasze silniki elektryczne pracują w wielu miejscach. Jeśli chcesz, żeby przez lata działały także dla Ciebie lub Twojej firmy, przejrzyj ofertę i zam&oacute;w model, kt&oacute;rego potrzebujesz!</p>
+<h2><strong>Zastosowanie silnika elektrycznego</strong></h2>
+<p>Indukcyjne silniki elektryczne napędzają wsp&oacute;łczesną gospodarkę. Są wszechobecne i szeroko wykorzystywane &ndash; od fabryk, poprzez gospodarstwa, na prywatnych ogr&oacute;dkach skończywszy. Oto kilka przykładowych zastosowań napęd&oacute;w, kt&oacute;re zam&oacute;wisz u nas w wielu wariantach.</p>
+<h3><strong>Przemysł</strong></h3>
+<ul>
+<li><strong>Linie produkcyjne.</strong> Silniki elektryczne są podstawowym elementem większości linii produkcyjnych, napędzając maszyny &ndash; od pras, po taśmociągi.</li>
+<li><strong>Pompy i wentylatory.</strong> Nasze napędy są stosowane w systemach HVAC oraz w procesach przemysłowych do pompowania cieczy i gaz&oacute;w.</li>
+<li><strong>Maszyny CNC.</strong> Wysoka precyzja i efektywność silnik&oacute;w elektrycznych sprawiają, że są idealne do zastosowań, w kt&oacute;rych wymagana jest duża dokładność pracy.</li>
+</ul>
+<h3><strong>Rolnictwo</strong></h3>
+<ul>
+<li><strong>Systemy nawadniające.</strong> Silniki elektryczne są wykorzystywane do napędzania pomp wodnych.</li>
+<li><strong>Maszyny rolnicze.</strong> Od kombajn&oacute;w do młocarni &ndash; bez naszych napęd&oacute;w nowoczesne rolnictwo nie mogłoby funkcjonować.</li>
+</ul>
+<h3><strong>Transport</strong></h3>
+<ul>
+<li><strong>Pojazdy elektryczne.</strong> Elektryczne silniki indukcyjne są coraz częściej używane w pojazdach elektrycznych ze względu na ich efektywność.</li>
+<li><strong>Suwnice i dźwigi. </strong>Nasze napędy montuje się w suwnicach i dźwigach pracujących w magazynach i portach. Ich wysoka efektywność i zdolność do generowania dużego momentu obrotowego powodują, że idealne spisują się w podnoszeniu i przenoszeniu ciężkich ładunk&oacute;w.</li>
+<li><strong>Systemy transportu wewnętrznego. </strong>Silniki elektryczne napędzają taśmy przenośnikowe i inne systemy transportu wewnętrznego. Umożliwiają płynny przepływ materiał&oacute;w i produkt&oacute;w pomiędzy r&oacute;żnymi etapami produkcji.</li>
+</ul>
+<h3><strong>Inne gałęzie gospodarki</strong></h3>
+<ul>
+<li><strong>Odnawialne źr&oacute;dła energii.</strong> W turbinach wiatrowych i morskich agregatach prądotw&oacute;rczych.</li>
+<li><strong>Systemy medyczne.</strong> W urządzeniach takich jak wentylatory czy pompy infuzyjne.</li>
+</ul>
+<h2><strong>Działanie silnika elektrycznego</strong></h2>
+<p>Silnik elektryczny składa się z obudowy zwanej stojanem, kt&oacute;ry jest wyposażony w cewki. Gdy przepływa przez nie prąd elektryczny, generuje się pole magnetyczne o określonej sile i kierunku. Nie jest statyczne, lecz dynamicznie oddziałuje na wirnik, kt&oacute;ry stanowi drugi kluczowy element napędu.</p>
+<p>W rezultacie oddziaływania pola magnetycznego w wirniku dochodzi do indukcji prądu. Jest ona możliwa za sprawą użycia materiał&oacute;w o właściwościach magnetycznych w konstrukcji silnika elektrycznego. Indukowany prąd w wirniku tworzy własne pole magnetyczne, kt&oacute;re z kolei oddziałuje z polem magnetycznym stojana. Na skutek tych wzajemnych oddziaływań wirnik zaczyna się obracać.</p>
+<p>Obr&oacute;t wirnika umożliwia napędzanie r&oacute;żnego rodzaju maszyn i urządzeń. Od prostych wentylator&oacute;w i pomp, po skomplikowane systemy produkcyjne w fabrykach &mdash; wszędzie tam, gdzie potrzebna jest precyzyjna i efektywna konwersja energii elektrycznej na mechaniczną, nasze silniki indukcyjne, kt&oacute;rych sprzedaż oferujemy, znajdują zastosowanie.</p>
+<p>Tym, co sprawia, że nasze napędy są uniwersalne, jest możliwość działania w r&oacute;żnych warunkach &ndash; zar&oacute;wno jeśli chodzi o obciążenie, jak i zakresy prędkości. W efekcie elektryczne silniki indukcyjne są nie tylko efektywne, ale też niezawodne. R&oacute;wnież wysoka wydajność energetyczna silnik&oacute;w elektrycznych jest aspektem wpływającym na szerokie zastosowanie w przemyśle. Powszechnie montuje się je bowiem w instalacjach, maszynach i urządzeniach, w kt&oacute;rych fundamentalną rolę odgrywa wydajność pracy, na przykład w taśmach transportujących czy pompach.</p>
+<h2><strong>Sprzedaż silnik&oacute;w elektrycznych</strong></h2>
+<p>Specjalizujemy się w sprzedaży silnik&oacute;w elektrycznych. Zapewniamy najwyższą jakość oferowanych napęd&oacute;w oraz profesjonalną obsługę na każdym etapie wsp&oacute;łpracy. Dlaczego warto zdecydować się na nasze usługi? Oto kluczowe zalety wsp&oacute;łpracy z naszym sklepem!</p>
+<h3><strong>Silniki gotowe do pracy &ndash; 100% sprawności</strong></h3>
+<p>W naszej ofercie znajdują się wyłącznie w pełni sprawne, sprawdzone i gotowe do pracy silniki elektryczne. Nie ma znaczenia, jaki zam&oacute;wisz napęd &ndash; zawsze otrzymujesz od nas gwarancję rozruchową. Oddajemy do Twojej dyspozycji kompletne produkty, kt&oacute;rych rzeczywiste parametry są zgodne opisami publikowanymi na stronie.</p>
+<h3><strong>Najlepsi producenci</strong></h3>
+<p>Nasz asortyment obejmuje silniki elektryczne najlepszych producent&oacute;w. Przebieraj w napędach takich marek jak EMIT, Celma, ABB, Nidec, OMEC czy SEW i zyskaj pewność, że inwestujesz w urządzenie, kt&oacute;re będzie służyło Tobie lub Twojej firmie przez długi czas.</p>
+<h3><strong>Konkurencyjne ceny</strong></h3>
+<p>Dbamy zar&oacute;wno o jakość, jak i konkurencyjność cenową oferty. Gwarantujemy atrakcyjne stawki w każdej grupie silnik&oacute;w elektrycznych dostępnych w naszym katalogu.</p>
+<h3><strong>Bogaty wyb&oacute;r</strong></h3>
+<p>Naszym celem jest dostarczanie produkt&oacute;w spełniających wymagania wszystkich klient&oacute;w, począwszy od os&oacute;b indywidualnych, poprzez gospodarstwa rolne i małe warsztaty, skończywszy na dużych zakładach przemysłowych. Zam&oacute;wisz u nas niewielkie napędy o mocy zaledwie 0,09 kW, jak i największe modele o mocy przekraczającej 200 kW. Cały czas wzbogacamy asortyment o kolejne warianty.</p>
+<h3><strong>Dostawa</strong></h3>
+<p>Kładziemy nacisk na zapewnienie profesjonalnej obsługi, dlatego przykładamy dużą wagę do szybkości, terminowości, jakości i bezpieczeństwa transportu sprzedawanych napęd&oacute;w. Wsp&oacute;łpracujemy z renomowanymi firmami kurierskimi i dbamy o wydajność działalności, dlatego większość zam&oacute;wień realizujemy w ciągu zaledwie 24 godzin. Niekt&oacute;re z dostępnych w ofercie silnik&oacute;w elektrycznych dostarczamy w ramach darmowej dostawy.</p>
+    </div>
+  </section>
+</BaseLayout>

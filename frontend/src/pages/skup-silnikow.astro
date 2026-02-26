@@ -1,0 +1,236 @@
+---
+// frontend/src/pages/skup-silnikow.astro
+import BaseLayout from '@/layouts/BaseLayout.astro';
+
+const title = 'Skup silników elektrycznych | Stojan Shop';
+const description = 'Profesjonalny skup silników elektrycznych - uczciwa wycena na podstawie stanu technicznego i wagi. Skup sprawnych i uszkodzonych silników. Zadzwoń: 500 385 112.';
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Service",
+  "name": "Skup silników elektrycznych",
+  "provider": {
+    "@type": "Organization",
+    "name": "Stojan S.C.",
+    "telephone": "+48500385112",
+    "email": "stojan@silniki-elektryczne.com.pl",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Wojewódzka 2",
+      "addressLocality": "Pigża",
+      "postalCode": "87-152",
+      "addressCountry": "PL"
+    }
+  },
+  "description": description,
+  "areaServed": { "@type": "Country", "name": "PL" },
+};
+
+const benefits = [
+  { icon: 'scale', title: 'Rozliczenie wagowe', desc: 'Rozliczamy skup na podstawie wagi silnika — uczciwa cena za każdy kilogram.', badge: 'Cena orientacyjna' },
+  { icon: 'search', title: 'Wycena indywidualna', desc: 'Każdy silnik oceniamy indywidualnie — stan techniczny, typ, producent mają wpływ na ostateczną cenę.', bullets: ['Bezpłatna wycena', 'Uczciwa ocena stanu', 'Natychmiastowa płatność'] },
+  { icon: 'truck', title: 'Możliwość odbioru', desc: 'Przy większych partiach oferujemy odbiór własnym transportem.', bullets: ['Odbiór silników od klienta', 'Możliwość dostawy własnej', 'Ustalenie indywidualne'] },
+];
+
+const categories = [
+  { icon: '✓', title: 'Silniki sprawne', desc: 'Silniki w pełni sprawne technicznie — najlepsza wycena' },
+  { icon: '⚙', title: 'Silniki uszkodzone', desc: 'Silniki wymagające naprawy — wycena na podstawie wagi' },
+  { icon: '⚡', title: 'Silniki różnych mocy', desc: 'Od małych (0,09 kW) do dużych (200+ kW)' },
+  { icon: '🏭', title: 'Różni producenci', desc: 'SEW, Siemens, ABB, Tamel i inne marki' },
+  { icon: '📦', title: 'Partie silników', desc: 'Skup pojedynczych sztuk oraz większych partii' },
+  { icon: '🔧', title: 'Różne typy', desc: '1-fazowe, 3-fazowe, z hamulcem, specjalne' },
+];
+
+const steps = [
+  { num: '1', title: 'Kontakt', desc: 'Skontaktuj się telefonicznie lub mailowo' },
+  { num: '2', title: 'Opis silnika', desc: 'Podaj parametry: moc, typ, stan techniczny' },
+  { num: '3', title: 'Wycena', desc: 'Wstępna wycena lub spotkanie z oceną' },
+  { num: '4', title: 'Transakcja', desc: 'Ważenie, płatność i odbiór/dostawa' },
+];
+
+const higherPrice = [
+  'Silniki w pełni sprawne',
+  'Silniki znanych producentów',
+  'Większe partie (hurtowe)',
+  'Dobry stan wizualny',
+  'Większa moc silnika',
+];
+
+const priceFactors = [
+  'Stanu technicznego silnika',
+  'Wagi całkowitej urządzenia',
+  'Typu konstrukcji (korpus, uzwojenia)',
+  'Aktualnych cen surowców wtórnych',
+  'Kompletności dokumentacji',
+];
+---
+
+<BaseLayout title={title} description={description} canonical="/skup-silnikow" jsonLd={jsonLd}>
+
+  {/* ── HERO ── */}
+  <section class="relative overflow-hidden">
+    <div class="absolute inset-0 bg-gradient-to-br from-primary/8 via-primary/3 to-transparent"></div>
+    <div class="absolute -top-40 -right-40 w-96 h-96 bg-primary/8 rounded-full blur-3xl"></div>
+
+    <div class="relative container mx-auto px-4 py-16 md:py-24 text-center max-w-3xl">
+      <nav class="text-sm text-muted-foreground mb-8" aria-label="Ścieżka nawigacji">
+        <a href="/" class="hover:text-primary transition-colors">Strona główna</a>
+        <span class="mx-2">›</span>
+        <span class="text-foreground">Skup silników</span>
+      </nav>
+
+      <h1 class="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-foreground leading-tight">
+        Skup silników <span class="text-primary">elektrycznych</span>
+      </h1>
+      <p class="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
+        Profesjonalny skup silników elektrycznych — uczciwa wycena na podstawie stanu technicznego i wagi urządzenia
+      </p>
+
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a href="tel:+48500385112" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground font-semibold rounded-lg hover:opacity-90 transition-opacity">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          Zadzwoń: 500 385 112
+        </a>
+        <a href="mailto:stojan@silniki-elektryczne.com.pl" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-card border border-border text-foreground font-semibold rounded-lg hover:border-primary/40 hover:text-primary transition-all">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          Napisz do nas
+        </a>
+      </div>
+    </div>
+  </section>
+
+  {/* ── BENEFITS ── */}
+  <section class="container mx-auto px-4 py-12">
+    <div class="grid md:grid-cols-3 gap-6">
+      {benefits.map((b) => (
+        <div class="bg-card border border-border rounded-xl p-6 hover:border-primary/30 transition-colors">
+          <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+            {b.icon === 'scale' && (
+              <svg class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M16 16l3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z"/><path d="M2 16l3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+            )}
+            {b.icon === 'search' && (
+              <svg class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            )}
+            {b.icon === 'truck' && (
+              <svg class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            )}
+          </div>
+          <h3 class="font-bold text-foreground mb-2">{b.title}</h3>
+          <p class="text-sm text-muted-foreground mb-3">{b.desc}</p>
+          {b.badge && (
+            <span class="inline-block px-3 py-1 text-xs font-semibold bg-primary/10 text-primary rounded-full">{b.badge}</span>
+          )}
+          {b.bullets && (
+            <ul class="text-sm text-muted-foreground space-y-1">
+              {b.bullets.map((item) => (
+                <li class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+    </div>
+  </section>
+
+  {/* ── CO SKUPUJEMY ── */}
+  <section class="bg-card/50 border-y border-border">
+    <div class="container mx-auto px-4 py-12">
+      <h2 class="text-2xl font-bold text-foreground mb-8 text-center">Co skupujemy?</h2>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {categories.map((c) => (
+          <div class="bg-card border border-border rounded-xl p-5 text-center hover:border-primary/30 transition-colors">
+            <div class="text-2xl mb-2">{c.icon}</div>
+            <h3 class="font-semibold text-foreground text-sm mb-1">{c.title}</h3>
+            <p class="text-xs text-muted-foreground">{c.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  {/* ── JAK PRZEBIEGA SKUP ── */}
+  <section class="container mx-auto px-4 py-12">
+    <h2 class="text-2xl font-bold text-foreground mb-8 text-center">Jak przebiega skup?</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+      {steps.map((s, i) => (
+        <div class="relative text-center">
+          <div class="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-lg font-bold mx-auto mb-3">
+            {s.num}
+          </div>
+          <h3 class="font-semibold text-foreground text-sm mb-1">{s.title}</h3>
+          <p class="text-xs text-muted-foreground">{s.desc}</p>
+          {i < steps.length - 1 && (
+            <div class="hidden md:block absolute top-6 left-[calc(50%+28px)] w-[calc(100%-56px)] h-px bg-border"></div>
+          )}
+        </div>
+      ))}
+    </div>
+  </section>
+
+  {/* ── CENNIK ── */}
+  <section class="container mx-auto px-4 py-12">
+    <div class="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+      <div class="bg-card border border-border rounded-xl p-6">
+        <h3 class="font-bold text-foreground mb-4 flex items-center gap-2">
+          <svg class="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          Wyższa cena za:
+        </h3>
+        <ul class="space-y-2">
+          {higherPrice.map((item) => (
+            <li class="flex items-center gap-2 text-sm text-muted-foreground">
+              <svg class="w-4 h-4 text-green-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div class="bg-card border border-border rounded-xl p-6">
+        <h3 class="font-bold text-foreground mb-4 flex items-center gap-2">
+          <svg class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Cena zależy od:
+        </h3>
+        <ul class="space-y-2">
+          {priceFactors.map((item) => (
+            <li class="flex items-center gap-2 text-sm text-muted-foreground">
+              <span class="w-1.5 h-1.5 rounded-full bg-primary shrink-0"></span>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  {/* ── CTA ── */}
+  <section class="bg-card/50 border-y border-border">
+    <div class="container mx-auto px-4 py-12">
+      <div class="max-w-2xl mx-auto text-center">
+        <h2 class="text-2xl font-bold text-foreground mb-3">Masz silniki do sprzedania?</h2>
+        <p class="text-muted-foreground mb-8">Skontaktuj się z nami już dziś — szybka wycena i uczciwe warunki współpracy</p>
+
+        <div class="grid sm:grid-cols-3 gap-4">
+          <a href="tel:+48500385112" class="bg-card border border-border rounded-xl p-5 hover:border-primary/30 transition-colors group">
+            <div class="text-sm font-semibold text-foreground mb-1 group-hover:text-primary transition-colors">Zadzwoń</div>
+            <div class="text-primary font-bold">500 385 112</div>
+          </a>
+          <a href="mailto:stojan@silniki-elektryczne.com.pl" class="bg-card border border-border rounded-xl p-5 hover:border-primary/30 transition-colors group">
+            <div class="text-sm font-semibold text-foreground mb-1 group-hover:text-primary transition-colors">Napisz</div>
+            <div class="text-primary font-bold text-sm">E-mail</div>
+          </a>
+          <div class="bg-card border border-border rounded-xl p-5">
+            <div class="text-sm font-semibold text-foreground mb-1">Godziny pracy</div>
+            <div class="text-xs text-muted-foreground">
+              <p>Pon–Pt: 8:00–16:00</p>
+              <p>Sob: 9:00–14:00</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</BaseLayout>
