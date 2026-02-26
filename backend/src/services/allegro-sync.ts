@@ -580,14 +580,9 @@ export async function fullReconciliation(): Promise<SyncResult> {
       try {
         const offer = await getOffer(product.allegro_id);
         const allegroStock = offer.stock?.available ?? 0;
-        const allegroPrice = parseFloat(
-          offer.sellingMode?.price?.amount || "0",
-        );
-        const shopPrice = parseFloat(product.price);
 
         let changed = false;
 
-        // Sync stock: Allegro → Shop
         if (allegroStock !== product.stock) {
           console.log(
             `🔄 Stock mismatch "${product.name}": shop=${product.stock}, allegro=${allegroStock}`,
@@ -600,7 +595,6 @@ export async function fullReconciliation(): Promise<SyncResult> {
         }
 
         if (changed) {
-          // Update lastSyncAt
           const fullProduct = await prisma.product.findUnique({
             where: { id: product.id },
             select: { marketplaces: true },
@@ -624,10 +618,21 @@ export async function fullReconciliation(): Promise<SyncResult> {
           result.synced++;
         }
 
-        // Rate limit: 200ms between Allegro API calls
         await new Promise((r) => setTimeout(r, 200));
       } catch (err: any) {
-        result.errors.push(`${product.name}: ${err.message}`);
+        // ⬇️ KEY CHANGE: detect 404 = offer gone from Allegro → auto-unlink
+        if (err.message?.includes("404")) {
+          console.warn(
+            `⚠️ Allegro offer ${product.allegro_id} returns 404 for "${product.name}" — unlinking`,
+          );
+          await unlinkAllegroFromProduct(
+            product.id,
+            `Offer ${product.allegro_id} no longer exists on Allegro (404)`,
+          );
+          result.synced++;
+        } else {
+          result.errors.push(`${product.name}: ${err.message}`);
+        }
       }
     }
   } catch (err: any) {
@@ -638,5 +643,112 @@ export async function fullReconciliation(): Promise<SyncResult> {
   console.log(
     `🔄 Reconciliation done: ${result.synced} synced, ${result.errors.length} errors`,
   );
+  return result;
+}
+
+async function unlinkAllegroFromProduct(
+  productId: string,
+  reason: string,
+): Promise<void> {
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { id: true, name: true, marketplaces: true },
+  });
+  if (!product) return;
+
+  const mp = product.marketplaces as any;
+  const allegroId = mp?.allegro?.productId;
+  const { allegro: _removed, ...restMp } = mp || {};
+
+  await prisma.product.update({
+    where: { id: productId },
+    data: { marketplaces: restMp },
+  });
+
+  console.log(
+    `🔗❌ Unlinked Allegro offer ${allegroId} from "${product.name}" — reason: ${reason}`,
+  );
+}
+
+// ============================================
+//    Detect orphaned links (bulk comparison)
+//    Compares linked Allegro IDs in DB against actual seller offers.
+//    Faster than fetching each offer individually.
+// ============================================
+
+export async function detectOrphanedLinks(): Promise<{
+  checked: number;
+  unlinked: number;
+  errors: string[];
+}> {
+  const result = { checked: 0, unlinked: 0, errors: [] as string[] };
+
+  const connected = await isAllegroConnected();
+  if (!connected) {
+    result.errors.push("Allegro not connected");
+    return result;
+  }
+
+  try {
+    // 1. Get ALL seller offers from Allegro (just IDs)
+    const allegroOfferIds = new Set<string>();
+    let offset = 0;
+    const limit = 1000; // max allowed by Allegro API
+
+    while (true) {
+      const data = await getSellerOffers(offset, limit);
+      for (const offer of data.offers || []) {
+        allegroOfferIds.add(offer.id);
+      }
+      if (offset + limit >= data.totalCount) break;
+      offset += limit;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    console.log(
+      `🔍 Allegro has ${allegroOfferIds.size} total offers for this seller`,
+    );
+
+    // 2. Get all linked Allegro IDs from our DB
+    const linkedProducts = await prisma.$queryRaw<
+      Array<{ id: string; name: string; allegro_id: string }>
+    >`
+      SELECT id, name,
+        marketplaces->'allegro'->>'productId' as allegro_id
+      FROM products
+      WHERE marketplaces->'allegro'->>'productId' IS NOT NULL
+    `;
+
+    result.checked = linkedProducts.length;
+    console.log(
+      `🔍 Shop has ${linkedProducts.length} products linked to Allegro`,
+    );
+
+    // 3. Find orphans: linked in DB but NOT in Allegro offers list
+    for (const product of linkedProducts) {
+      if (!allegroOfferIds.has(product.allegro_id)) {
+        console.warn(
+          `🔗❌ Orphaned link: "${product.name}" → Allegro ${product.allegro_id} (not found in seller offers)`,
+        );
+        try {
+          await unlinkAllegroFromProduct(
+            product.id,
+            `Offer ${product.allegro_id} not found in seller's Allegro offers`,
+          );
+          result.unlinked++;
+        } catch (err: any) {
+          result.errors.push(`Unlink ${product.name}: ${err.message}`);
+        }
+      }
+    }
+
+    console.log(
+      `🔍 Orphan detection done: ${result.checked} checked, ${result.unlinked} unlinked`,
+    );
+  } catch (err: any) {
+    result.errors.push(err.message);
+    console.error("❌ Orphan detection failed:", err.message);
+  }
+
   return result;
 }

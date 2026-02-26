@@ -11,6 +11,7 @@ import {
   importAllegroOffers,
   fullReconciliation,
   pollAllegroEvents,
+  detectOrphanedLinks,
 } from "../services/allegro-sync.js";
 import { prisma } from "../lib/prisma.js";
 
@@ -102,6 +103,23 @@ export async function allegroRoutes(app: FastifyInstance) {
             sample: (typedEvents?.events || []).slice(0, 3),
           },
         },
+      });
+    } catch (err: any) {
+      return reply.status(500).send({ success: false, error: err.message });
+    }
+  });
+
+  /**
+   * POST /api/allegro/detect-orphans — find and unlink offers that no longer exist on Allegro
+   */
+
+  app.post("/detect-orphans", async (_request, reply) => {
+    try {
+      const result = await detectOrphanedLinks();
+      return reply.send({
+        success: true,
+        data: result,
+        message: `Sprawdzono ${result.checked} powiązań, usunięto ${result.unlinked} osieroconych`,
       });
     } catch (err: any) {
       return reply.status(500).send({ success: false, error: err.message });

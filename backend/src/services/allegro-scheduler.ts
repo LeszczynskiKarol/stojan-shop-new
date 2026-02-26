@@ -5,12 +5,14 @@
 // NOTE: Only event polling runs automatically.
 // Full reconciliation is triggered MANUALLY from admin panel only.
 
-import { pollAllegroEvents } from "./allegro-sync.js";
+import { detectOrphanedLinks, pollAllegroEvents } from "./allegro-sync.js";
 import { isAllegroConnected } from "../lib/allegro-client.js";
 
 let eventPollInterval: ReturnType<typeof setInterval> | null = null;
+let orphanInterval: ReturnType<typeof setInterval> | null = null;
 
 const EVENT_POLL_MS = 10 * 60 * 1000; // Poll events every 10 min
+const ORPHAN_CHECK_MS = 24 * 60 * 60 * 1000; // 24h
 
 /**
  * Start Allegro background tasks.
@@ -18,7 +20,9 @@ const EVENT_POLL_MS = 10 * 60 * 1000; // Poll events every 10 min
  * Only event polling — reconciliation is manual only.
  */
 export function startAllegroScheduler(): void {
-  console.log("⏰ Starting Allegro scheduler (event polling only)...");
+  console.log(
+    "⏰ Starting Allegro scheduler (event polling + orphan detection)...",
+  );
 
   // Event polling — every 10 minutes
   eventPollInterval = setInterval(async () => {
@@ -37,6 +41,22 @@ export function startAllegroScheduler(): void {
       console.error("❌ Allegro event poll error:", err.message);
     }
   }, EVENT_POLL_MS);
+
+  // Orphan detection — once a day (check for deleted Allegro offers)
+  orphanInterval = setInterval(async () => {
+    try {
+      const connected = await isAllegroConnected();
+      if (!connected) return;
+
+      console.log("🔍 Running daily orphaned link detection...");
+      const result = await detectOrphanedLinks();
+      if (result.unlinked > 0) {
+        console.log(`🔍 Orphan check: unlinked ${result.unlinked} dead offers`);
+      }
+    } catch (err: any) {
+      console.error("❌ Orphan detection error:", err.message);
+    }
+  }, ORPHAN_CHECK_MS);
 
   // Also run event poll once shortly after startup (30s delay)
   setTimeout(async () => {
@@ -62,6 +82,8 @@ export function startAllegroScheduler(): void {
  */
 export function stopAllegroScheduler(): void {
   if (eventPollInterval) clearInterval(eventPollInterval);
+  if (orphanInterval) clearInterval(orphanInterval);
   eventPollInterval = null;
+  orphanInterval = null;
   console.log("⏰ Allegro scheduler stopped");
 }
