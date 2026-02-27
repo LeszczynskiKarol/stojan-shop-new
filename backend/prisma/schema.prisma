@@ -373,3 +373,74 @@ updatedAt    DateTime @updatedAt
 
 @@map("olx_tokens")
 }
+
+model AnalyticsSession {
+  id            String   @id @default(uuid())
+  visitorId     String   @map("visitor_id")    // anonimowe cookie ID
+  
+  // Źródło ruchu
+  source        String   @default("direct")     // google_shopping, google_organic, google_ads, direct, referral
+  medium        String   @default("none")       // cpc, organic, referral, direct, shopping
+  campaign      String?                         // nazwa kampanii (jeśli UTM)
+  referrer      String?  @db.Text               // pełny referrer URL
+  landingPage   String   @db.Text @map("landing_page")
+  
+  // Google-specific
+  srsltid       String?                         // Google Search Results Link Tracking ID
+  gclid         String?                         // Google Click ID (płatne reklamy)
+  
+  // Urządzenie
+  userAgent     String?  @db.Text @map("user_agent")
+  deviceType    String   @default("desktop") @map("device_type")  // desktop, mobile, tablet
+  browser       String?
+  os            String?
+  screenWidth   Int?     @map("screen_width")
+  screenHeight  Int?     @map("screen_height")
+  
+  // Sesja
+  startedAt     DateTime @default(now()) @map("started_at")
+  lastSeenAt    DateTime @default(now()) @map("last_seen_at")
+  duration      Int      @default(0)            // sekundy
+  pageCount     Int      @default(1) @map("page_count")
+  
+  // Konwersje
+  hasViewedProduct  Boolean @default(false) @map("has_viewed_product")
+  hasAddedToCart    Boolean @default(false) @map("has_added_to_cart")
+  hasStartedCheckout Boolean @default(false) @map("has_started_checkout")
+  hasOrdered        Boolean @default(false) @map("has_ordered")
+  orderId           String? @map("order_id")
+  orderValue        Decimal? @db.Decimal(10, 2) @map("order_value")
+  
+  // Bounce = tylko 1 page view i duration < 10s
+  isBounce      Boolean  @default(true) @map("is_bounce")
+  
+  events        AnalyticsEvent[]
+
+  @@index([visitorId])
+  @@index([startedAt])
+  @@index([source])
+  @@index([source, startedAt])
+  @@index([hasOrdered])
+  @@index([landingPage])
+  @@map("analytics_sessions")
+}
+
+model AnalyticsEvent {
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id")
+  session   AnalyticsSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  type      String   // page_view, product_view, add_to_cart, checkout_start, order_complete, search
+  page      String   @db.Text
+  
+  // Dane kontekstowe (zależne od typu eventu)
+  data      Json?    // { productId, productName, price, searchQuery, orderId, orderValue... }
+  
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([sessionId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([type, createdAt])
+  @@map("analytics_events")
+}

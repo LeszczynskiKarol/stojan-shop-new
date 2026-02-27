@@ -240,8 +240,8 @@ export async function orderRoutes(app: FastifyInstance) {
           payment_method_types: ["card", "p24", "blik"],
           line_items: lineItems,
           mode: "payment",
-          success_url: `${FRONTEND_URL}/zamowienie/sukces?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${FRONTEND_URL}/zamowienie?stripe_cancel=true`,
+          success_url: `${FRONTEND_URL}/checkout/sukces?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${FRONTEND_URL}/checkout?stripe_cancel=true`,
           customer_email: body.shipping.email,
           metadata: {
             orderId: order.id,

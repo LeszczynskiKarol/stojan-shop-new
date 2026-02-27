@@ -1,6 +1,8 @@
 // frontend/src/lib/cart.ts
 // Cart store — localStorage + CustomEvent for cross-component sync
 
+import { tracker } from "./tracker";
+
 export interface CartItem {
   productId: string;
   name: string;
@@ -54,6 +56,12 @@ export const cart = {
       items.push({ ...item });
     }
     write(items);
+    tracker.addToCart({
+      productId: item.productId,
+      productName: item.name,
+      price: item.price,
+      quantity: item.quantity,
+    });
   },
   updateQuantity(productId: string, quantity: number): void {
     const items = read();
@@ -64,6 +72,7 @@ export const cart = {
       write(items);
     }
   },
+
   remove(productId: string): void {
     write(read().filter((i) => i.productId !== productId));
   },

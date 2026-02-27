@@ -1,0 +1,28 @@
+---
+// frontend/src/pages/checkout/sukces.astro
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { CheckoutSuccess } from '@/components/shop/CheckoutSuccess';
+---
+
+<BaseLayout
+  title="Zamówienie złożone | Stojan Shop"
+  description="Potwierdzenie zamówienia"
+  canonical="/checkout/sukces"
+>
+  <div class="container mx-auto px-4 py-12 max-w-3xl">
+    <CheckoutSuccess client:load />
+  </div>
+  <script is:inline>
+  // Google Ads conversion
+  // gtag respects consent mode — fires only if ad_storage is granted
+  if (window.gtag) {
+    gtag('event', 'conversion', {
+      'send_to': 'AW-988030143/MXlzCNyahrcZEL_JkNcD',
+      'transaction_id': '', // wypełnij ID zamówienia jeśli dostępne
+      'value': 0,           // wypełnij wartość zamówienia
+      'currency': 'PLN'
+    });
+  }
+</script>
+
+</BaseLayout>

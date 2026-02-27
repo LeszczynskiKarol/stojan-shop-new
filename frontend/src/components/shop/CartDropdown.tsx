@@ -1,5 +1,5 @@
 // frontend/src/components/shop/CartDropdown.tsx
-// Mini-modal dropdown at cart icon — shows items, remove, "Zamów" → /zamowienie
+// Mini-modal dropdown at cart icon — shows items, remove, "Zamów" → /checkout
 import { useState, useEffect, useRef } from "react";
 import { cart, type CartItem } from "@/lib/cart";
 
@@ -19,6 +19,7 @@ function fmt(n: number) {
 export default function CartDropdown() {
   const [items, setItems] = useState<CartItem[]>([]);
   const [open, setOpen] = useState(false);
+  const [isCheckoutPage, setIsCheckoutPage] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const count = items.reduce((s, i) => s + i.quantity, 0);
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -27,6 +28,10 @@ export default function CartDropdown() {
 
   useEffect(() => {
     refresh();
+    // Detect if we're on the checkout page
+    setIsCheckoutPage(
+      window.location.pathname.replace(/\/+$/, "") === "/checkout",
+    );
     window.addEventListener("cart-updated", refresh);
     return () => window.removeEventListener("cart-updated", refresh);
   }, []);
@@ -163,23 +168,25 @@ export default function CartDropdown() {
                   <span>Razem</span>
                   <span className="cd-total-val">{fmt(subtotal)} zł</span>
                 </div>
-                <a
-                  href="/zamowienie"
-                  className="cd-order"
-                  onClick={() => setOpen(false)}
-                >
-                  Zamów
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
+                {!isCheckoutPage && (
+                  <a
+                    href="/checkout"
+                    className="cd-order"
+                    onClick={() => setOpen(false)}
                   >
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </a>
+                    Zamawiam →
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                    >
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  </a>
+                )}
               </div>
             </>
           )}

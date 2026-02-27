@@ -1,5 +1,6 @@
 // frontend/src/components/shop/CheckoutSuccess.tsx
 import { useEffect, useState } from "react";
+import { tracker } from "@/lib/tracker";
 
 const API_URL =
   (import.meta as any).env?.PUBLIC_API_URL || "http://localhost:4000";
@@ -36,6 +37,16 @@ interface OrderDetails {
 export function CheckoutSuccess() {
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (order) {
+      tracker.orderComplete({
+        orderId: order.id,
+        orderValue: Number(order.total),
+        itemCount: order.items.length,
+      });
+    }
+  }, [order]);
 
   useEffect(() => {
     const fetchOrder = async () => {

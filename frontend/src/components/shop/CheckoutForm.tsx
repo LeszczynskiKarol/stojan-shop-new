@@ -218,7 +218,7 @@ export function CheckoutForm() {
       if (paymentMethod === "prepaid" && result.data.checkoutUrl) {
         window.location.href = result.data.checkoutUrl;
       } else {
-        window.location.href = `/zamowienie/sukces?order_id=${result.data.order.id}`;
+        window.location.href = `/checkout/sukces?order_id=${result.data.order.id}`;
       }
     } catch (err: any) {
       setSubmitError(err.message || "Wystąpił błąd");
@@ -255,7 +255,7 @@ export function CheckoutForm() {
               selected={paymentMethod === "prepaid"}
               onClick={() => setPaymentMethod("prepaid")}
               label="Płatność online"
-              desc="BLIK, karta, przelew"
+              desc="BLIK, przelew, karta, Google Pay, Apple Pay"
             />
             {totalWeight <= 575 && (
               <RadioCard
@@ -435,7 +435,12 @@ export function CheckoutForm() {
         )}
 
         <div className="lg:hidden">
-          <SubmitButton isSubmitting={isSubmitting} total={total} fmt={fmt} />
+          <SubmitButton
+            isSubmitting={isSubmitting}
+            total={total}
+            fmt={fmt}
+            paymentMethod={paymentMethod}
+          />
         </div>
       </div>
 
@@ -445,7 +450,7 @@ export function CheckoutForm() {
           {/* Products */}
           <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl p-5">
             <h2 className="font-semibold text-[hsl(var(--foreground))] mb-4">
-              Twoje zamówienie ({totalCount}{" "}
+              Moje zamówienie ({totalCount}{" "}
               {totalCount === 1
                 ? "produkt"
                 : totalCount < 5
@@ -558,11 +563,16 @@ export function CheckoutForm() {
 
           {/* Submit desktop */}
           <div className="hidden lg:block">
-            <SubmitButton isSubmitting={isSubmitting} total={total} fmt={fmt} />
+            <SubmitButton
+              isSubmitting={isSubmitting}
+              total={total}
+              fmt={fmt}
+              paymentMethod={paymentMethod}
+            />
           </div>
 
           <p className="text-xs text-[hsl(var(--muted-foreground))] text-center">
-            Klikając „Złóż zamówienie" akceptujesz{" "}
+            Klikając „Zamawiam", akceptuję{" "}
             <a
               href="/regulamin-sklepu"
               className="underline hover:text-[hsl(var(--foreground))]"
@@ -711,10 +721,12 @@ function SubmitButton({
   isSubmitting,
   total,
   fmt,
+  paymentMethod,
 }: {
   isSubmitting: boolean;
   total: number;
   fmt: (v: number) => string;
+  paymentMethod: "prepaid" | "cod";
 }) {
   return (
     <button
@@ -727,8 +739,10 @@ function SubmitButton({
           <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
           Przetwarzanie...
         </span>
+      ) : paymentMethod === "prepaid" ? (
+        "Kupuję i płacę →"
       ) : (
-        `Złóż zamówienie · ${fmt(total)} zł`
+        "Kupuję za pobraniem →"
       )}
     </button>
   );

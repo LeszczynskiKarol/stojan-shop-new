@@ -4,6 +4,7 @@
 import '@/styles/globals.css';
 import { GlobalSearch } from '@/components/search/GlobalSearch';
 import CartDropdown from '@/components/shop/CartDropdown';
+import CookieConsent from '@/components/CookieConsent';
 
 interface Props {
   title: string;
@@ -116,6 +117,63 @@ const currentYear = new Date().getFullYear();
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- ═══ CONSENT MODE V2 + GOOGLE TAGS ═══ -->
+  <!-- 1. Consent defaults (MUST be first!) -->
+  <script is:inline>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    
+    // Default: all denied until user consents
+    gtag('consent', 'default', {
+      'ad_storage': 'denied',
+      'ad_user_data': 'denied',
+      'ad_personalization': 'denied',
+      'analytics_storage': 'denied',
+      'functionality_storage': 'granted',
+      'security_storage': 'granted',
+      'wait_for_update': 500
+    });
+    
+    // Better attribution without cookies
+    gtag('set', 'url_passthrough', true);
+    gtag('set', 'ads_data_redaction', true);
+    
+    // If user already consented, apply immediately
+    try {
+      var cc = document.cookie.match(/(?:^|;\s*)cookie_consent=([^;]*)/);
+      if (cc) {
+        var s = JSON.parse(decodeURIComponent(cc[1]));
+        if (s && s.version === 1) {
+          gtag('consent', 'update', {
+            'ad_storage': s.marketing ? 'granted' : 'denied',
+            'ad_user_data': s.marketing ? 'granted' : 'denied',
+            'ad_personalization': s.marketing ? 'granted' : 'denied',
+            'analytics_storage': s.analytics ? 'granted' : 'denied'
+          });
+        }
+      }
+    } catch(e) {}
+  </script>
+
+  <!-- 2. Load gtag.js (respects consent mode — no cookies until granted) -->
+  <script is:inline async src="https://www.googletagmanager.com/gtag/js?id=G-VPV7V6L3KW"></script>
+  <script is:inline>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    
+    // GA4
+    gtag('config', 'G-VPV7V6L3KW', {
+      send_page_view: true,
+      cookie_flags: 'SameSite=Lax;Secure'
+    });
+    
+    // Google Ads (for conversion tracking + remarketing)
+    gtag('config', 'AW-988030143', {
+      cookie_flags: 'SameSite=Lax;Secure'
+    });
+  </script>
+  <!-- ═══ END CONSENT + GOOGLE TAGS ═══ -->
 
   <!-- SEO -->
   <title>{title}</title>
@@ -373,6 +431,9 @@ const currentYear = new Date().getFullYear();
           <div class="text-xs text-muted-foreground space-y-1">
             <a href="/skup-silnikow" class="block hover:underline hover:text-primary transition-colors">Skup silników</a>
           </div>
+          <button class="text-xs text-muted-foreground space-y-1" onclick="window.openCookieSettings()">
+            Ustawienia plików cookie
+          </button>
         </div>
       </div>
 
@@ -430,5 +491,18 @@ const currentYear = new Date().getFullYear();
         .catch(function() {});
     })();
   </script>
+  <script is:inline>
+  document.getElementById('cookie-settings-btn')?.addEventListener('click', function() {
+    if (window.openCookieSettings) {
+      window.openCookieSettings();
+    } else {
+      document.dispatchEvent(new Event('open-cookie-settings'));
+    }
+  });
+</script>
+
+  <script> import { tracker } from '@/lib/tracker'; tracker.init(); </script>
+    <CookieConsent client:load />
+
 </body>
 </html>

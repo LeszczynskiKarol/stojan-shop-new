@@ -67204,5 +67204,791 @@
     "cancellationReason": null,
     "cancelledAt": null,
     "cancelledBy": null
+  },
+  {
+    "id": "4031aef9-e492-44e3-8036-9f2aefb6c8c0",
+    "items": [
+      {
+        "productId": "8a778ff9-9edb-4f2f-91ae-561c48086317",
+        "quantity": 1,
+        "name": "silnik elektryczny 4kW 2900obr. 3fazowy 100B3 MS",
+        "price": 699,
+        "image": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1739347881056.JPG",
+        "stock": 4,
+        "weight": 26.5,
+        "mainImage": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1739347881056.JPG",
+        "slug": "silnik-elektryczny-4kw-2900obr-100b3",
+        "categorySlug": "trojfazowe",
+        "manufacturer": "Promotor",
+        "shaftDiameter": "28",
+        "condition": "nowy",
+        "mechanicalSize": 100,
+        "categories": [
+          {
+            "id": "3c9093a5-fd5c-4b1d-a5ff-3fcfe6c7f49a",
+            "slug": "trojfazowe"
+          }
+        ],
+        "marketplaces": {
+          "ownStore": {
+            "active": true,
+            "price": 699,
+            "slug": "silnik-elektryczny-4kw-2900obr-100b3"
+          }
+        },
+        "images": [
+          "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/products/57a5aca0-7dff-4dab-9b58-5310e15cb62d.jpg"
+        ],
+        "totalWeight": 26.5
+      }
+    ],
+    "shipping": {
+      "companyName": "Filip Pawlak",
+      "firstName": "Filip Pawlak",
+      "lastName": "-",
+      "email": "j.grzybek@vitroflora.com.pl",
+      "phone": "723683061",
+      "postalCode": "86-065",
+      "city": "Łochowo",
+      "street": "Bukowa 3",
+      "notes": "Witam, poproszę o fv papierową lub na maila. Dziękuję",
+      "differentShippingAddress": true,
+      "nip": "5542934138",
+      "shippingPostalCode": "86-022",
+      "shippingCity": "Kotomierz",
+      "shippingStreet": "Koronowska 15",
+      "shippingGmina": "Dobrcz",
+      "shippingPowiat": "bydgoski",
+      "shippingWojewodztwo": "kujawsko-pomorskie",
+      "invoiceStreet": "Bukowa 3",
+      "invoicePostalCode": "86-065",
+      "invoiceCity": "Łochowo"
+    },
+    "subtotal": "699.00",
+    "shippingCost": "27.00",
+    "total": "726.00",
+    "status": "shipped",
+    "paymentIntentId": null,
+    "createdAt": "2026-02-25T09:49:51.665Z",
+    "updatedAt": "2026-02-25T10:17:31.573Z",
+    "expiresAt": "2026-02-25T10:19:51.664Z",
+    "isStockReserved": true,
+    "stripeSessionId": "cs_live_b1HGziSb80cDs3Npv5Kno7ntIEPKK9GJuamnpVLBNHdX7Uvdq9VYd5fmAB",
+    "paymentMethod": "prepaid",
+    "paymentDetails": null,
+    "totalWeight": "26.50",
+    "invoiceUrls": [
+      "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/stojan/invoices/FV_200_02_2026.pdf",
+      "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/stojan/invoices/label_2026_02_25_11_12_06.pdf"
+    ],
+    "orderNumber": "094/02/2026",
+    "shippingDate": "2026-02-25T09:49:51.664Z",
+    "cancellationReason": null,
+    "cancelledAt": null,
+    "cancelledBy": null
+  },
+  {
+    "id": "8a36f96f-1840-4ee4-8bd1-9da1cbeb4060",
+    "items": [
+      {
+        "productId": "c5c04a02-c49f-46d6-bab1-39d0af2b8a74",
+        "quantity": 1,
+        "name": "silnik elektryczny 1,1kW 1400obr. 3fazowy 80B5 MS",
+        "price": 425,
+        "image": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1764769663047.JPG",
+        "stock": 3,
+        "weight": 11,
+        "mainImage": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1764769663047.JPG",
+        "slug": "silnik-elektryczny-11kw-1400obr-3fazowy-80b5-ms",
+        "categorySlug": "trojfazowe",
+        "manufacturer": "Promotor",
+        "shaftDiameter": "19",
+        "condition": "nowy",
+        "mechanicalSize": 80,
+        "categories": [
+          {
+            "id": "3c9093a5-fd5c-4b1d-a5ff-3fcfe6c7f49a",
+            "slug": "trojfazowe"
+          }
+        ],
+        "marketplaces": {
+          "ownStore": {
+            "active": true,
+            "price": 425,
+            "slug": "silnik-elektryczny-11kw-1400obr-3fazowy-80b5-ms"
+          }
+        },
+        "images": [],
+        "totalWeight": 11
+      }
+    ],
+    "shipping": {
+      "companyName": "UPTOR SP. Z O.O.",
+      "firstName": "UPTOR SP. Z O.O.",
+      "lastName": "-",
+      "email": "EWA.KWIECIEN@UPTOR.PL",
+      "phone": "537833288",
+      "postalCode": "59-600",
+      "city": "Rakowice Wielkie",
+      "street": "RAKOWICE WIELKIE 47D",
+      "notes": "",
+      "differentShippingAddress": false,
+      "nip": "",
+      "shippingStreet": "RAKOWICE WIELKIE 47D",
+      "shippingPostalCode": "59-600",
+      "shippingCity": "Rakowice Wielkie",
+      "invoiceStreet": "RAKOWICE WIELKIE 47D",
+      "invoicePostalCode": "59-600",
+      "invoiceCity": "Rakowice Wielkie"
+    },
+    "subtotal": "425.00",
+    "shippingCost": "27.00",
+    "total": "452.00",
+    "status": "shipped",
+    "paymentIntentId": null,
+    "createdAt": "2026-02-25T10:42:22.674Z",
+    "updatedAt": "2026-02-25T11:29:18.671Z",
+    "expiresAt": "2026-02-25T11:12:22.674Z",
+    "isStockReserved": true,
+    "stripeSessionId": "cs_live_b1yOMo2TyXv36HfuD448dEjfLoRtqnzh6nodHI4RZJWBSaoBL3rSLczfQW",
+    "paymentMethod": "prepaid",
+    "paymentDetails": null,
+    "totalWeight": "11.00",
+    "invoiceUrls": [
+      "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/stojan/invoices/label_2026_02_25_12_27_54.pdf"
+    ],
+    "orderNumber": "095/02/2026",
+    "shippingDate": "2026-02-25T10:42:22.674Z",
+    "cancellationReason": null,
+    "cancelledAt": null,
+    "cancelledBy": null
+  },
+  {
+    "id": "58528d51-b54b-4162-ab23-7ada27e1645f",
+    "items": [
+      {
+        "productId": "1c74778f-a38b-4ee6-a08b-c1da3b29b02b",
+        "quantity": 1,
+        "name": "silnik elektryczny 2,2kW 1400obr. 3fazowy 90B3 MS",
+        "price": 599,
+        "image": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1739347793825.JPG",
+        "stock": 6,
+        "weight": 19,
+        "mainImage": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1739347793825.JPG",
+        "slug": "silnik-elektryczny-22kw-1400obr-3fazowy-90b3-2",
+        "categorySlug": "trojfazowe",
+        "manufacturer": "Promotor",
+        "shaftDiameter": "24",
+        "condition": "nowy",
+        "mechanicalSize": 90,
+        "categories": [
+          {
+            "id": "3c9093a5-fd5c-4b1d-a5ff-3fcfe6c7f49a",
+            "slug": "trojfazowe"
+          }
+        ],
+        "marketplaces": {
+          "ownStore": {
+            "active": true,
+            "price": 599,
+            "slug": "silnik-elektryczny-22kw-1400obr-3fazowy-90b3-2"
+          }
+        },
+        "images": [
+          "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/products/3ed45f3d-1de6-450f-b550-8c94a847760d.jpg"
+        ],
+        "totalWeight": 19
+      }
+    ],
+    "shipping": {
+      "companyName": "PROEMA Sp. z o.o.",
+      "firstName": "PROEMA Sp. z o.o.",
+      "lastName": "-",
+      "email": "proema@proema.com.pl",
+      "phone": "579003303",
+      "postalCode": "35-206",
+      "city": "Rzeszów",
+      "street": "Okulickiego 14",
+      "notes": "Dostawa do firmy:\nZbigniew Pisarczyk\nPPG Deco Polska sp. z o.o.\nUL. MOŚCICKIEGO 23, 39-200, DĘBICA, \ntel. 600149007",
+      "differentShippingAddress": true,
+      "nip": "5170396525",
+      "gmina": "Rzeszów",
+      "powiat": "Rzeszów",
+      "wojewodztwo": "podkarpackie",
+      "shippingPostalCode": "39-200",
+      "shippingCity": "Dębica",
+      "shippingStreet": "MOŚCICKIEGO 23",
+      "shippingGmina": "Dębica",
+      "shippingPowiat": "dębicki",
+      "shippingWojewodztwo": "podkarpackie",
+      "invoiceStreet": "Okulickiego 14",
+      "invoicePostalCode": "35-206",
+      "invoiceCity": "Rzeszów"
+    },
+    "subtotal": "599.00",
+    "shippingCost": "27.00",
+    "total": "626.00",
+    "status": "pending",
+    "paymentIntentId": null,
+    "createdAt": "2026-02-25T12:23:35.888Z",
+    "updatedAt": "2026-02-25T12:23:36.466Z",
+    "expiresAt": "2026-02-25T12:53:35.885Z",
+    "isStockReserved": false,
+    "stripeSessionId": "cs_live_b1pgulrkkVuH0ljZvfXl1tbyrWfhglii7ZC9wqJaOQa9k8wnzWqV6FHt4y",
+    "paymentMethod": "prepaid",
+    "paymentDetails": null,
+    "totalWeight": "19.00",
+    "invoiceUrls": [],
+    "orderNumber": "096/02/2026",
+    "shippingDate": "2026-02-26T12:23:35.885Z",
+    "cancellationReason": null,
+    "cancelledAt": null,
+    "cancelledBy": null
+  },
+  {
+    "id": "d5034201-c1ae-4b43-b7d5-f5c6b85bc6d5",
+    "items": [
+      {
+        "productId": "5f595a0a-ffa4-41ac-9459-920809f55e77",
+        "quantity": 1,
+        "name": "silnik elektryczny 3kW 1400obr. 3fazowy 100B3 MS",
+        "price": 755,
+        "image": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1739347883178.JPG",
+        "stock": 4,
+        "weight": 26.5,
+        "mainImage": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1739347883178.JPG",
+        "slug": "silnik-elektryczny-3kw-1400obr-3fazowy-100b3-2",
+        "categorySlug": "trojfazowe",
+        "manufacturer": "Promotor",
+        "shaftDiameter": "28",
+        "condition": "nowy",
+        "mechanicalSize": 100,
+        "categories": [
+          {
+            "id": "3c9093a5-fd5c-4b1d-a5ff-3fcfe6c7f49a",
+            "slug": "trojfazowe"
+          }
+        ],
+        "marketplaces": {
+          "ownStore": {
+            "active": true,
+            "price": 755,
+            "slug": "silnik-elektryczny-3kw-1400obr-3fazowy-100b3-2"
+          }
+        },
+        "images": [
+          "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/products/2674872e-1c37-418f-81a4-60b66be80c1a.jpg"
+        ],
+        "totalWeight": 26.5
+      }
+    ],
+    "shipping": {
+      "companyName": "Ecopywriting.pl Karol Leszczyński",
+      "firstName": "Ecopywriting.pl Karol Leszczyński",
+      "lastName": "-",
+      "email": "leszczu123@wp.pl",
+      "phone": "509370772",
+      "postalCode": "86-221",
+      "city": "Firlus",
+      "street": "Papowo Biskupie, 119 m. 18",
+      "notes": "",
+      "differentShippingAddress": false,
+      "nip": "",
+      "shippingStreet": "Papowo Biskupie, 119 m. 18",
+      "shippingPostalCode": "86-221",
+      "shippingCity": "Firlus",
+      "invoiceStreet": "Papowo Biskupie, 119 m. 18",
+      "invoicePostalCode": "86-221",
+      "invoiceCity": "Firlus"
+    },
+    "subtotal": "755.00",
+    "shippingCost": "27.00",
+    "total": "782.00",
+    "status": "pending",
+    "paymentIntentId": null,
+    "createdAt": "2026-02-25T12:30:24.086Z",
+    "updatedAt": "2026-02-25T12:30:24.652Z",
+    "expiresAt": "2026-02-25T13:00:24.086Z",
+    "isStockReserved": false,
+    "stripeSessionId": "cs_live_b1fjx0Zv7cUKWSWJ4YIQfx7GmPELllaaoEQnGEydSsx5OBHdVNwxgsygw6",
+    "paymentMethod": "prepaid",
+    "paymentDetails": null,
+    "totalWeight": "26.50",
+    "invoiceUrls": [],
+    "orderNumber": "097/02/2026",
+    "shippingDate": "2026-02-26T12:30:24.085Z",
+    "cancellationReason": null,
+    "cancelledAt": null,
+    "cancelledBy": null
+  },
+  {
+    "id": "0a88c7df-63e4-4a5b-b3aa-7ee42e43a493",
+    "items": [
+      {
+        "productId": "4590a18e-5eba-4f8e-95d0-8777f865d2ef",
+        "quantity": 1,
+        "name": "silnik elektryczny 0,55kW 2900obr. 1fazowy 230V 71B3 MY",
+        "price": 309,
+        "image": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1742646799043.JPG",
+        "stock": 6,
+        "weight": 7,
+        "mainImage": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1742646799043.JPG",
+        "slug": "silnik-elektryczny-055kw-2900obr-1fazowy-230v",
+        "categorySlug": "jednofazowe",
+        "manufacturer": "Promotor",
+        "shaftDiameter": "14",
+        "condition": "nowy",
+        "mechanicalSize": 71,
+        "categories": [
+          {
+            "id": "1641d9b8-8059-4ca5-ac6b-ba5ab7e7109a",
+            "slug": "jednofazowe"
+          }
+        ],
+        "marketplaces": {
+          "ownStore": {
+            "active": true,
+            "price": 309,
+            "slug": "silnik-elektryczny-055kw-2900obr-1fazowy-230v"
+          }
+        },
+        "images": [
+          "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/products/977f82ae-3d39-4223-8df1-30165506e659.jpg"
+        ],
+        "totalWeight": 7
+      }
+    ],
+    "shipping": {
+      "companyName": "",
+      "firstName": "Natalia",
+      "lastName": "Dycha",
+      "email": "skodziara@gmail.com",
+      "phone": "798 535 097",
+      "postalCode": "14-407",
+      "city": "Stojpy",
+      "street": "Stojpy 3/1",
+      "notes": "",
+      "differentShippingAddress": false,
+      "nip": "",
+      "shippingStreet": "Stojpy 3/1",
+      "shippingPostalCode": "14-407",
+      "shippingCity": "Stojpy",
+      "invoiceStreet": "Stojpy 3/1",
+      "invoicePostalCode": "14-407",
+      "invoiceCity": "Stojpy"
+    },
+    "subtotal": "309.00",
+    "shippingCost": "23.00",
+    "total": "332.00",
+    "status": "shipped",
+    "paymentIntentId": null,
+    "createdAt": "2026-02-25T18:57:08.864Z",
+    "updatedAt": "2026-02-26T07:18:39.329Z",
+    "expiresAt": "2026-02-25T19:27:08.863Z",
+    "isStockReserved": false,
+    "stripeSessionId": null,
+    "paymentMethod": "cod",
+    "paymentDetails": null,
+    "totalWeight": "7.00",
+    "invoiceUrls": [
+      "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/stojan/invoices/label_2026_02_26_08_08_39.pdf"
+    ],
+    "orderNumber": "098/02/2026",
+    "shippingDate": "2026-02-26T18:57:08.863Z",
+    "cancellationReason": null,
+    "cancelledAt": null,
+    "cancelledBy": null
+  },
+  {
+    "id": "b98cd2ff-2734-49ab-8284-c7de64f53460",
+    "items": [
+      {
+        "productId": "82b1e1c1-b2e0-44db-a870-555f74e1a422",
+        "quantity": 1,
+        "name": "motoreduktor / przekładnia 0,55kW 46obr. 3fazowy NORD",
+        "price": 999,
+        "image": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1739379474503.JPG",
+        "stock": 5,
+        "weight": 24,
+        "mainImage": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1739379474503.JPG",
+        "slug": "motoreduktor-przekladnia-055kw-46obr-3fazowy-nord",
+        "categorySlug": "motoreduktory",
+        "manufacturer": "NORD",
+        "shaftDiameter": "0",
+        "condition": "nieuzywany",
+        "mechanicalSize": 0,
+        "categories": [
+          {
+            "id": "135f5eca-d1ea-4ada-ab3c-7f6d2b5d2106",
+            "slug": "motoreduktory"
+          }
+        ],
+        "marketplaces": {
+          "ownStore": {
+            "active": true,
+            "price": 999,
+            "slug": "motoreduktor-przekladnia-055kw-46obr-3fazowy-nord"
+          }
+        },
+        "images": [
+          "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/products/9a74f08d-d94e-4996-b0b0-44ad6caa3f7f.jpg"
+        ],
+        "totalWeight": 24
+      }
+    ],
+    "shipping": {
+      "companyName": "Hydro-Magnet",
+      "firstName": "Hydro-Magnet",
+      "lastName": "-",
+      "email": "hydromagnet@op.pl",
+      "phone": "605086321",
+      "postalCode": "80-180",
+      "city": "Gdańsk",
+      "street": "Kielecka 17",
+      "notes": "",
+      "differentShippingAddress": false,
+      "nip": "5911062646",
+      "shippingStreet": "Kielecka 17",
+      "shippingPostalCode": "80-180",
+      "shippingCity": "Gdańsk",
+      "invoiceStreet": "Kielecka 17",
+      "invoicePostalCode": "80-180",
+      "invoiceCity": "Gdańsk"
+    },
+    "subtotal": "999.00",
+    "shippingCost": "27.00",
+    "total": "1026.00",
+    "status": "shipped",
+    "paymentIntentId": null,
+    "createdAt": "2026-02-26T09:13:34.749Z",
+    "updatedAt": "2026-02-26T09:25:56.012Z",
+    "expiresAt": "2026-02-26T09:43:34.749Z",
+    "isStockReserved": true,
+    "stripeSessionId": "cs_live_b1Ejtv3dn8GySOLyLy70eCjAQnrVYgk4mC7yZF4AjkOs9Kf5aJ2P3EJKKn",
+    "paymentMethod": "prepaid",
+    "paymentDetails": null,
+    "totalWeight": "24.00",
+    "invoiceUrls": [
+      "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/stojan/invoices/FV_220_02_2026.pdf",
+      "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/stojan/invoices/label_2026_02_26_10_21_48.pdf"
+    ],
+    "orderNumber": "099/02/2026",
+    "shippingDate": "2026-02-26T09:13:34.748Z",
+    "cancellationReason": null,
+    "cancelledAt": null,
+    "cancelledBy": null
+  },
+  {
+    "id": "ebe981d0-ce6a-449e-88e5-7313e4401da3",
+    "items": [
+      {
+        "productId": "8a778ff9-9edb-4f2f-91ae-561c48086317",
+        "quantity": 1,
+        "name": "silnik elektryczny 4kW 2900obr. 3fazowy 100B3 MS",
+        "price": 699,
+        "image": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1739347881056.JPG",
+        "stock": 3,
+        "weight": 26.5,
+        "mainImage": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1739347881056.JPG",
+        "slug": "silnik-elektryczny-4kw-2900obr-100b3",
+        "categorySlug": "trojfazowe",
+        "manufacturer": "Promotor",
+        "shaftDiameter": "28",
+        "condition": "nowy",
+        "mechanicalSize": 100,
+        "categories": [
+          {
+            "id": "3c9093a5-fd5c-4b1d-a5ff-3fcfe6c7f49a",
+            "slug": "trojfazowe"
+          }
+        ],
+        "marketplaces": {
+          "ownStore": {
+            "active": true,
+            "price": 699,
+            "slug": "silnik-elektryczny-4kw-2900obr-100b3"
+          }
+        },
+        "images": [
+          "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/products/57a5aca0-7dff-4dab-9b58-5310e15cb62d.jpg"
+        ],
+        "totalWeight": 26.5
+      }
+    ],
+    "shipping": {
+      "companyName": "",
+      "firstName": "Patryk ",
+      "lastName": "Przyborowski ",
+      "email": "przyborowskipatryk@wp.pl",
+      "phone": "577650322",
+      "postalCode": "05-430",
+      "city": "Zabieżki",
+      "street": "Ziołowa 6",
+      "notes": "",
+      "differentShippingAddress": false,
+      "nip": "",
+      "shippingStreet": "Ziołowa 6",
+      "shippingPostalCode": "05-430",
+      "shippingCity": "Zabieżki",
+      "invoiceStreet": "Ziołowa 6",
+      "invoicePostalCode": "05-430",
+      "invoiceCity": "Zabieżki"
+    },
+    "subtotal": "699.00",
+    "shippingCost": "29.00",
+    "total": "728.00",
+    "status": "shipped",
+    "paymentIntentId": null,
+    "createdAt": "2026-02-26T09:34:45.034Z",
+    "updatedAt": "2026-02-26T10:33:58.709Z",
+    "expiresAt": "2026-02-26T10:04:45.033Z",
+    "isStockReserved": false,
+    "stripeSessionId": null,
+    "paymentMethod": "cod",
+    "paymentDetails": null,
+    "totalWeight": "26.50",
+    "invoiceUrls": [
+      "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/stojan/invoices/label_2026_02_26_10_51_28.pdf"
+    ],
+    "orderNumber": "100/02/2026",
+    "shippingDate": "2026-02-26T09:34:45.033Z",
+    "cancellationReason": null,
+    "cancelledAt": null,
+    "cancelledBy": null
+  },
+  {
+    "id": "95f5376b-361f-46ca-a504-d20d0fd5ac72",
+    "items": [
+      {
+        "productId": "01f74557-7820-4274-89f1-1dfbb759d1bf",
+        "quantity": 1,
+        "name": "silnik elektryczny 1,5kW 1400obr. 1fazowy 230V 90B3 ML",
+        "price": 729,
+        "image": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1742542137036.JPG",
+        "stock": 6,
+        "weight": 17.5,
+        "mainImage": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1742542137036.JPG",
+        "slug": "silnik-elektryczny-15kw-1400obr-1fazowy-230v",
+        "categorySlug": "jednofazowe",
+        "manufacturer": "Promotor",
+        "shaftDiameter": "24",
+        "condition": "nowy",
+        "mechanicalSize": 90,
+        "categories": [
+          {
+            "id": "1641d9b8-8059-4ca5-ac6b-ba5ab7e7109a",
+            "slug": "jednofazowe"
+          }
+        ],
+        "marketplaces": {
+          "ownStore": {
+            "active": true,
+            "price": 729,
+            "slug": "silnik-elektryczny-15kw-1400obr-1fazowy-230v"
+          }
+        },
+        "images": [
+          "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/products/82c6704e-93d3-4eab-a6b1-3667b94f3fd5.jpg"
+        ],
+        "totalWeight": 17.5
+      }
+    ],
+    "shipping": {
+      "companyName": "MECHANIKA POJAZDOWA MAREK NUREK",
+      "firstName": "MECHANIKA POJAZDOWA MAREK NUREK",
+      "lastName": "-",
+      "email": "marek170168@wp.pl",
+      "phone": "602365526",
+      "postalCode": "83-251",
+      "city": "Pinczyn",
+      "street": "SEMLIŃSKA 54",
+      "notes": "",
+      "differentShippingAddress": false,
+      "nip": "",
+      "shippingStreet": "SEMLIŃSKA 54",
+      "shippingPostalCode": "83-251",
+      "shippingCity": "Pinczyn",
+      "invoiceStreet": "SEMLIŃSKA 54",
+      "invoicePostalCode": "83-251",
+      "invoiceCity": "Pinczyn"
+    },
+    "subtotal": "729.00",
+    "shippingCost": "29.00",
+    "total": "758.00",
+    "status": "shipped",
+    "paymentIntentId": null,
+    "createdAt": "2026-02-26T17:14:21.326Z",
+    "updatedAt": "2026-02-27T07:31:51.276Z",
+    "expiresAt": "2026-02-26T17:44:21.325Z",
+    "isStockReserved": false,
+    "stripeSessionId": null,
+    "paymentMethod": "cod",
+    "paymentDetails": null,
+    "totalWeight": "17.50",
+    "invoiceUrls": [
+      "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/stojan/invoices/label_2026_02_27_08_29_14.pdf"
+    ],
+    "orderNumber": "101/02/2026",
+    "shippingDate": "2026-02-27T17:14:21.325Z",
+    "cancellationReason": null,
+    "cancelledAt": null,
+    "cancelledBy": null
+  },
+  {
+    "id": "4209e1de-b3ad-4a69-a4e6-761c01a4130b",
+    "items": [
+      {
+        "productId": "e3651221-f237-4cd4-85a9-917aedf43fd1",
+        "quantity": 1,
+        "name": "reduktor / przekładnia walcowa MR 14/P",
+        "price": 185,
+        "image": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1759492311248.JPG",
+        "stock": 1,
+        "weight": 2.5,
+        "mainImage": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1759492311248.JPG",
+        "slug": "reduktor-przekladnia-walcowa-mr-14-p",
+        "categorySlug": "motoreduktory",
+        "manufacturer": "Bonfiglioli",
+        "shaftDiameter": "14",
+        "condition": "uzywany",
+        "mechanicalSize": 0,
+        "categories": [
+          {
+            "id": "135f5eca-d1ea-4ada-ab3c-7f6d2b5d2106",
+            "slug": "motoreduktory"
+          }
+        ],
+        "marketplaces": {
+          "ownStore": {
+            "active": true,
+            "price": 185,
+            "slug": "reduktor-przekladnia-walcowa-mr-14-p"
+          }
+        },
+        "images": [],
+        "totalWeight": 2.5
+      }
+    ],
+    "shipping": {
+      "companyName": "Czakdrew Piotr Oczkowski",
+      "firstName": "Czakdrew Piotr Oczkowski",
+      "lastName": "-",
+      "email": "czakdrew@firma.pl",
+      "phone": "796573036",
+      "postalCode": "34-220",
+      "city": "Maków Podhalański",
+      "street": "ul. Za Woda 43",
+      "notes": "",
+      "differentShippingAddress": false,
+      "nip": "9930172160",
+      "shippingStreet": "ul. Za Woda 43",
+      "shippingPostalCode": "34-220",
+      "shippingCity": "Maków Podhalański",
+      "invoiceStreet": "ul. Za Woda 43",
+      "invoicePostalCode": "34-220",
+      "invoiceCity": "Maków Podhalański"
+    },
+    "subtotal": "185.00",
+    "shippingCost": "23.00",
+    "total": "208.00",
+    "status": "shipped",
+    "paymentIntentId": null,
+    "createdAt": "2026-02-26T18:38:12.131Z",
+    "updatedAt": "2026-02-27T07:45:26.365Z",
+    "expiresAt": "2026-02-26T19:08:12.129Z",
+    "isStockReserved": false,
+    "stripeSessionId": null,
+    "paymentMethod": "cod",
+    "paymentDetails": null,
+    "totalWeight": "2.50",
+    "invoiceUrls": [
+      "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/stojan/invoices/FV_226_02_2026.pdf",
+      "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/stojan/invoices/label_2026_02_27_08_41_00.pdf"
+    ],
+    "orderNumber": "102/02/2026",
+    "shippingDate": "2026-02-27T18:38:12.129Z",
+    "cancellationReason": null,
+    "cancelledAt": null,
+    "cancelledBy": null
+  },
+  {
+    "id": "7e301c9d-5070-4fc4-a2a4-104be71ae2e7",
+    "items": [
+      {
+        "productId": "512b46ee-02b3-4ad2-b1b0-5cd4e7fb282a",
+        "quantity": 1,
+        "name": "silnik elektryczny 15kW 2940obr. 3fazowy 160B3 IE2",
+        "price": 2099,
+        "image": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1749822775152.JPG",
+        "stock": 5,
+        "weight": 132,
+        "mainImage": "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1749822775152.JPG",
+        "slug": "silnik-elektryczny-15kw-2940obr-3fazowy-160b3-ie2",
+        "categorySlug": "trojfazowe",
+        "manufacturer": "AC-Motoren",
+        "shaftDiameter": "42",
+        "condition": "nowy",
+        "mechanicalSize": 160,
+        "categories": [
+          {
+            "id": "3c9093a5-fd5c-4b1d-a5ff-3fcfe6c7f49a",
+            "slug": "trojfazowe"
+          }
+        ],
+        "marketplaces": {
+          "ownStore": {
+            "active": true,
+            "price": 2099,
+            "slug": "silnik-elektryczny-15kw-2940obr-3fazowy-160b3-ie2"
+          }
+        },
+        "images": [],
+        "totalWeight": 132
+      }
+    ],
+    "shipping": {
+      "companyName": "Biuro Serwis Wojciech Biernacki",
+      "firstName": "Biuro Serwis Wojciech Biernacki",
+      "lastName": "-",
+      "email": "biernacki.wojciech@yahoo.pl",
+      "phone": "502713513",
+      "postalCode": "16-300",
+      "city": "Augustów",
+      "street": "Mickiewicza, 3",
+      "notes": "British American Tobacco Polska S.A., ul. Tytoniowa 16, 16-300 Augustów, osoba kontaktowa : Robert Gudanowski ",
+      "differentShippingAddress": true,
+      "nip": "8471134419",
+      "shippingPostalCode": "16-300",
+      "shippingCity": "Augustów",
+      "shippingStreet": "British American Tobacco Polska S.A. , Tytoniowa 16",
+      "shippingGmina": "Augustów",
+      "shippingPowiat": "augustowski",
+      "shippingWojewodztwo": "podlaskie",
+      "invoiceStreet": "Mickiewicza, 3",
+      "invoicePostalCode": "16-300",
+      "invoiceCity": "Augustów"
+    },
+    "subtotal": "2099.00",
+    "shippingCost": "165.00",
+    "total": "2264.00",
+    "status": "shipped",
+    "paymentIntentId": null,
+    "createdAt": "2026-02-27T09:19:14.354Z",
+    "updatedAt": "2026-02-27T09:31:59.417Z",
+    "expiresAt": "2026-02-27T09:49:14.353Z",
+    "isStockReserved": true,
+    "stripeSessionId": "cs_live_b1NFOXJHkKB3LeFZyzc9ryM2XkGq6YEk2Dbh1GuGUj1dnOqe70jslQouxq",
+    "paymentMethod": "prepaid",
+    "paymentDetails": null,
+    "totalWeight": "132.00",
+    "invoiceUrls": [
+      "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/stojan/invoices/FV_230_02_2026.pdf",
+      "https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/stojan/invoices/wysylajnami-pl-dokumenty - 2026-02-27T103042.463.pdf"
+    ],
+    "orderNumber": "103/02/2026",
+    "shippingDate": "2026-02-27T09:19:14.353Z",
+    "cancellationReason": null,
+    "cancelledAt": null,
+    "cancelledBy": null
   }
 ]

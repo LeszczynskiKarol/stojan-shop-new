@@ -1,5 +1,5 @@
 // frontend/src/components/shop/OrderButton.tsx
-// "Zamów teraz" — adds to cart + redirects to /zamowienie
+// "Zamów teraz" — adds to cart + redirects to /checkout
 import { useState } from "react";
 import { cart, type CartItem } from "@/lib/cart";
 
@@ -50,7 +50,7 @@ export function OrderButton({ product, categorySlug, productSlug }: Props) {
       rpm,
     };
     cart.add(item);
-    window.location.href = "/zamowienie";
+    window.location.href = "/checkout";
   };
 
   return (
@@ -80,7 +80,7 @@ export function OrderButton({ product, categorySlug, productSlug }: Props) {
         disabled={product.stock === 0}
         className="flex-1 h-11 px-6 rounded-lg font-semibold text-[hsl(var(--primary-foreground))] bg-[hsl(var(--primary))] hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {quantity === 1 ? "Zamów teraz" : `Zamów ${quantity} szt.`}
+        {quantity === 1 ? "Zamawiam →" : `Zamawiam ${quantity} szt.  →`}
       </button>
     </div>
   );
