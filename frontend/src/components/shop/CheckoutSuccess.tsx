@@ -1,6 +1,7 @@
 // frontend/src/components/shop/CheckoutSuccess.tsx
 import { useEffect, useState } from "react";
 import { tracker } from "@/lib/tracker";
+import { cart } from "@/lib/cart";
 
 const API_URL =
   (import.meta as any).env?.PUBLIC_API_URL || "http://localhost:4000";
@@ -37,6 +38,14 @@ interface OrderDetails {
 export function CheckoutSuccess() {
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // ✅ Wyczyść koszyk i dane formularza na stronie sukcesu
+  useEffect(() => {
+    cart.clear();
+    try {
+      sessionStorage.removeItem("stojan_checkout_form");
+    } catch {}
+  }, []);
 
   useEffect(() => {
     if (order) {

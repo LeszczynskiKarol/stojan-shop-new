@@ -13,6 +13,53 @@ const COND_LABEL: Record<string, string> = {
   nieuzywany: "Nieużywany",
 };
 
+// ============================================
+// FORM PERSISTENCE — sessionStorage
+// ============================================
+const FORM_STORAGE_KEY = "stojan_checkout_form";
+
+interface FormData {
+  isCompany: boolean;
+  companyName: string;
+  nip: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  street: string;
+  postalCode: string;
+  city: string;
+  notes: string;
+  wantsInvoice: boolean;
+  diffShipping: boolean;
+  shipStreet: string;
+  shipPostal: string;
+  shipCity: string;
+  paymentMethod: "prepaid" | "cod";
+}
+
+function saveFormData(data: FormData) {
+  try {
+    sessionStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(data));
+  } catch {}
+}
+
+function loadFormData(): FormData | null {
+  try {
+    const raw = sessionStorage.getItem(FORM_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function clearFormData() {
+  try {
+    sessionStorage.removeItem(FORM_STORAGE_KEY);
+  } catch {}
+}
+
 export function CheckoutForm() {
   // === STATE ===
   const [items, setItems] = useState<CartItem[]>([]);
@@ -23,6 +70,7 @@ export function CheckoutForm() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [stripeCancel, setStripeCancel] = useState(false);
 
   // Form
   const [isCompany, setIsCompany] = useState(false);
@@ -43,7 +91,7 @@ export function CheckoutForm() {
   const [shipCity, setShipCity] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // === LOAD FROM CART ===
+  // === LOAD FROM CART + RESTORE FORM ===
   useEffect(() => {
     const cartItems = cart.getItems();
     if (cartItems.length === 0) {
@@ -51,7 +99,81 @@ export function CheckoutForm() {
       return;
     }
     setItems(cartItems);
+
+    // Detect stripe cancel
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("stripe_cancel") === "true") {
+      setStripeCancel(true);
+      // Clean URL without reload
+      window.history.replaceState({}, "", "/checkout");
+    }
+
+    // Restore saved form data
+    const saved = loadFormData();
+    if (saved) {
+      setIsCompany(saved.isCompany);
+      setCompanyName(saved.companyName || "");
+      setNip(saved.nip || "");
+      setFirstName(saved.firstName || "");
+      setLastName(saved.lastName || "");
+      setEmail(saved.email || "");
+      setPhone(saved.phone || "");
+      setStreet(saved.street || "");
+      setPostalCode(saved.postalCode || "");
+      setCity(saved.city || "");
+      setNotes(saved.notes || "");
+      setWantsInvoice(saved.wantsInvoice || false);
+      setDiffShipping(saved.diffShipping || false);
+      setShipStreet(saved.shipStreet || "");
+      setShipPostal(saved.shipPostal || "");
+      setShipCity(saved.shipCity || "");
+      if (saved.paymentMethod) setPaymentMethod(saved.paymentMethod);
+    }
   }, []);
+
+  // === SAVE FORM on every change ===
+  useEffect(() => {
+    // Don't save on initial empty state
+    if (items.length === 0) return;
+    saveFormData({
+      isCompany,
+      companyName,
+      nip,
+      firstName,
+      lastName,
+      email,
+      phone,
+      street,
+      postalCode,
+      city,
+      notes,
+      wantsInvoice,
+      diffShipping,
+      shipStreet,
+      shipPostal,
+      shipCity,
+      paymentMethod,
+    });
+  }, [
+    isCompany,
+    companyName,
+    nip,
+    firstName,
+    lastName,
+    email,
+    phone,
+    street,
+    postalCode,
+    city,
+    notes,
+    wantsInvoice,
+    diffShipping,
+    shipStreet,
+    shipPostal,
+    shipCity,
+    paymentMethod,
+    items,
+  ]);
 
   // Sync cart changes
   useEffect(() => {
@@ -212,12 +334,14 @@ export function CheckoutForm() {
       if (!result.success)
         throw new Error(result.error || "Błąd tworzenia zamówienia");
 
-      // Clear cart
-      cart.clear();
-
       if (paymentMethod === "prepaid" && result.data.checkoutUrl) {
+        // ✅ NIE czyścimy koszyka — zostanie wyczyszczony na stronie sukcesu
+        // Dane formularza też zostawiamy w sessionStorage na wypadek cancel
         window.location.href = result.data.checkoutUrl;
       } else {
+        // COD — czyścimy koszyk i dane formularza od razu
+        cart.clear();
+        clearFormData();
         window.location.href = `/checkout/sukces?order_id=${result.data.order.id}`;
       }
     } catch (err: any) {
@@ -248,6 +372,14 @@ export function CheckoutForm() {
     >
       {/* ==================== LEFT: FORM ==================== */}
       <div className="space-y-6">
+        {/* Stripe cancel info */}
+        {stripeCancel && (
+          <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-sm">
+            Płatność została anulowana. Twoje dane zostały zachowane — możesz
+            spróbować ponownie.
+          </div>
+        )}
+
         {/* Payment method */}
         <Section title="Sposób płatności">
           <div className="grid sm:grid-cols-2 gap-3">
