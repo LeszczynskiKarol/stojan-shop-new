@@ -4,6 +4,25 @@
 
 import { useState, useEffect } from "react";
 
+// Only these URL params are actual shop filters — everything else (tracking, analytics) is ignored
+const FILTER_KEYS = new Set([
+  "q",
+  "cat",
+  "mfr",
+  "cond",
+  "kw",
+  "kwmin",
+  "kwmax",
+  "rpm",
+  "rpmr",
+  "obrmin",
+  "obrmax",
+  "pmin",
+  "pmax",
+  "sort",
+  "page",
+]);
+
 export default function BackToList({
   categorySlug,
   categoryName,
@@ -24,8 +43,17 @@ export default function BackToList({
           url.pathname === `/${categorySlug}` ||
           url.pathname.startsWith(`/${categorySlug}?`)
         ) {
-          setBackUrl(url.pathname + url.search);
-          setHasFilters(url.search.length > 0);
+          // Strip tracking params (_gl, _ga, gclid, fbclid, utm_*, etc.)
+          // Keep only actual shop filter params
+          const cleanParams = new URLSearchParams();
+          for (const [key, value] of url.searchParams) {
+            if (FILTER_KEYS.has(key)) {
+              cleanParams.set(key, value);
+            }
+          }
+          const cleanSearch = cleanParams.toString();
+          setBackUrl(url.pathname + (cleanSearch ? `?${cleanSearch}` : ""));
+          setHasFilters(cleanSearch.length > 0);
         }
       }
     } catch {}
