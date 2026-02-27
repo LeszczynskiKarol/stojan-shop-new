@@ -123,9 +123,6 @@ async function isAdmin(request: FastifyRequest): Promise<boolean> {
   try {
     const token = (request.cookies as any)?.admin_token;
     if (!token) return false;
-    // Simple check — if token exists and is not empty, treat as admin
-    // More robust: actually verify the JWT, but this is lightweight
-    const { createHmac } = await import("crypto");
     const parts = token.split(".");
     if (parts.length !== 3) return false;
     const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
@@ -135,6 +132,13 @@ async function isAdmin(request: FastifyRequest): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** Detect bots by user-agent */
+function isBotUA(ua: string): boolean {
+  return /bot|crawl|spider|slurp|bingbot|googlebot|yandex|baidu|duckduck|facebookexternalhit|semrush|ahrefs|mj12bot|dotbot|petalbot|bytespider|gptbot|claudebot|anthropic/i.test(
+    ua,
+  );
 }
 
 // ============================================
@@ -169,6 +173,12 @@ export async function analyticsRoutes(app: FastifyInstance) {
         return { success: true, tracked: false, reason: "admin" };
       }
 
+      // Exclude bots
+      const ua = request.headers["user-agent"] || "";
+      if (isBotUA(ua)) {
+        return { success: true, tracked: false, reason: "bot" };
+      }
+
       const { visitorId, type, page, data, sessionMeta } = request.body;
       if (!visitorId || !type || !page) {
         return reply
@@ -176,8 +186,10 @@ export async function analyticsRoutes(app: FastifyInstance) {
           .send({ success: false, error: "Missing fields" });
       }
 
-      const ua = request.headers["user-agent"] || "";
       const { deviceType, browser, os } = parseDevice(ua);
+
+      // Clean HTML-encoded ampersands from page URL
+      const cleanPage = page.replace(/&amp;/g, "&");
 
       // Find or create session
       const now = new Date();
@@ -192,15 +204,39 @@ export async function analyticsRoutes(app: FastifyInstance) {
       });
 
       if (!session) {
-        // New session
+        // New session — extract params from URL as fallback
+        let gclid = sessionMeta?.gclid;
+        let srsltid = sessionMeta?.srsltid;
+        let utm_source = sessionMeta?.utm_source;
+        let utm_medium = sessionMeta?.utm_medium;
+        let utm_campaign = sessionMeta?.utm_campaign;
+
+        // Fallback: extract from landing page URL if not in sessionMeta
+        if (!gclid || !srsltid) {
+          try {
+            const qIdx = cleanPage.indexOf("?");
+            if (qIdx !== -1) {
+              const urlParams = new URLSearchParams(cleanPage.slice(qIdx));
+              if (!gclid) gclid = urlParams.get("gclid") || undefined;
+              if (!srsltid) srsltid = urlParams.get("srsltid") || undefined;
+              if (!utm_source)
+                utm_source = urlParams.get("utm_source") || undefined;
+              if (!utm_medium)
+                utm_medium = urlParams.get("utm_medium") || undefined;
+              if (!utm_campaign)
+                utm_campaign = urlParams.get("utm_campaign") || undefined;
+            }
+          } catch {}
+        }
+
         const sourceInfo = detectSource({
           ref: sessionMeta?.referrer,
-          srsltid: sessionMeta?.srsltid,
-          gclid: sessionMeta?.gclid,
-          utm_source: sessionMeta?.utm_source,
-          utm_medium: sessionMeta?.utm_medium,
-          utm_campaign: sessionMeta?.utm_campaign,
-          landingPage: page,
+          srsltid,
+          gclid,
+          utm_source,
+          utm_medium,
+          utm_campaign,
+          landingPage: cleanPage,
         });
 
         session = await prisma.analyticsSession.create({
@@ -210,7 +246,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
             medium: sourceInfo.medium,
             campaign: sourceInfo.campaign,
             referrer: sessionMeta?.referrer || null,
-            landingPage: page,
+            landingPage: cleanPage,
             srsltid: sessionMeta?.srsltid || null,
             gclid: sessionMeta?.gclid || null,
             userAgent: ua,
@@ -249,7 +285,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
         data: {
           sessionId: session.id,
           type,
-          page,
+          page: cleanPage,
           data: data || undefined,
         },
       });
@@ -288,6 +324,9 @@ export async function analyticsRoutes(app: FastifyInstance) {
   }>("/heartbeat", async (request, reply) => {
     try {
       if (await isAdmin(request)) {
+        return { success: true };
+      }
+      if (isBotUA(request.headers["user-agent"] || "")) {
         return { success: true };
       }
 

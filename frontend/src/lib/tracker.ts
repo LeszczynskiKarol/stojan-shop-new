@@ -1,5 +1,6 @@
 // frontend/src/lib/tracker.ts
 // Wewnętrzna analityka — lightweight tracker
+// Dodaj do BaseLayout: <script> import { tracker } from '@/lib/tracker'; tracker.init(); </script>
 
 const API_URL =
   (typeof window !== "undefined" && (window as any).__PUBLIC_API_URL) ||
@@ -39,6 +40,14 @@ function isAdmin(): boolean {
   }
 }
 
+/** Detect bots by user-agent */
+function isBot(): boolean {
+  const ua = navigator.userAgent.toLowerCase();
+  return /bot|crawl|spider|slurp|bingbot|googlebot|yandex|baidu|duckduck|facebookexternalhit|semrush|ahrefs|mj12bot|dotbot|petalbot|bytespider/i.test(
+    ua,
+  );
+}
+
 /** Extract URL params relevant for source detection */
 function getSessionMeta(): {
   referrer?: string;
@@ -50,7 +59,9 @@ function getSessionMeta(): {
   screenWidth: number;
   screenHeight: number;
 } {
-  const params = new URLSearchParams(window.location.search);
+  // Use raw search string, decode &amp; entities (bot protection)
+  const rawSearch = window.location.search.replace(/&amp;/g, "&");
+  const params = new URLSearchParams(rawSearch);
   return {
     referrer: document.referrer || undefined,
     srsltid: params.get("srsltid") || undefined,
@@ -130,23 +141,22 @@ export const tracker = {
   init(): void {
     if (typeof window === "undefined") return;
     if (isAdmin()) return;
+    if (isBot()) return;
     if (initialized) return;
     initialized = true;
 
-    // Track initial page view
-    send(
-      "page_view",
-      window.location.pathname + window.location.search,
-      undefined,
-      true,
-    );
+    // Track initial page view (clean &amp; entities from URL)
+    const cleanPage = (
+      window.location.pathname + window.location.search
+    ).replace(/&amp;/g, "&");
+    send("page_view", cleanPage, undefined, true);
 
     // Auto-detect product page view
     const pathParts = window.location.pathname.split("/").filter(Boolean);
     if (
       pathParts.length === 2 &&
       !pathParts[0].startsWith("admin") &&
-      !pathParts[0].startsWith("zamowienie")
+      !pathParts[0].startsWith("checkout")
     ) {
       // This is a /:categorySlug/:productSlug page — delay to get product info from DOM
       setTimeout(() => {
@@ -171,14 +181,20 @@ export const tracker = {
     }
 
     // Detect checkout page
-    if (window.location.pathname === "/checkout") {
-      send("checkout_start", "/checkout");
+    if (
+      window.location.pathname === "/checkout" ||
+      window.location.pathname === "/zamowienie"
+    ) {
+      send("checkout_start", window.location.pathname);
     }
 
     // Detect success page
-    if (window.location.pathname.startsWith("/checkout/success")) {
+    if (
+      window.location.pathname.startsWith("/checkout/sukces") ||
+      window.location.pathname.startsWith("/zamowienie/sukces")
+    ) {
       const params = new URLSearchParams(window.location.search);
-      send("order_complete", "/checkout/success", {
+      send("order_complete", window.location.pathname, {
         orderId: params.get("order_id") || params.get("session_id") || null,
       });
     }
@@ -222,7 +238,7 @@ export const tracker = {
 
   /** Track checkout start */
   checkoutStart(): void {
-    send("checkout_start", "/checkout");
+    send("checkout_start", "/zamowienie");
   },
 
   /** Track order complete */
