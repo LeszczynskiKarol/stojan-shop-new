@@ -136,9 +136,42 @@ async function isAdmin(request: FastifyRequest): Promise<boolean> {
 
 /** Detect bots by user-agent */
 function isBotUA(ua: string): boolean {
-  return /bot|crawl|spider|slurp|bingbot|googlebot|yandex|baidu|duckduck|facebookexternalhit|semrush|ahrefs|mj12bot|dotbot|petalbot|bytespider|gptbot|claudebot|anthropic/i.test(
-    ua,
-  );
+  // Layer 1: Known bot patterns (UA strings)
+  if (
+    /bot|crawl|spider|slurp|bingbot|googlebot|yandex|baidu|duckduck|facebookexternalhit|semrush|ahrefs|mj12bot|dotbot|petalbot|bytespider|gptbot|claudebot|anthropic|applebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|pingdom|uptimerobot|headlesschrome|phantomjs|puppeteer|selenium|webdriver|wget|curl|httpie|python-requests|go-http|java\/|libwww|scrapy|httpclient|okhttp|axios\/|node-fetch/i.test(
+      ua,
+    )
+  ) {
+    return true;
+  }
+
+  // Layer 2: Stale Chrome version (pre-2024) — real users auto-update
+  const chromeMatch = ua.match(/Chrome\/(\d+)/);
+  if (chromeMatch) {
+    const ver = parseInt(chromeMatch[1], 10);
+    if (ver > 0 && ver < 120) return true;
+  }
+
+  // Layer 3: Empty or minimal UA
+  if (!ua || ua.length < 20) return true;
+
+  // Layer 4: "compatible;" pattern without MSIE = old bot convention
+  if (/compatible;/i.test(ua) && !/msie|trident/i.test(ua)) return true;
+
+  return false;
+}
+
+/** Score bot likelihood 0-100 — usable for soft filtering / flagging */
+function botScore(
+  ua: string,
+  meta?: { botSignals?: string[]; screenWidth?: number; screenHeight?: number },
+): number {
+  let score = 0;
+  if (isBotUA(ua)) score += 80;
+  if (meta?.botSignals && meta.botSignals.length > 0)
+    score += meta.botSignals.length * 20;
+  if (meta?.screenWidth === 0 || meta?.screenHeight === 0) score += 40;
+  return Math.min(score, 100);
 }
 
 // ============================================
@@ -164,6 +197,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
         utm_campaign?: string;
         screenWidth?: number;
         screenHeight?: number;
+        botSignals?: string[];
       };
     };
   }>("/event", async (request, reply) => {
@@ -173,13 +207,15 @@ export async function analyticsRoutes(app: FastifyInstance) {
         return { success: true, tracked: false, reason: "admin" };
       }
 
-      // Exclude bots
       const ua = request.headers["user-agent"] || "";
-      if (isBotUA(ua)) {
-        return { success: true, tracked: false, reason: "bot" };
+      const { visitorId, type, page, data, sessionMeta } = request.body;
+
+      // Exclude bots (multi-layer detection)
+      const bScore = botScore(ua, sessionMeta);
+      if (bScore >= 50) {
+        return { success: true, tracked: false, reason: "bot", score: bScore };
       }
 
-      const { visitorId, type, page, data, sessionMeta } = request.body;
       if (!visitorId || !type || !page) {
         return reply
           .status(400)

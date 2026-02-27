@@ -42,10 +42,37 @@ function isAdmin(): boolean {
 
 /** Detect bots by user-agent */
 function isBot(): boolean {
-  const ua = navigator.userAgent.toLowerCase();
-  return /bot|crawl|spider|slurp|bingbot|googlebot|yandex|baidu|duckduck|facebookexternalhit|semrush|ahrefs|mj12bot|dotbot|petalbot|bytespider/i.test(
-    ua,
-  );
+  const ua = navigator.userAgent;
+
+  // Layer 1: Known bot UA patterns
+  if (
+    /bot|crawl|spider|slurp|bingbot|googlebot|yandex|baidu|duckduck|facebookexternalhit|semrush|ahrefs|mj12bot|dotbot|petalbot|bytespider|gptbot|claudebot|anthropic|applebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|pingdom|uptimerobot|headlesschrome|phantomjs|puppeteer|selenium|webdriver/i.test(
+      ua,
+    )
+  ) {
+    return true;
+  }
+
+  // Layer 2: WebDriver flag (Selenium, Puppeteer, Playwright)
+  if (navigator.webdriver) return true;
+
+  // Layer 3: Headless Chrome detection — real Chrome always has plugins
+  if (
+    /chrome/i.test(ua) &&
+    navigator.plugins &&
+    navigator.plugins.length === 0
+  ) {
+    return true;
+  }
+
+  // Layer 4: Stale browser version — Chrome <120 is pre-2024, almost certainly a bot/scraper
+  const chromeVer = ua.match(/Chrome\/(\d+)/);
+  if (chromeVer && parseInt(chromeVer[1], 10) < 120) return true;
+
+  // Layer 5: Zero screen dimensions = headless environment
+  if (window.screen.width === 0 || window.screen.height === 0) return true;
+
+  return false;
 }
 
 /** Extract URL params relevant for source detection */
@@ -58,10 +85,29 @@ function getSessionMeta(): {
   utm_campaign?: string;
   screenWidth: number;
   screenHeight: number;
+  botSignals?: string[];
 } {
   // Use raw search string, decode &amp; entities (bot protection)
   const rawSearch = window.location.search.replace(/&amp;/g, "&");
   const params = new URLSearchParams(rawSearch);
+
+  // Collect suspicious signals for server-side scoring
+  const botSignals: string[] = [];
+  if (navigator.webdriver) botSignals.push("webdriver");
+  if (
+    navigator.plugins &&
+    navigator.plugins.length === 0 &&
+    /chrome/i.test(navigator.userAgent)
+  ) {
+    botSignals.push("no_plugins");
+  }
+  const cv = navigator.userAgent.match(/Chrome\/(\d+)/);
+  if (cv && parseInt(cv[1], 10) < 120) botSignals.push("stale_chrome_" + cv[1]);
+  if (!navigator.languages || navigator.languages.length === 0)
+    botSignals.push("no_languages");
+  if (window.outerWidth === 0 && window.outerHeight === 0)
+    botSignals.push("zero_outer");
+
   return {
     referrer: document.referrer || undefined,
     srsltid: params.get("srsltid") || undefined,
@@ -71,6 +117,7 @@ function getSessionMeta(): {
     utm_campaign: params.get("utm_campaign") || undefined,
     screenWidth: window.screen.width,
     screenHeight: window.screen.height,
+    botSignals: botSignals.length > 0 ? botSignals : undefined,
   };
 }
 
