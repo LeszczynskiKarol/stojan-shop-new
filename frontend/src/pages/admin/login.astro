@@ -155,13 +155,15 @@
     const errorEl = document.getElementById('error');
     const submitBtn = document.getElementById('submitBtn');
 
-    // Check if already logged in
+    
+    // Clean up admin flag if session expired
     fetch(`${API_URL}/api/admin/auth/verify`, { credentials: 'include' })
       .then(r => r.json())
       .then(data => {
         if (data.success) window.location.href = '/admin/products';
+        else localStorage.removeItem('is_admin');
       })
-      .catch(() => {});
+      .catch(() => { localStorage.removeItem('is_admin'); });
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -183,6 +185,7 @@
         const data = await res.json();
 
         if (data.success) {
+          localStorage.setItem('is_admin', '1');
           window.location.href = '/admin/products';
         } else {
           errorEl.textContent = data.error || 'Błąd logowania';
@@ -196,6 +199,7 @@
         submitBtn.textContent = 'Zaloguj się';
       }
     });
+    
   </script>
 </body>
 </html>

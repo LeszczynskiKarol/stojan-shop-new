@@ -31,8 +31,11 @@ function getVisitorId(): string {
 }
 
 /** Check if user is admin (has admin cookie — skips tracking server-side too) */
+// tracker.ts — tymczasowy debug
+
 function isAdmin(): boolean {
   try {
+    if (localStorage.getItem("is_admin") === "1") return true;
     return document.cookie.includes("admin_token=");
   } catch {
     return false;
@@ -70,7 +73,12 @@ function send(
   data?: Record<string, any>,
   includeSessionMeta = false,
 ): void {
-  if (isAdmin()) return;
+  const admin = isAdmin();
+
+  if (admin) {
+    console.log("[TRACKER DEBUG] ⛔ BLOCKED — admin detected on frontend");
+    return;
+  }
 
   const payload: any = {
     visitorId: getVisitorId(),
@@ -84,10 +92,10 @@ function send(
   const url = `${API_URL}/api/analytics/event`;
   const body = JSON.stringify(payload);
 
-  // Try sendBeacon first (survives page unload), fall back to fetch
   if (navigator.sendBeacon) {
     const blob = new Blob([body], { type: "application/json" });
     const sent = navigator.sendBeacon(url, blob);
+
     if (sent) return;
   }
 
@@ -129,7 +137,10 @@ export const tracker = {
   /** Initialize — call once on page load */
   init(): void {
     if (typeof window === "undefined") return;
-    if (isAdmin()) return;
+    if (isAdmin()) {
+      console.log("[TRACKER DEBUG] ⛔ init() ABORTED — admin");
+      return;
+    }
     if (initialized) return;
     initialized = true;
 

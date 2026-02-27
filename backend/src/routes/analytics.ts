@@ -122,18 +122,19 @@ function parseDevice(ua: string): {
 /** Check if request is from admin (has valid admin cookie) */
 async function isAdmin(request: FastifyRequest): Promise<boolean> {
   try {
-    const token = (request.cookies as any)?.admin_token;
+    const cookies = (request.cookies as any) || {};
+    const token = cookies?.admin_token;
+
     if (!token) return false;
-    // Simple check — if token exists and is not empty, treat as admin
-    // More robust: actually verify the JWT, but this is lightweight
-    const { createHmac } = await import("crypto");
     const parts = token.split(".");
     if (parts.length !== 3) return false;
     const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
-    return (
-      payload.role === "admin" && payload.exp > Math.floor(Date.now() / 1000)
-    );
-  } catch {
+
+    const result =
+      payload.role === "admin" && payload.exp > Math.floor(Date.now() / 1000);
+
+    return result;
+  } catch (e) {
     return false;
   }
 }
@@ -165,11 +166,6 @@ export async function analyticsRoutes(app: FastifyInstance) {
     };
   }>("/event", async (request, reply) => {
     try {
-      // Exclude admin
-      if (await isAdmin(request)) {
-        return { success: true, tracked: false, reason: "admin" };
-      }
-
       const { visitorId, type, page, data, sessionMeta } = request.body;
       if (!visitorId || !type || !page) {
         return reply
