@@ -229,38 +229,11 @@ const currentYear = new Date().getFullYear();
     })();
   </script>
 
-  <!-- Consent Mode -->
-  <script is:inline>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    window.gtag = gtag;
-    gtag('consent', 'default', {
-      'ad_storage': 'denied', 'ad_user_data': 'denied', 'ad_personalization': 'denied',
-      'analytics_storage': 'denied', 'functionality_storage': 'granted', 'security_storage': 'granted',
-      'wait_for_update': 2500
-    });
-    try { var sv = localStorage.getItem('consentSettings'); if (sv) gtag('consent', 'update', JSON.parse(sv)); } catch(e){}
-  </script>
-
-  <!-- Google Ads -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-988030143"></script>
-  <script is:inline>gtag('config', 'AW-988030143', { 'allow_ad_personalization_signals': false });</script>
-
-  <!-- GTM -->
-  <script is:inline>
-    (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','GTM-MSS5RSBK');
-  </script>
+ 
 </head>
 
 <body class="min-h-screen bg-background text-foreground flex flex-col overflow-x-hidden">
-  <!-- GTM noscript -->
-  <noscript>
-    <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MSS5RSBK" height="0" width="0" style="display:none;visibility:hidden"></iframe>
-  </noscript>
+  
 
   <!-- ============ HEADER ============ -->
   <header class="sticky top-0 z-50 bg-background border-b border-border" style="backdrop-filter:none">
@@ -431,9 +404,9 @@ const currentYear = new Date().getFullYear();
           <div class="text-xs text-muted-foreground space-y-1">
             <a href="/skup-silnikow" class="block hover:underline hover:text-primary transition-colors">Skup silników</a>
           </div>
-          <button class="text-xs text-muted-foreground space-y-1" onclick="window.openCookieSettings()">
-            Ustawienia plików cookie
-          </button>
+         <button class="text-xs text-muted-foreground hover:underline hover:text-primary transition-colors mt-2 block" onclick="window.openCookieSettings()">
+          Ustawienia plików cookie
+        </button>
         </div>
       </div>
 
@@ -491,16 +464,7 @@ const currentYear = new Date().getFullYear();
         .catch(function() {});
     })();
   </script>
-  <script is:inline>
-  document.getElementById('cookie-settings-btn')?.addEventListener('click', function() {
-    if (window.openCookieSettings) {
-      window.openCookieSettings();
-    } else {
-      document.dispatchEvent(new Event('open-cookie-settings'));
-    }
-  });
-</script>
-
+  
   <script> import { tracker } from '@/lib/tracker'; tracker.init(); </script>
     <CookieConsent client:load />
 

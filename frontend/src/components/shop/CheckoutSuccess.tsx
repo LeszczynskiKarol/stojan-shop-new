@@ -48,11 +48,36 @@ export function CheckoutSuccess() {
   }, []);
 
   useEffect(() => {
-    if (order) {
-      tracker.orderComplete({
-        orderId: order.id,
-        orderValue: Number(order.total),
-        itemCount: order.items.length,
+    if (!order) return;
+
+    // Internal analytics
+    tracker.orderComplete({
+      orderId: order.id,
+      orderValue: Number(order.total),
+      itemCount: order.items.length,
+    });
+
+    // GA4 purchase event
+    if (window.gtag) {
+      window.gtag("event", "purchase", {
+        transaction_id: order.id,
+        value: Number(order.total),
+        currency: "PLN",
+        items: order.items.map((item, i) => ({
+          item_id: String(i),
+          item_name: item.name,
+          price: Number(item.price),
+          quantity: item.quantity,
+          index: i,
+        })),
+      });
+
+      // Google Ads conversion
+      window.gtag("event", "conversion", {
+        send_to: "AW-988030143/MXlzCNyahrcZEL_JkNcD",
+        transaction_id: order.id,
+        value: Number(order.total),
+        currency: "PLN",
       });
     }
   }, [order]);

@@ -1,5 +1,3 @@
-// frontend/src/components/CookieConsent.tsx
-
 /**
  * CookieConsent — banner + modal ustawień
  * GDPR/RODO + Google Consent Mode v2
@@ -15,9 +13,11 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   getSavedConsent,
+  shouldShowBanner,
   acceptAll,
   rejectAll,
   saveCustom,
+  type ConsentState,
 } from "../lib/consent";
 
 // ============================================
@@ -109,21 +109,25 @@ export default function CookieConsent() {
       {/* Settings Modal */}
       {showSettings && (
         <div
-          className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 transition-all duration-300 ${
-            animate ? "opacity-100 scale-100" : "opacity-0 scale-95"
+          className={`fixed inset-0 z-[9999] flex items-end sm:items-center justify-center sm:p-4 transition-all duration-300 ${
+            animate ? "opacity-100" : "opacity-0"
           }`}
           role="dialog"
           aria-modal="true"
           aria-label="Ustawienia plików cookie"
+          onClick={() => setShowSettings(false)}
         >
           <div
-            className="w-full max-w-lg bg-[#1a1a2e] border border-[#2a2a4a] rounded-2xl shadow-2xl overflow-hidden"
+            className={`w-full sm:max-w-lg bg-[#1a1a2e] border border-[#2a2a4a] rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col transition-transform duration-300 ${
+              animate ? "translate-y-0" : "translate-y-full sm:translate-y-4"
+            }`}
+            style={{ boxSizing: "border-box", maxWidth: "100vw" }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="px-6 py-5 border-b border-[#2a2a4a]">
+            <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-[#2a2a4a] flex-shrink-0">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white">
+                <h2 className="text-base sm:text-lg font-semibold text-white">
                   Ustawienia plików cookie
                 </h2>
                 <button
@@ -141,14 +145,14 @@ export default function CookieConsent() {
                   </svg>
                 </button>
               </div>
-              <p className="text-sm text-gray-400 mt-2 leading-relaxed">
+              <p className="text-xs sm:text-sm text-gray-400 mt-2 leading-relaxed">
                 Wybierz, które kategorie plików cookie chcesz włączyć. Możesz
                 zmienić swoje preferencje w&nbsp;dowolnym momencie.
               </p>
             </div>
 
             {/* Categories */}
-            <div className="px-6 py-4 space-y-1 max-h-[60vh] overflow-y-auto">
+            <div className="px-4 sm:px-6 py-4 space-y-1 overflow-y-auto flex-1">
               {/* Necessary */}
               <CategoryToggle
                 title="Niezbędne"
@@ -178,25 +182,66 @@ export default function CookieConsent() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-[#2a2a4a] flex flex-col sm:flex-row gap-2">
-              <button
-                onClick={handleRejectAll}
-                className="flex-1 h-11 rounded-xl border border-[#3a3a5a] text-sm text-gray-300 hover:bg-white/5 transition-colors"
+            <div
+              style={{
+                padding: "12px 16px",
+                borderTop: "1px solid #2a2a4a",
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: "6px" }}
               >
-                Odrzuć opcjonalne
-              </button>
-              <button
-                onClick={handleSaveCustom}
-                className="flex-1 h-11 rounded-xl bg-indigo-600 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
-              >
-                Zapisz wybór
-              </button>
-              <button
-                onClick={handleAcceptAll}
-                className="flex-1 h-11 rounded-xl bg-white text-sm font-medium text-gray-900 hover:bg-gray-100 transition-colors"
-              >
-                Akceptuj wszystkie
-              </button>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <button
+                    onClick={handleRejectAll}
+                    style={{
+                      flex: 1,
+                      height: "38px",
+                      borderRadius: "8px",
+                      background: "transparent",
+                      color: "#d1d5db",
+                      fontSize: "12px",
+                      border: "1px solid #3a3a5a",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Odrzuć opcjonalne
+                  </button>
+                  <button
+                    onClick={handleSaveCustom}
+                    style={{
+                      flex: 1,
+                      height: "38px",
+                      borderRadius: "8px",
+                      background: "#4f46e5",
+                      color: "#fff",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Zapisz wybór
+                  </button>
+                </div>
+                <button
+                  onClick={handleAcceptAll}
+                  style={{
+                    width: "100%",
+                    height: "38px",
+                    borderRadius: "8px",
+                    background: "#fff",
+                    color: "#111",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  Akceptuj wszystkie
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -205,64 +250,113 @@ export default function CookieConsent() {
       {/* Bottom Banner */}
       {!showSettings && (
         <div
-          className={`fixed bottom-0 left-0 right-0 z-[9999] transition-transform duration-500 ease-out ${
+          className={`fixed bottom-0 left-0 right-0 z-[9999] overflow-hidden transition-transform duration-500 ease-out ${
             animate ? "translate-y-0" : "translate-y-full"
           }`}
           role="dialog"
           aria-label="Zgoda na pliki cookie"
+          style={{ maxWidth: "100vw" }}
         >
-          <div className="mx-auto max-w-5xl px-4 pb-4">
-            <div className="bg-[#1a1a2e] border border-[#2a2a4a] rounded-2xl shadow-2xl shadow-black/40 p-5 sm:p-6">
-              <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:items-center">
-                {/* Text */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start gap-3">
-                    <span
-                      className="text-2xl flex-shrink-0 mt-0.5"
-                      aria-hidden="true"
-                    >
-                      🍪
-                    </span>
-                    <div>
-                      <h2 className="text-base font-semibold text-white mb-1.5">
-                        Ta strona używa plików cookie
-                      </h2>
-                      <p className="text-sm text-gray-400 leading-relaxed">
-                        Używamy plików cookie niezbędnych do działania sklepu
-                        oraz opcjonalnych cookie analitycznych
-                        i&nbsp;marketingowych. Szczegóły znajdziesz
-                        w&nbsp;naszej{" "}
-                        <a
-                          href="/polityka-prywatnosci"
-                          className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
-                        >
-                          polityce prywatności
-                        </a>
-                        .
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Buttons */}
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 lg:flex-shrink-0">
-                  <button
-                    onClick={() => setShowSettings(true)}
-                    className="h-11 px-5 rounded-xl border border-[#3a3a5a] text-sm text-gray-300 hover:bg-white/5 transition-colors whitespace-nowrap order-3 sm:order-1"
+          <div style={{ padding: "8px", maxWidth: "1024px", margin: "0 auto" }}>
+            <div
+              style={{
+                background: "#1a1a2e",
+                border: "1px solid #2a2a4a",
+                borderRadius: "12px",
+                padding: "12px",
+                boxShadow: "0 -4px 30px rgba(0,0,0,0.4)",
+              }}
+            >
+              {/* Text */}
+              <div
+                style={{ display: "flex", gap: "8px", marginBottom: "12px" }}
+              >
+                <span
+                  style={{ fontSize: "18px", flexShrink: 0 }}
+                  aria-hidden="true"
+                >
+                  🍪
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <p
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      color: "#fff",
+                      marginBottom: "2px",
+                    }}
                   >
-                    Ustawienia
-                  </button>
+                    Ta strona używa plików cookie
+                  </p>
+                  <p
+                    style={{
+                      fontSize: "11px",
+                      color: "#9ca3af",
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    Używamy cookie niezbędnych oraz opcjonalnych analitycznych i
+                    marketingowych.{" "}
+                    <a
+                      href="/polityka-prywatnosci"
+                      style={{ color: "#818cf8", textDecoration: "underline" }}
+                    >
+                      Polityka prywatności
+                    </a>
+                  </p>
+                </div>
+              </div>
+
+              {/* Buttons — full width stack */}
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: "6px" }}
+              >
+                <button
+                  onClick={handleAcceptAll}
+                  style={{
+                    height: "38px",
+                    borderRadius: "8px",
+                    background: "#4f46e5",
+                    color: "#fff",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    border: "none",
+                    cursor: "pointer",
+                    width: "100%",
+                  }}
+                >
+                  Akceptuj wszystkie
+                </button>
+                <div style={{ display: "flex", gap: "6px" }}>
                   <button
                     onClick={handleRejectAll}
-                    className="h-11 px-5 rounded-xl border border-[#3a3a5a] text-sm text-gray-300 hover:bg-white/5 transition-colors whitespace-nowrap order-2"
+                    style={{
+                      flex: 1,
+                      height: "38px",
+                      borderRadius: "8px",
+                      background: "transparent",
+                      color: "#d1d5db",
+                      fontSize: "12px",
+                      border: "1px solid #3a3a5a",
+                      cursor: "pointer",
+                    }}
                   >
                     Odrzuć opcjonalne
                   </button>
                   <button
-                    onClick={handleAcceptAll}
-                    className="h-11 px-6 rounded-xl bg-indigo-600 text-sm font-medium text-white hover:bg-indigo-500 transition-colors whitespace-nowrap order-1 sm:order-3"
+                    onClick={() => setShowSettings(true)}
+                    style={{
+                      flex: 1,
+                      height: "38px",
+                      borderRadius: "8px",
+                      background: "transparent",
+                      color: "#d1d5db",
+                      fontSize: "12px",
+                      border: "1px solid #3a3a5a",
+                      cursor: "pointer",
+                    }}
                   >
-                    Akceptuj wszystkie
+                    Ustawienia
                   </button>
                 </div>
               </div>
@@ -295,16 +389,18 @@ function CategoryToggle({
 }) {
   return (
     <div
-      className={`rounded-xl p-4 transition-colors ${
+      className={`rounded-xl p-3 sm:p-4 transition-colors ${
         checked
           ? "bg-indigo-500/8 border border-indigo-500/20"
           : "bg-white/3 border border-transparent"
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-medium text-white">{title}</span>
+            <span className="text-xs sm:text-sm font-medium text-white">
+              {title}
+            </span>
             {disabled && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 uppercase tracking-wider font-medium">
                 Zawsze aktywne
