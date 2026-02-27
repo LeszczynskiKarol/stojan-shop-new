@@ -352,34 +352,33 @@ const { title = 'Admin Panel' } = Astro.props;
     // ============================================
     // AUTH GUARD - redirect to login if not authenticated
     // ============================================
-(async () => {
+    (async () => {
       try {
         const res = await fetch(`${API_URL}/api/admin/auth/verify`, { credentials: 'include' });
         const data = await res.json();
         if (!data.success) {
-          localStorage.removeItem('is_admin');
           window.location.href = '/admin/login';
           return;
         }
       } catch {
-        localStorage.removeItem('is_admin');
         window.location.href = '/admin/login';
         return;
       }
+
+      // Show content only after auth passes
       document.body.style.opacity = '1';
     })();
 
     // Logout handler
     document.getElementById('logoutBtn')?.addEventListener('click', async () => {
-          try {
-            await fetch(`${API_URL}/api/admin/auth/logout`, {
-              method: 'POST',
-              credentials: 'include',
-            });
-          } catch {}
-          localStorage.removeItem('is_admin');
-          window.location.href = '/admin/login';
+      try {
+        await fetch(`${API_URL}/api/admin/auth/logout`, {
+          method: 'POST',
+          credentials: 'include',
         });
+      } catch {}
+      window.location.href = '/admin/login';
+    });
   </script>
 
   <style>

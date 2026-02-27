@@ -3,7 +3,6 @@
 // Simple single-admin setup (credentials from env vars)
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import "@fastify/cookie";
 import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 
 // ============================================
@@ -139,15 +138,6 @@ export async function adminAuthRoutes(app: FastifyInstance) {
         maxAge: TOKEN_EXPIRY,
       });
 
-      // Marker cookie for frontend tracker (not httpOnly — JS can read it)
-      reply.setCookie("is_admin", "1", {
-        httpOnly: false,
-        secure: true,
-        sameSite: "none" as const,
-        path: "/",
-        maxAge: TOKEN_EXPIRY,
-      });
-
       return { success: true, data: { username, role: "admin" } };
     },
   );
@@ -159,12 +149,6 @@ export async function adminAuthRoutes(app: FastifyInstance) {
     // FIX: clearCookie MUST use the same options as setCookie
     // (httpOnly, secure, sameSite, path) — otherwise the browser ignores it
     reply.clearCookie(COOKIE_NAME, COOKIE_OPTIONS);
-    reply.clearCookie("is_admin", {
-      httpOnly: false,
-      secure: true,
-      sameSite: "none" as const,
-      path: "/",
-    });
     return { success: true, message: "Wylogowano" };
   });
 
