@@ -2,6 +2,7 @@
 // Admin panel product management - Fastify + Prisma
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import "@fastify/multipart";
 import {
   fireAllegroStockSync,
   fireAllegroPriceSync,
@@ -383,7 +384,7 @@ export async function adminProductRoutes(app: FastifyInstance) {
   // POST / — create product
   // ------------------------------------------
   app.post<{ Body: any }>("/", async (request, reply) => {
-    const body = request.body;
+    const body = request.body as Record<string, any>;
 
     // Resolve category ID (frontend sends slug-based data)
     let categoryId: string | null = null;

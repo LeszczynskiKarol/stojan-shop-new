@@ -2,6 +2,7 @@
 import { FastifyInstance } from "fastify";
 import Stripe from "stripe";
 import { prisma } from "../lib/prisma.js";
+import "@fastify/multipart";
 import {
   calculateShippingCost,
   isCodAvailable,

@@ -3,6 +3,7 @@
 // Simple single-admin setup (credentials from env vars)
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import "@fastify/cookie";
 import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 
 // ============================================

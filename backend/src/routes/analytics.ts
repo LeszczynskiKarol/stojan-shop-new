@@ -4,6 +4,7 @@
 
 import { FastifyInstance, FastifyRequest } from "fastify";
 import { prisma } from "../lib/prisma.js";
+import "@fastify/cookie";
 
 // ============================================
 // HELPERS
