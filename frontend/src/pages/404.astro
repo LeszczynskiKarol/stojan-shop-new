@@ -3,6 +3,7 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 
 const requestedPath = Astro.url.pathname;
+const requestedSearch = Astro.url.search || '';
 ---
 
 <BaseLayout
@@ -51,6 +52,99 @@ const requestedPath = Astro.url.pathname;
       </p>
     </div>
   </div>
+
+  <!-- Internal tracker: 404 event with full context -->
+  <script is:inline define:vars={{ requestedPath, requestedSearch }}>
+    (function() {
+      var API_URL = window.__PUBLIC_API_URL || window.__API_URL || 'http://localhost:4000';
+      var VISITOR_KEY = 'stojan_vid';
+
+      // Get or create visitor ID
+      var visitorId;
+      try { visitorId = localStorage.getItem(VISITOR_KEY); } catch(e) {}
+      if (!visitorId) {
+        var arr = new Uint8Array(16);
+        crypto.getRandomValues(arr);
+        visitorId = Array.from(arr, function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+        try { localStorage.setItem(VISITOR_KEY, visitorId); } catch(e) {}
+      }
+
+      // Skip admin
+      if (document.cookie.indexOf('admin_token=') !== -1) return;
+
+      // Classify the 404 pattern for easy filtering in dashboard
+      var pattern = 'unknown';
+      var path = requestedPath;
+      if (path.indexOf('/undefined/') === 0) pattern = 'undefined_category';
+      else if (/^\/silniki-elektryczne-[0-9]/.test(path)) pattern = 'power_kw_old';
+      else if (path.indexOf('/producent/marka-producent/') === 0) pattern = 'producent_old';
+      else if (path.indexOf('/legal/') === 0) pattern = 'legal_old';
+      else if (path.indexOf('/hamulcem/') === 0) pattern = 'hamulcem_old';
+      else if (path.indexOf('/silniki-elektryczne-trojfazowe/') === 0) pattern = 'se_trojfazowe_old';
+      else if (path.indexOf('/silniki-elektryczne-z-hamulcem/') === 0) pattern = 'se_hamulcem_old';
+      else if (path.indexOf('/silniki-elektryczne/') === 0) pattern = 'se_catchall';
+      else if (path.indexOf('/bez-kategorii/') === 0) pattern = 'bez_kategorii';
+      else if (path.indexOf('/produkt/') === 0) pattern = 'woocommerce_old';
+      else if (path.indexOf('/wp-content/') === 0) pattern = 'wp_content';
+      else if (path.indexOf('/wp-admin/') === 0) pattern = 'wp_admin';
+      else if (/\.php$/.test(path)) pattern = 'php_old';
+      else if (path.indexOf('/moc/') === 0) pattern = 'moc_taxonomy';
+      else if (path.indexOf('/tag-produktu/') === 0) pattern = 'tag_old';
+      else if (path.indexOf('/blog/') === 0) pattern = 'blog';
+      else if (/^\/(trojfazowe|jednofazowe|z-hamulcem|dwubiegowe|motoreduktory|akcesoria|pompy|wentylatory-przemyslowe)\//.test(path)) pattern = 'valid_category_missing_product';
+
+      // Detect internal vs external source
+      var ref = document.referrer || '';
+      var isInternal = ref.indexOf('silniki-elektryczne.com.pl') !== -1;
+
+      // Parse query params
+      var rawSearch = (requestedSearch || window.location.search || '').replace(/&amp;/g, '&');
+      var params = new URLSearchParams(rawSearch);
+
+      var payload = {
+        visitorId: visitorId,
+        type: 'page_404',
+        page: path + rawSearch,
+        data: {
+          pattern: pattern,
+          fullUrl: window.location.href,
+          referrer: ref || null,
+          isInternal: isInternal,
+          internalSource: isInternal ? ref : null,
+          srsltid: params.get('srsltid') || null,
+          gclid: params.get('gclid') || null,
+          utm_source: params.get('utm_source') || null,
+          screenWidth: window.screen.width,
+          screenHeight: window.screen.height
+        },
+        sessionMeta: {
+          referrer: ref || undefined,
+          srsltid: params.get('srsltid') || undefined,
+          gclid: params.get('gclid') || undefined,
+          utm_source: params.get('utm_source') || undefined,
+          utm_medium: params.get('utm_medium') || undefined,
+          utm_campaign: params.get('utm_campaign') || undefined,
+          screenWidth: window.screen.width,
+          screenHeight: window.screen.height
+        }
+      };
+
+      var url = API_URL + '/api/analytics/event';
+      var body = JSON.stringify(payload);
+
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+      } else {
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: body,
+          keepalive: true,
+          credentials: 'include'
+        }).catch(function() {});
+      }
+    })();
+  </script>
 
   <!-- GA4: Track 404 errors with full path and referrer -->
   <script is:inline define:vars={{ requestedPath }}>

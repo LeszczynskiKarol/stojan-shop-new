@@ -635,4 +635,202 @@ export async function adminAnalyticsRoutes(app: FastifyInstance) {
 
     return { success: true, data: topProducts };
   });
+  // ------------------------------------------
+  // GET /404-stats — 404 error analytics
+  // Query: startDate, endDate
+  // ------------------------------------------
+  app.get("/404-stats", async (request) => {
+    const query = request.query as {
+      startDate?: string;
+      endDate?: string;
+    };
+
+    const now = new Date();
+    const endDate = query.endDate ? new Date(query.endDate) : now;
+    const startDate = query.startDate
+      ? new Date(query.startDate)
+      : new Date(now.getFullYear(), now.getMonth(), 1);
+    endDate.setHours(23, 59, 59, 999);
+
+    const events = await prisma.analyticsEvent.findMany({
+      where: {
+        type: "page_404",
+        createdAt: { gte: startDate, lte: endDate },
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        page: true,
+        data: true,
+        createdAt: true,
+        session: {
+          select: {
+            source: true,
+            medium: true,
+            deviceType: true,
+            visitorId: true,
+          },
+        },
+      },
+    });
+
+    // 1. By pattern
+    const patternMap = new Map<string, { count: number; urls: Set<string> }>();
+    // 2. Top URLs
+    const urlMap = new Map<
+      string,
+      { count: number; pattern: string; lastSeen: Date; sources: Set<string> }
+    >();
+    // 3. Internal broken links
+    const internalLinkMap = new Map<
+      string,
+      { count: number; targets: Set<string> }
+    >();
+    // 4. External sources
+    const externalSourceMap = new Map<string, number>();
+    // 5. Daily counts
+    const dailyMap = new Map<string, number>();
+
+    let totalInternal = 0;
+    let totalExternal = 0;
+    let totalDirect = 0;
+
+    for (const ev of events) {
+      const d = (ev.data || {}) as any;
+      const pattern = d.pattern || "unknown";
+      const page = ev.page || "unknown";
+      const isInternal = d.isInternal === true;
+      const referrer = d.referrer || "";
+      const internalSource = d.internalSource || null;
+      const source = ev.session?.source || "unknown";
+
+      // Pattern aggregation
+      const pc = patternMap.get(pattern) || { count: 0, urls: new Set() };
+      pc.count++;
+      pc.urls.add(page);
+      patternMap.set(pattern, pc);
+
+      // URL aggregation
+      const pagePath = page.split("?")[0]; // strip query params for grouping
+      const uc = urlMap.get(pagePath) || {
+        count: 0,
+        pattern,
+        lastSeen: ev.createdAt,
+        sources: new Set(),
+      };
+      uc.count++;
+      uc.sources.add(source);
+      if (ev.createdAt > uc.lastSeen) uc.lastSeen = ev.createdAt;
+      urlMap.set(pagePath, uc);
+
+      // Internal vs external
+      if (isInternal) {
+        totalInternal++;
+        if (internalSource) {
+          try {
+            const srcPath = new URL(internalSource).pathname;
+            const ic = internalLinkMap.get(srcPath) || {
+              count: 0,
+              targets: new Set(),
+            };
+            ic.count++;
+            ic.targets.add(pagePath);
+            internalLinkMap.set(srcPath, ic);
+          } catch {}
+        }
+      } else if (referrer) {
+        totalExternal++;
+        try {
+          const host = new URL(referrer).hostname.replace("www.", "");
+          externalSourceMap.set(host, (externalSourceMap.get(host) || 0) + 1);
+        } catch {
+          externalSourceMap.set(
+            referrer.slice(0, 50),
+            (externalSourceMap.get(referrer.slice(0, 50)) || 0) + 1,
+          );
+        }
+      } else {
+        totalDirect++;
+      }
+
+      // Daily
+      const dayKey = ev.createdAt.toISOString().split("T")[0];
+      dailyMap.set(dayKey, (dailyMap.get(dayKey) || 0) + 1);
+    }
+
+    // Format results
+    const byPattern = Array.from(patternMap.entries())
+      .map(([pattern, d]) => ({
+        pattern,
+        count: d.count,
+        uniqueUrls: d.urls.size,
+        pct: events.length > 0 ? round2((d.count / events.length) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    const topUrls = Array.from(urlMap.entries())
+      .map(([url, d]) => ({
+        url,
+        count: d.count,
+        pattern: d.pattern,
+        lastSeen: d.lastSeen.toISOString(),
+        sources: Array.from(d.sources),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 50);
+
+    const brokenInternalLinks = Array.from(internalLinkMap.entries())
+      .map(([sourcePage, d]) => ({
+        sourcePage,
+        count: d.count,
+        targets: Array.from(d.targets).slice(0, 5),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20);
+
+    const externalSources = Array.from(externalSourceMap.entries())
+      .map(([source, count]) => ({ source, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 15);
+
+    // Fill daily gaps
+    const dailyCursor = new Date(startDate);
+    while (dailyCursor <= endDate) {
+      const key = dailyCursor.toISOString().split("T")[0];
+      if (!dailyMap.has(key)) dailyMap.set(key, 0);
+      dailyCursor.setDate(dailyCursor.getDate() + 1);
+    }
+    const daily = Array.from(dailyMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, count]) => ({ date, count }));
+
+    // Recent events (last 30)
+    const recentEvents = events.slice(0, 30).map((ev) => {
+      const d = (ev.data || {}) as any;
+      return {
+        page: ev.page,
+        pattern: d.pattern || "unknown",
+        referrer: d.referrer || null,
+        isInternal: d.isInternal || false,
+        source: ev.session?.source || "unknown",
+        device: ev.session?.deviceType || "unknown",
+        createdAt: ev.createdAt.toISOString(),
+      };
+    });
+
+    return {
+      success: true,
+      data: {
+        total: events.length,
+        totalInternal,
+        totalExternal,
+        totalDirect,
+        byPattern,
+        topUrls,
+        brokenInternalLinks,
+        externalSources,
+        daily,
+        recentEvents,
+      },
+    };
+  });
 }

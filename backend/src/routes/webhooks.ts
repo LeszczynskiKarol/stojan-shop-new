@@ -2,6 +2,7 @@
 import { FastifyInstance } from "fastify";
 import Stripe from "stripe";
 import { prisma } from "../lib/prisma.js";
+import { trackOrderServerSide } from "../services/analyticsHooks.js";
 import { reserveStock } from "./orders.js";
 import {
   sendOrderConfirmation,
@@ -114,6 +115,13 @@ export async function webhookRoutes(app: FastifyInstance) {
           });
 
           app.log.info(`✅ Order ${order.orderNumber} opłacony (Stripe)`);
+
+          // ▶ Server-side analytics tracking
+          trackOrderServerSide({
+            visitorId: session.metadata?.visitorId,
+            orderId: order.id,
+            orderValue: Number(updatedOrder.total),
+          });
 
           // Wyślij email potwierdzenia
           try {

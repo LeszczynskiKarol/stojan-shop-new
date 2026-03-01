@@ -326,7 +326,7 @@ export function CheckoutForm() {
           totalWeight,
           paymentMethod,
           returnUrl: window.location.href,
-          analyticsSessionId: `session_${Date.now()}`,
+          visitorId: localStorage.getItem("stojan_vid") || undefined,
         }),
       });
 

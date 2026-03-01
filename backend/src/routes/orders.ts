@@ -2,6 +2,7 @@
 import { FastifyInstance } from "fastify";
 import Stripe from "stripe";
 import { prisma } from "../lib/prisma.js";
+import { trackOrderServerSide } from "../services/analyticsHooks.js";
 import "@fastify/multipart";
 import {
   calculateShippingCost,
@@ -135,7 +136,7 @@ export async function orderRoutes(app: FastifyInstance) {
         totalWeight: number;
         paymentMethod: "prepaid" | "cod";
         returnUrl?: string;
-        analyticsSessionId?: string;
+        visitorId?: string;
       };
 
       if (!body.items?.length) {
@@ -247,6 +248,7 @@ export async function orderRoutes(app: FastifyInstance) {
           metadata: {
             orderId: order.id,
             orderNumber,
+            visitorId: (body as any).visitorId || "",
           },
           expires_at: Math.floor(Date.now() / 1000) + 1800,
         });
@@ -275,6 +277,13 @@ export async function orderRoutes(app: FastifyInstance) {
             status: "paid",
             isStockReserved: true,
           },
+        });
+
+        // ▶ Server-side analytics tracking
+        trackOrderServerSide({
+          visitorId: (body as any).visitorId,
+          orderId: order.id,
+          orderValue: verifiedTotal,
         });
 
         try {

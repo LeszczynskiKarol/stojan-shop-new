@@ -1,7 +1,7 @@
 // frontend/src/components/admin/AnalyticsDashboard.tsx
 // Internal analytics dashboard for Stojan Shop admin panel
 // Displays: overview KPIs, conversion funnel, traffic sources, Google performance,
-// time series, devices, top landing pages, hourly heatmap, browsers/OS, sessions list
+// time series, devices, top landing pages, hourly heatmap, browsers/OS, sessions list, 404 errors
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 
@@ -140,7 +140,68 @@ interface SessionItem {
   events: any[];
 }
 
-type Tab = "overview" | "sources" | "funnel" | "pages" | "sessions";
+// ── 404 Types ──
+interface NotFoundPattern {
+  pattern: string;
+  count: number;
+  uniqueUrls: number;
+  pct: number;
+}
+
+interface NotFoundUrl {
+  url: string;
+  count: number;
+  pattern: string;
+  lastSeen: string;
+  sources: string[];
+}
+
+interface BrokenInternalLink {
+  sourcePage: string;
+  count: number;
+  targets: string[];
+}
+
+interface NotFoundExternalSource {
+  source: string;
+  count: number;
+}
+
+interface NotFoundDaily {
+  date: string;
+  count: number;
+}
+
+interface NotFoundEvent {
+  page: string;
+  pattern: string;
+  referrer: string | null;
+  isInternal: boolean;
+  source: string;
+  device: string;
+  createdAt: string;
+}
+
+interface NotFoundData {
+  total: number;
+  totalInternal: number;
+  totalExternal: number;
+  totalDirect: number;
+  byPattern: NotFoundPattern[];
+  topUrls: NotFoundUrl[];
+  brokenInternalLinks: BrokenInternalLink[];
+  externalSources: NotFoundExternalSource[];
+  daily: NotFoundDaily[];
+  recentEvents: NotFoundEvent[];
+}
+
+type Tab =
+  | "overview"
+  | "sources"
+  | "funnel"
+  | "pages"
+  | "sessions"
+  | "errors404";
 
 // ============================================
 // HELPERS
@@ -195,6 +256,36 @@ const DEVICE_ICONS: Record<string, string> = {
   tablet: "📋",
 };
 
+const PATTERN_LABELS: Record<string, string> = {
+  undefined_category: "🐛 /undefined/ (bug frontend)",
+  power_kw_old: "⚡ /silniki-elektryczne-{moc}-kw/ (stary WP)",
+  producent_old: "🏭 /producent/marka-producent/ (stary WP)",
+  legal_old: "📜 /legal/ (stary WP)",
+  hamulcem_old: "🔧 /hamulcem/ (brak z-)",
+  se_trojfazowe_old: "🔄 /silniki-elektryczne-trojfazowe/",
+  se_hamulcem_old: "🔄 /silniki-elektryczne-z-hamulcem/",
+  se_catchall: "🔄 /silniki-elektryczne/ (catch-all)",
+  bez_kategorii: "📁 /bez-kategorii/",
+  woocommerce_old: "🛒 /produkt/ (WooCommerce)",
+  wp_content: "📦 /wp-content/",
+  wp_admin: "🔒 /wp-admin/",
+  php_old: "🐘 .php pliki",
+  moc_taxonomy: "⚡ /moc/ (taksonomia WP)",
+  tag_old: "🏷️ /tag-produktu/",
+  blog: "📝 /blog/",
+  valid_category_missing_product: "❌ Kategoria OK, produkt nie istnieje",
+  unknown: "❓ Nieznany pattern",
+};
+
+const PATTERN_COLORS: Record<string, string> = {
+  undefined_category: "#ef4444",
+  power_kw_old: "#f59e0b",
+  valid_category_missing_product: "#ec4899",
+  producent_old: "#8b5cf6",
+  blog: "#3b82f6",
+  unknown: "#6b7280",
+};
+
 // ============================================
 // MAIN COMPONENT
 // ============================================
@@ -227,6 +318,10 @@ export default function AnalyticsDashboard() {
 
   // Top products
   const [topProducts, setTopProducts] = useState<any[]>([]);
+
+  // 404 tab state
+  const [notFoundData, setNotFoundData] = useState<NotFoundData | null>(null);
+  const [notFoundLoading, setNotFoundLoading] = useState(false);
 
   // ── FETCH MAIN DATA ──
   const fetchData = useCallback(async () => {
@@ -302,10 +397,26 @@ export default function AnalyticsDashboard() {
     } catch {}
   }, [startDate, endDate]);
 
+  // ── FETCH 404 STATS ──
+  const fetch404Stats = useCallback(async () => {
+    setNotFoundLoading(true);
+    try {
+      const params = new URLSearchParams({ startDate, endDate });
+      const res = await fetch(
+        `${API}/api/admin/analytics/404-stats?${params}`,
+        { credentials: "include" },
+      );
+      const json = await res.json();
+      if (json.success) setNotFoundData(json.data);
+    } catch {}
+    setNotFoundLoading(false);
+  }, [startDate, endDate]);
+
   useEffect(() => {
     if (tab === "sessions") fetchSessions(0);
     if (tab === "pages") fetchTopProducts();
-  }, [tab, fetchSessions, fetchTopProducts]);
+    if (tab === "errors404") fetch404Stats();
+  }, [tab, fetchSessions, fetchTopProducts, fetch404Stats]);
 
   // ── QUICK DATE PRESETS ──
   const setPreset = (preset: string) => {
@@ -422,6 +533,7 @@ export default function AnalyticsDashboard() {
             ["funnel", "Lejek konwersji"],
             ["pages", "Strony & Produkty"],
             ["sessions", "Sesje"],
+            ["errors404", "🚨 Błędy 404"],
           ] as [Tab, string][]
         ).map(([key, label]) => (
           <button
@@ -481,8 +593,306 @@ export default function AnalyticsDashboard() {
               }
             />
           )}
+          {tab === "errors404" && (
+            <NotFoundTab data={notFoundData} loading={notFoundLoading} />
+          )}
         </>
       )}
+    </div>
+  );
+}
+
+// ============================================
+// 404 ERRORS TAB
+// ============================================
+function NotFoundTab({
+  data,
+  loading,
+}: {
+  data: NotFoundData | null;
+  loading: boolean;
+}) {
+  const [urlFilter, setUrlFilter] = useState("");
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="w-8 h-8 border-3 border-[hsl(var(--primary))] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="text-center py-12 text-[hsl(var(--muted-foreground))]">
+        Brak danych
+      </div>
+    );
+  }
+
+  const filteredUrls = urlFilter
+    ? data.topUrls.filter(
+        (u) => u.url.includes(urlFilter) || u.pattern.includes(urlFilter),
+      )
+    : data.topUrls;
+
+  return (
+    <div className="space-y-6">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard
+          label="Łącznie 404"
+          value={String(data.total)}
+          warn={data.total > 50}
+        />
+        <KpiCard
+          label="Wewnętrzne"
+          value={String(data.totalInternal)}
+          warn={data.totalInternal > 0}
+        />
+        <KpiCard label="Zewnętrzne" value={String(data.totalExternal)} />
+        <KpiCard label="Bezpośrednie" value={String(data.totalDirect)} />
+      </div>
+
+      {/* Internal broken links alert */}
+      {data.brokenInternalLinks.length > 0 && (
+        <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-800">
+          <h3 className="font-bold text-sm text-red-700 dark:text-red-400 mb-3 flex items-center gap-2">
+            🚨 Wewnętrzne broken links — napraw w pierwszej kolejności!
+          </h3>
+          <div className="space-y-2">
+            {data.brokenInternalLinks.map((bl) => (
+              <div
+                key={bl.sourcePage}
+                className="flex items-start gap-3 text-sm"
+              >
+                <span className="font-mono text-xs bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded shrink-0">
+                  {bl.count}×
+                </span>
+                <div>
+                  <p className="font-medium">
+                    Strona źródłowa:{" "}
+                    <a
+                      href={bl.sourcePage}
+                      target="_blank"
+                      className="text-[hsl(var(--primary))] hover:underline font-mono text-xs"
+                    >
+                      {bl.sourcePage}
+                    </a>
+                  </p>
+                  <p className="text-[hsl(var(--muted-foreground))] text-xs mt-0.5">
+                    → linkuje do:{" "}
+                    {bl.targets.map((t, i) => (
+                      <span key={t}>
+                        {i > 0 && ", "}
+                        <span className="font-mono">{t}</span>
+                      </span>
+                    ))}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Pattern breakdown */}
+      <div className="border border-[hsl(var(--border))] rounded-lg p-4 bg-[hsl(var(--card))]">
+        <h3 className="font-semibold text-sm mb-4 text-[hsl(var(--foreground))]">
+          Rozkład wg typu (pattern)
+        </h3>
+        <div className="space-y-2">
+          {data.byPattern.map((p) => {
+            const maxCount = data.byPattern[0]?.count || 1;
+            const width = Math.max((p.count / maxCount) * 100, 3);
+            return (
+              <div key={p.pattern}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm">
+                    {PATTERN_LABELS[p.pattern] || p.pattern}
+                  </span>
+                  <div className="flex items-center gap-3 text-sm">
+                    <span className="font-bold">{p.count}</span>
+                    <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                      ({fmtPct(p.pct)})
+                    </span>
+                    <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                      {p.uniqueUrls} unikalnych
+                    </span>
+                  </div>
+                </div>
+                <div className="w-full bg-[hsl(var(--accent))] rounded-full h-4 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${width}%`,
+                      background: PATTERN_COLORS[p.pattern] || "#6366f1",
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Daily 404 chart */}
+      {data.daily.length > 0 && (
+        <div className="border border-[hsl(var(--border))] rounded-lg p-4 bg-[hsl(var(--card))]">
+          <h3 className="font-semibold text-sm mb-4 text-[hsl(var(--foreground))]">
+            404 w czasie
+          </h3>
+          <BarChart
+            data={data.daily}
+            barKey="count"
+            xKey="date"
+            barLabel="Błędy 404"
+            height={160}
+            barColor="#ef4444"
+          />
+        </div>
+      )}
+
+      {/* Top 404 URLs */}
+      <div className="border border-[hsl(var(--border))] rounded-lg overflow-hidden bg-[hsl(var(--card))]">
+        <div className="px-4 py-3 border-b border-[hsl(var(--border))] bg-[hsl(var(--accent))]/30 flex items-center justify-between">
+          <h3 className="font-semibold text-sm">Top 404 URL-e</h3>
+          <input
+            type="text"
+            placeholder="Filtruj URL / pattern..."
+            value={urlFilter}
+            onChange={(e) => setUrlFilter(e.target.value)}
+            className="h-8 px-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-xs w-56"
+          />
+        </div>
+        <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-[hsl(var(--accent))] sticky top-0">
+              <tr>
+                <th className="px-4 py-2 text-left">URL</th>
+                <th className="px-4 py-2 text-right">Trafień</th>
+                <th className="px-4 py-2 text-left">Pattern</th>
+                <th className="px-4 py-2 text-left">Źródła</th>
+                <th className="px-4 py-2 text-left">Ostatnio</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUrls.map((u) => (
+                <tr
+                  key={u.url}
+                  className="border-t border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]/20"
+                >
+                  <td
+                    className="px-4 py-2 font-mono text-xs max-w-[350px] truncate"
+                    title={u.url}
+                  >
+                    {u.url}
+                  </td>
+                  <td className="px-4 py-2 text-right font-bold">{u.count}</td>
+                  <td className="px-4 py-2">
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full"
+                      style={{
+                        background:
+                          (PATTERN_COLORS[u.pattern] || "#6366f1") + "20",
+                        color: PATTERN_COLORS[u.pattern] || "#6366f1",
+                      }}
+                    >
+                      {u.pattern}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-xs text-[hsl(var(--muted-foreground))]">
+                    {u.sources.slice(0, 3).join(", ")}
+                  </td>
+                  <td className="px-4 py-2 text-xs text-[hsl(var(--muted-foreground))]">
+                    {new Date(u.lastSeen).toLocaleDateString("pl-PL")}
+                  </td>
+                </tr>
+              ))}
+              {filteredUrls.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-4 py-8 text-center text-[hsl(var(--muted-foreground))]"
+                  >
+                    {data.total === 0
+                      ? "Brak 404 — super! 🎉"
+                      : "Brak wyników dla filtra"}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* External sources + Recent events side by side */}
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* External sources */}
+        {data.externalSources.length > 0 && (
+          <div className="border border-[hsl(var(--border))] rounded-lg p-4 bg-[hsl(var(--card))]">
+            <h3 className="font-semibold text-sm mb-3 text-[hsl(var(--foreground))]">
+              Zewnętrzne źródła 404
+            </h3>
+            <div className="space-y-1.5">
+              {data.externalSources.map((s) => (
+                <div
+                  key={s.source}
+                  className="flex items-center justify-between text-sm py-1 border-b border-[hsl(var(--border))]/50 last:border-0"
+                >
+                  <span className="font-mono text-xs truncate max-w-[200px]">
+                    {s.source}
+                  </span>
+                  <span className="font-bold text-xs">{s.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recent 404 events */}
+        <div className="border border-[hsl(var(--border))] rounded-lg p-4 bg-[hsl(var(--card))]">
+          <h3 className="font-semibold text-sm mb-3 text-[hsl(var(--foreground))]">
+            Ostatnie 404
+          </h3>
+          <div className="space-y-1 max-h-[300px] overflow-y-auto">
+            {data.recentEvents.map((ev, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-2 text-xs py-1.5 border-b border-[hsl(var(--border))]/50 last:border-0"
+              >
+                <span className="text-[hsl(var(--muted-foreground))] shrink-0">
+                  {new Date(ev.createdAt).toLocaleString("pl-PL", {
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+                <span
+                  className={`shrink-0 ${ev.isInternal ? "text-red-500" : "text-[hsl(var(--muted-foreground))]"}`}
+                >
+                  {ev.isInternal ? "🔴" : "🌐"}
+                </span>
+                <span
+                  className="font-mono truncate max-w-[200px]"
+                  title={ev.page}
+                >
+                  {ev.page}
+                </span>
+                <span className="shrink-0 px-1.5 py-0.5 rounded bg-[hsl(var(--accent))] text-[10px]">
+                  {ev.pattern}
+                </span>
+              </div>
+            ))}
+            {data.recentEvents.length === 0 && (
+              <p className="text-[hsl(var(--muted-foreground))] text-center py-4">
+                Brak 404
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -831,7 +1241,6 @@ function FunnelTab({ data }: { data: AnalyticsData }) {
   const maxCount = Math.max(...data.funnel.map((f) => f.count), 1);
   return (
     <div className="space-y-6">
-      {/* Visual Funnel */}
       <div className="border border-[hsl(var(--border))] rounded-lg p-6 bg-[hsl(var(--card))]">
         <h3 className="font-semibold text-sm mb-6 text-[hsl(var(--foreground))]">
           Lejek konwersji
@@ -889,15 +1298,10 @@ function FunnelTab({ data }: { data: AnalyticsData }) {
         </div>
       </div>
 
-      {/* Conversion Metrics */}
       <div className="grid md:grid-cols-4 gap-3">
         <MiniCard
           label="Sesja → Produkt"
-          value={fmtPct(
-            data.overview.cartRate > 0
-              ? data.funnel[1]?.pct || 0
-              : data.funnel[1]?.pct || 0,
-          )}
+          value={fmtPct(data.funnel[1]?.pct || 0)}
           sub="widzą produkt"
         />
         <MiniCard
@@ -950,7 +1354,6 @@ function PagesTab({
 }) {
   return (
     <div className="space-y-6">
-      {/* Top Landing Pages */}
       <div className="border border-[hsl(var(--border))] rounded-lg overflow-hidden bg-[hsl(var(--card))]">
         <div className="px-4 py-3 border-b border-[hsl(var(--border))] bg-[hsl(var(--accent))]/30">
           <h3 className="font-semibold text-sm">Top strony wejściowe</h3>
@@ -1001,7 +1404,6 @@ function PagesTab({
         </div>
       </div>
 
-      {/* Top Viewed Products */}
       {topProducts.length > 0 && (
         <div className="border border-[hsl(var(--border))] rounded-lg overflow-hidden bg-[hsl(var(--card))]">
           <div className="px-4 py-3 border-b border-[hsl(var(--border))] bg-[hsl(var(--accent))]/30">
@@ -1080,7 +1482,6 @@ function SessionsTab({
 }) {
   return (
     <div className="space-y-4">
-      {/* Filters */}
       <div className="flex gap-3 flex-wrap items-center">
         <select
           value={source}
@@ -1222,7 +1623,6 @@ function SessionsTab({
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-between items-center">
           <button
@@ -1420,6 +1820,7 @@ function BarChart({
   barLabel,
   lineLabel,
   height = 200,
+  barColor,
 }: {
   data: any[];
   barKey: string;
@@ -1428,12 +1829,12 @@ function BarChart({
   barLabel: string;
   lineLabel?: string;
   height?: number;
+  barColor?: string;
 }) {
   const maxBar = Math.max(...data.map((d) => d[barKey] || 0), 1);
   const maxLine = lineKey
     ? Math.max(...data.map((d) => d[lineKey] || 0), 1)
     : 1;
-  const barWidth = Math.max(100 / data.length - 1, 2);
 
   return (
     <div>
@@ -1443,14 +1844,12 @@ function BarChart({
       >
         {data.map((d, i) => {
           const barH = ((d[barKey] || 0) / maxBar) * height;
-          const dateStr = d[xKey]?.slice(5) || "";
           return (
             <div
               key={i}
               className="flex-1 flex flex-col items-center justify-end group relative"
               style={{ minWidth: 0 }}
             >
-              {/* Tooltip */}
               <div className="absolute bottom-full mb-1 hidden group-hover:block z-10 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded px-2 py-1 text-xs shadow-lg whitespace-nowrap">
                 <p className="font-medium">{d[xKey]}</p>
                 <p>
@@ -1462,15 +1861,13 @@ function BarChart({
                   </p>
                 )}
               </div>
-              {/* Bar */}
               <div
                 className="w-full rounded-t transition-all hover:opacity-90"
                 style={{
                   height: `${Math.max(barH, 1)}px`,
-                  background: "#818cf8",
+                  background: barColor || "#818cf8",
                 }}
               />
-              {/* Line dot overlay */}
               {lineKey && d[lineKey] > 0 && (
                 <div
                   className="absolute w-2 h-2 rounded-full bg-green-500 border border-white"
@@ -1483,7 +1880,6 @@ function BarChart({
           );
         })}
       </div>
-      {/* X-axis labels (show every nth) */}
       <div
         className="flex mt-1"
         style={{ fontSize: "9px", color: "hsl(var(--muted-foreground))" }}
@@ -1502,10 +1898,12 @@ function BarChart({
           );
         })}
       </div>
-      {/* Legend */}
       <div className="flex gap-4 mt-2 text-xs">
         <div className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded" style={{ background: "#818cf8" }} />
+          <span
+            className="w-3 h-3 rounded"
+            style={{ background: barColor || "#818cf8" }}
+          />
           <span>{barLabel}</span>
         </div>
         {lineKey && lineLabel && (
