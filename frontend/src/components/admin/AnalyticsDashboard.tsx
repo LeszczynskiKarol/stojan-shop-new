@@ -17,6 +17,7 @@ interface Overview {
   avgDuration: number;
   bounceRate: number;
   conversionRate: number;
+  medianDuration: number;
   cartRate: number;
   cartToOrderRate: number;
   totalOrders: number;
@@ -914,7 +915,11 @@ function OverviewTab({ data }: { data: AnalyticsData }) {
         />
         <KpiCard label="Unikalni" value={fmt(o.uniqueVisitors)} />
         <KpiCard label="Odsłony" value={fmt(o.totalPageViews)} />
-        <KpiCard label="Śr. czas" value={fmtDuration(o.avgDuration)} />
+        <KpiCard
+          label="Czas sesji - mediana"
+          value={fmtDuration(o.medianDuration)}
+          sub={`śr. ${fmtDuration(o.avgDuration)}`}
+        />
         <KpiCard
           label="Bounce rate"
           value={fmtPct(o.bounceRate)}
@@ -1743,6 +1748,7 @@ function KpiCard({
   good,
   warn,
   isCurrency,
+  sub,
 }: {
   label: string;
   value: string;
@@ -1751,6 +1757,7 @@ function KpiCard({
   good?: boolean;
   warn?: boolean;
   isCurrency?: boolean;
+  sub?: string;
 }) {
   return (
     <div
@@ -1766,6 +1773,11 @@ function KpiCard({
         {label}
       </p>
       <p className="text-xl font-bold text-[hsl(var(--foreground))]">{value}</p>
+      {sub && ( // ← dodaj blok
+        <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">
+          {sub}
+        </p>
+      )}
       {change !== undefined && change !== 0 && (
         <p className="text-xs mt-1" style={{ color: changeColor(change) }}>
           {changeArrow(change)} {Math.abs(change).toFixed(1)}% vs prev.

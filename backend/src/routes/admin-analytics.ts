@@ -96,6 +96,19 @@ export async function adminAnalyticsRoutes(app: FastifyInstance) {
       totalSessions > 0
         ? sessions.reduce((s, sess) => s + sess.duration, 0) / totalSessions
         : 0;
+    const sortedDurations = sessions
+      .map((s) => s.duration)
+      .sort((a, b) => a - b);
+    const medianDuration =
+      sortedDurations.length > 0
+        ? sortedDurations.length % 2 === 0
+          ? Math.round(
+              (sortedDurations[sortedDurations.length / 2 - 1] +
+                sortedDurations[sortedDurations.length / 2]) /
+                2,
+            )
+          : sortedDurations[Math.floor(sortedDurations.length / 2)]
+        : 0;
     const bounceCount = sessions.filter((s) => s.isBounce).length;
     const bounceRate =
       totalSessions > 0 ? (bounceCount / totalSessions) * 100 : 0;
@@ -493,6 +506,7 @@ export async function adminAnalyticsRoutes(app: FastifyInstance) {
           totalPageViews,
           avgDuration: Math.round(avgDuration),
           bounceRate: round2(bounceRate),
+          medianDuration,
           conversionRate: round2(conversionRate),
           cartRate: round2(cartRate),
           cartToOrderRate: round2(cartToOrderRate),
