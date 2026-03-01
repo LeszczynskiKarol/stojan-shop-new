@@ -9,59 +9,117 @@ const { title = 'Admin Panel' } = Astro.props;
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
   <title>{title} | Stojan Admin</title>
+
+  <!-- Inline theme init to prevent FOUC -->
+  <script is:inline>
+    (function(){
+      var t = localStorage.getItem('admin-theme');
+      if (!t) t = window.matchMedia('(prefers-color-scheme:light)').matches ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-admin-theme', t);
+    })();
+  </script>
+
   <style is:global>
-      :root {
-      --bg: #0f1117;
-      --bg-card: #1a1d27;
-      --bg-hover: #252836;
-      --bg-input: #1e2130;
-      --border: #2d3348;
-      --text: #e4e6ef;
-      --text-muted: #8b8fa3;
-      --primary: #6366f1;
-      --primary-hover: #818cf8;
-      --danger: #ef4444;
+    /* =============================================
+       THEME TOKENS
+       ============================================= */
+    :root,
+    [data-admin-theme="dark"] {
+      --bg:           #0f1117;
+      --bg-card:      #1a1d27;
+      --bg-hover:     #252836;
+      --bg-input:     #1e2130;
+      --border:       #2d3348;
+      --text:         #e4e6ef;
+      --text-muted:   #8b8fa3;
+      --primary:      #6366f1;
+      --primary-hover:#818cf8;
+      --danger:       #ef4444;
       --danger-hover: #f87171;
-      --success: #22c55e;
-      --warning: #f59e0b;
-      --accent: #3b82f6;
+      --success:      #22c55e;
+      --warning:      #f59e0b;
+      --accent:       #3b82f6;
+      --shadow-sm:    0 1px 3px rgba(0,0,0,.4);
+      --shadow-md:    0 4px 12px rgba(0,0,0,.5);
+      --shadow-lg:    0 25px 50px rgba(0,0,0,.6);
+      --thead-bg:     #161825;
     }
+
+    [data-admin-theme="light"] {
+      --bg:           #f0f2f5;
+      --bg-card:      #ffffff;
+      --bg-hover:     #f3f4f6;
+      --bg-input:     #ffffff;
+      --border:       #d1d5db;
+      --text:         #111827;
+      --text-muted:   #6b7280;
+      --primary:      #4f46e5;
+      --primary-hover:#6366f1;
+      --danger:       #dc2626;
+      --danger-hover: #ef4444;
+      --success:      #16a34a;
+      --warning:      #d97706;
+      --accent:       #2563eb;
+      --shadow-sm:    0 1px 3px rgba(0,0,0,.08);
+      --shadow-md:    0 4px 12px rgba(0,0,0,.1);
+      --shadow-lg:    0 25px 50px rgba(0,0,0,.15);
+      --thead-bg:     #f9fafb;
+    }
+
+    /* =============================================
+       RESET / BASE
+       ============================================= */
     * { margin:0; padding:0; box-sizing:border-box; }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* === NAV === */
+    /* =============================================
+       NAV — Desktop
+       ============================================= */
     .admin-nav {
       background: var(--bg-card);
       border-bottom: 1px solid var(--border);
-      padding: 0 24px;
+      padding: 0 20px;
       display: flex;
       align-items: center;
       height: 56px;
-      gap: 24px;
+      gap: 8px;
       position: sticky;
       top: 0;
       z-index: 100;
+      box-shadow: var(--shadow-sm);
     }
     .admin-nav .logo {
       font-weight: 700;
-      font-size: 18px;
+      font-size: 17px;
       color: var(--primary);
       text-decoration: none;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
-    .admin-nav a {
+    .admin-nav .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      margin-left: 12px;
+    }
+    .admin-nav .nav-links a {
       color: var(--text-muted);
       text-decoration: none;
-      font-size: 14px;
-      padding: 8px 12px;
+      font-size: 13px;
+      padding: 7px 10px;
       border-radius: 6px;
       transition: all .15s;
+      white-space: nowrap;
     }
-    .admin-nav a:hover, .admin-nav a.active {
+    .admin-nav .nav-links a:hover,
+    .admin-nav .nav-links a.active {
       color: var(--text);
       background: var(--bg-hover);
     }
@@ -69,23 +127,158 @@ const { title = 'Admin Panel' } = Astro.props;
     .admin-nav .shop-link {
       font-size: 12px;
       color: var(--accent);
-      opacity: .7;
+      opacity: .8;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .admin-nav .shop-link:hover { opacity: 1; }
+
+    /* Theme toggle button */
+    .theme-toggle {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: all .15s;
+      flex-shrink: 0;
+    }
+    .theme-toggle:hover {
+      color: var(--text);
+      border-color: var(--primary);
+      background: var(--bg-hover);
     }
 
-    /* === MAIN === */
+    /* Hamburger */
+    .nav-hamburger {
+      display: none;
+      width: 36px;
+      height: 36px;
+      border: none;
+      background: none;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 22px;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* Mobile overlay */
+    .nav-mobile-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      z-index: 199;
+    }
+    .nav-mobile-overlay.open { display: block; }
+
+    .nav-mobile-drawer {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      width: 260px;
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      z-index: 200;
+      flex-direction: column;
+      padding: 20px 0;
+      box-shadow: var(--shadow-lg);
+      transform: translateX(-100%);
+      transition: transform .2s ease;
+    }
+    .nav-mobile-drawer.open {
+      display: flex;
+      transform: translateX(0);
+    }
+    .nav-mobile-drawer a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14px;
+      padding: 12px 24px;
+      transition: all .15s;
+    }
+    .nav-mobile-drawer a:hover,
+    .nav-mobile-drawer a.active {
+      color: var(--text);
+      background: var(--bg-hover);
+    }
+    .nav-mobile-drawer .drawer-header {
+      padding: 0 24px 16px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .nav-mobile-drawer .drawer-logo {
+      font-weight: 700;
+      font-size: 17px;
+      color: var(--primary);
+      text-decoration: none;
+    }
+    .nav-mobile-drawer .drawer-close {
+      width: 32px; height: 32px;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+    }
+    .nav-mobile-drawer .drawer-close:hover {
+      color: var(--text);
+      background: var(--bg-hover);
+    }
+    .nav-mobile-drawer .drawer-footer {
+      margin-top: auto;
+      padding: 16px 24px 0;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Mobile breakpoint */
+    @media (max-width: 768px) {
+      .admin-nav .nav-links { display: none; }
+      .admin-nav .shop-link { display: none; }
+      .nav-hamburger { display: flex; }
+      .admin-nav { padding: 0 12px; gap: 6px; }
+      .admin-nav .logo { font-size: 15px; }
+    }
+
+    /* =============================================
+       MAIN
+       ============================================= */
     .admin-main {
-      padding: 24px;
+      padding: 20px;
       max-width: 100%;
       overflow-x: auto;
     }
+    @media (max-width: 768px) {
+      .admin-main { padding: 12px; }
+    }
 
-
-    /* === TABLE STYLES === */
+    /* =============================================
+       TABLE
+       ============================================= */
     .admin-table-wrap {
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow-x: auto;
       background: var(--bg-card);
+      box-shadow: var(--shadow-sm);
     }
     .admin-table-wrap table {
       width: 100%;
@@ -98,7 +291,7 @@ const { title = 'Admin Panel' } = Astro.props;
       z-index: 20;
     }
     .admin-table-wrap th {
-      background: #161825;
+      background: var(--thead-bg);
       color: var(--text-muted);
       font-weight: 600;
       text-align: left;
@@ -120,21 +313,30 @@ const { title = 'Admin Panel' } = Astro.props;
     .col-sticky-0 { position:sticky; left:0; z-index:10; background:var(--bg-card); }
     .col-sticky-1 { position:sticky; left:40px; z-index:10; background:var(--bg-card); border-right:2px solid var(--border); }
     .col-sticky-2 { position:sticky; left:340px; z-index:10; background:var(--bg-card); border-right:1px solid var(--border); }
-    thead .col-sticky-0, thead .col-sticky-1, thead .col-sticky-2 { background:#161825; z-index:25; }
+    thead .col-sticky-0, thead .col-sticky-1, thead .col-sticky-2 { background:var(--thead-bg); z-index:25; }
     tr:hover .col-sticky-0, tr:hover .col-sticky-1, tr:hover .col-sticky-2 { background:var(--bg-hover); }
 
-    /* === FORM ELEMENTS === */
-    input[type="text"], input[type="number"], input[type="search"], textarea, select {
+    /* =============================================
+       FORM ELEMENTS
+       ============================================= */
+    input[type="text"],
+    input[type="number"],
+    input[type="search"],
+    textarea,
+    select {
       background: var(--bg-input);
       color: var(--text);
       border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 6px 8px;
+      border-radius: 6px;
+      padding: 6px 10px;
       font-size: 13px;
       outline: none;
-      transition: border-color .15s;
+      transition: border-color .15s, box-shadow .15s;
     }
-    input:focus, textarea:focus, select:focus { border-color: var(--primary); }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(99,102,241,.15);
+    }
     input[type="checkbox"] {
       width: 16px;
       height: 16px;
@@ -142,7 +344,9 @@ const { title = 'Admin Panel' } = Astro.props;
       cursor: pointer;
     }
 
-    /* === BUTTONS === */
+    /* =============================================
+       BUTTONS
+       ============================================= */
     .btn {
       display: inline-flex;
       align-items: center;
@@ -171,15 +375,22 @@ const { title = 'Admin Panel' } = Astro.props;
     .btn-ghost { background:transparent; color:var(--text-muted); padding:4px 8px; }
     .btn-ghost:hover { color:var(--text); background:var(--bg-hover); }
     .btn-sm { padding:4px 10px; font-size:12px; }
-    .btn-icon { padding:6px; border-radius:4px; }
+    .btn-icon { padding:6px; border-radius:6px; }
 
-    /* === MODAL === */
+    /* =============================================
+       MODAL
+       ============================================= */
     .modal-backdrop {
       position:fixed; inset:0;
-      background:rgba(0,0,0,.6);
+      background:rgba(0,0,0,.55);
       display:flex; align-items:center; justify-content:center;
       z-index:200;
       padding:16px;
+      animation: fadeInBackdrop .15s ease;
+    }
+    @keyframes fadeInBackdrop {
+      from { opacity:0; }
+      to { opacity:1; }
     }
     .modal {
       background:var(--bg-card);
@@ -188,7 +399,12 @@ const { title = 'Admin Panel' } = Astro.props;
       max-height:90vh;
       display:flex;
       flex-direction:column;
-      box-shadow:0 25px 50px rgba(0,0,0,.5);
+      box-shadow:var(--shadow-lg);
+      animation: modalSlideUp .2s ease;
+    }
+    @keyframes modalSlideUp {
+      from { opacity:0; transform:translateY(16px) scale(.98); }
+      to { opacity:1; transform:translateY(0) scale(1); }
     }
     .modal-header {
       padding:16px 20px;
@@ -207,7 +423,9 @@ const { title = 'Admin Panel' } = Astro.props;
       gap:8px;
     }
 
-    /* === TOAST === */
+    /* =============================================
+       TOAST
+       ============================================= */
     .toast-container {
       position:fixed;
       bottom:20px;
@@ -221,17 +439,21 @@ const { title = 'Admin Panel' } = Astro.props;
       padding:12px 20px;
       border-radius:8px;
       font-size:13px;
-      box-shadow:0 4px 12px rgba(0,0,0,.3);
-      animation: slideIn .3s ease-out;
+      box-shadow:var(--shadow-md);
+      animation: toastSlideIn .3s ease-out;
     }
     .toast-success { background:#166534; color:#bbf7d0; }
     .toast-error { background:#991b1b; color:#fecaca; }
-    @keyframes slideIn {
+    [data-admin-theme="light"] .toast-success { background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+    [data-admin-theme="light"] .toast-error { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+    @keyframes toastSlideIn {
       from { opacity:0; transform:translateX(50px); }
       to { opacity:1; transform:translateX(0); }
     }
 
-    /* === BADGES === */
+    /* =============================================
+       BADGES
+       ============================================= */
     .badge {
       display:inline-flex;
       padding:2px 8px;
@@ -242,8 +464,13 @@ const { title = 'Admin Panel' } = Astro.props;
     .badge-green { background:#166534; color:#4ade80; }
     .badge-yellow { background:#713f12; color:#fbbf24; }
     .badge-red { background:#7f1d1d; color:#f87171; }
+    [data-admin-theme="light"] .badge-green { background:#dcfce7; color:#166534; }
+    [data-admin-theme="light"] .badge-yellow { background:#fef3c7; color:#92400e; }
+    [data-admin-theme="light"] .badge-red { background:#fef2f2; color:#991b1b; }
 
-    /* === PAGINATION === */
+    /* =============================================
+       PAGINATION
+       ============================================= */
     .pagination {
       display:flex;
       align-items:center;
@@ -251,9 +478,16 @@ const { title = 'Admin Panel' } = Astro.props;
       padding:16px 0;
       font-size:13px;
       color:var(--text-muted);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 640px) {
+      .pagination { flex-direction: column; gap: 8px; }
     }
 
-    /* === SEARCH === */
+    /* =============================================
+       SEARCH
+       ============================================= */
     .search-bar {
       width:100%;
       padding:10px 16px;
@@ -264,9 +498,14 @@ const { title = 'Admin Panel' } = Astro.props;
       color:var(--text);
       margin-bottom:16px;
     }
-    .search-bar:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(99,102,241,.15); }
+    .search-bar:focus {
+      border-color:var(--primary);
+      box-shadow:0 0 0 3px rgba(99,102,241,.15);
+    }
 
-    /* === TOOLBAR === */
+    /* =============================================
+       TOOLBAR
+       ============================================= */
     .toolbar {
       display:flex;
       align-items:center;
@@ -277,8 +516,14 @@ const { title = 'Admin Panel' } = Astro.props;
     }
     .toolbar h1 { font-size:24px; font-weight:700; }
     .toolbar-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    @media (max-width: 640px) {
+      .toolbar { flex-direction: column; align-items: flex-start; }
+      .toolbar h1 { font-size: 20px; }
+    }
 
-    /* === CELL EDIT === */
+    /* =============================================
+       CELL EDIT
+       ============================================= */
     .cell-editable {
       cursor:pointer;
       padding:4px 6px;
@@ -300,7 +545,9 @@ const { title = 'Admin Panel' } = Astro.props;
     .edit-confirm { background:var(--success); color:#fff; }
     .edit-cancel { background:var(--danger); color:#fff; }
 
-    /* === IMAGE === */
+    /* =============================================
+       IMAGES
+       ============================================= */
     .img-thumb {
       width:80px; height:80px;
       object-fit:cover;
@@ -325,65 +572,176 @@ const { title = 'Admin Panel' } = Astro.props;
     }
     .img-upload-zone:hover { border-color:var(--primary); }
 
-    /* === SCROLLBAR === */
+    /* =============================================
+       SCROLLBAR
+       ============================================= */
     ::-webkit-scrollbar { width:6px; height:6px; }
     ::-webkit-scrollbar-track { background:var(--bg); }
     ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
     ::-webkit-scrollbar-thumb:hover { background:var(--text-muted); }
+
+    /* =============================================
+       DELETE CONFIRM MODAL (specific)
+       ============================================= */
+    .delete-modal {
+      width: 420px;
+      max-width: 95vw;
+    }
+    .delete-modal .delete-icon {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: rgba(239,68,68,.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin: 0 auto 16px;
+    }
+    [data-admin-theme="light"] .delete-modal .delete-icon {
+      background: #fef2f2;
+    }
+    .delete-modal .delete-title {
+      font-size: 16px;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .delete-modal .delete-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+    .delete-modal .delete-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+    .delete-modal .delete-actions .btn {
+      min-width: 110px;
+      justify-content: center;
+    }
+
+    /* Hide content until auth verified */
+    body { opacity: 0; transition: opacity 0.15s; }
   </style>
 </head>
 <body>
+  <!-- MOBILE DRAWER OVERLAY -->
+  <div class="nav-mobile-overlay" id="mobileOverlay"></div>
+  <div class="nav-mobile-drawer" id="mobileDrawer">
+    <div class="drawer-header">
+      <a href="/admin" class="drawer-logo">⚡ Stojan</a>
+      <button class="drawer-close" id="drawerClose">✕</button>
+    </div>
+    <a href="/admin/products">📦 Produkty</a>
+    <a href="/admin/products/add">➕ Dodaj produkt</a>
+    <a href="/admin/allegro">🅰️ Allegro</a>
+    <a href="/admin/zamowienia">📋 Zamówienia</a>
+    <a href="/admin/analytics">📊 Analityka</a>
+    <div class="drawer-footer">
+      <a href="/" target="_blank" style="font-size:12px;color:var(--accent);">→ Otwórz sklep</a>
+      <button id="logoutBtnMobile" class="btn btn-ghost" style="color:var(--danger);font-size:13px;justify-content:flex-start;padding:8px 0;">Wyloguj</button>
+    </div>
+  </div>
+
+  <!-- DESKTOP NAV -->
   <nav class="admin-nav">
-  <a href="/admin" class="logo">⚡ Stojan Admin</a>
-  <a href="/admin/products">Produkty</a>
-  <a href="/admin/products/add">+ Dodaj produkt</a>
-  <a href="/admin/allegro">Allegro</a>
-  <a href="/admin/zamowienia">Zamówienia</a>  
-  <a href="/admin/analytics">Analityka</a>  
-  <span class="spacer"></span>
-  <a href="/" class="shop-link" target="_blank">→ Sklep</a>
-  <button id="logoutBtn" class="btn btn-ghost" style="color:var(--danger);font-size:13px;">Wyloguj</button>
-</nav>
+    <button class="nav-hamburger" id="hamburgerBtn">☰</button>
+    <a href="/admin" class="logo">⚡ Stojan Admin</a>
+    <div class="nav-links">
+      <a href="/admin/products">Produkty</a>
+      <a href="/admin/products/add">+ Dodaj</a>
+      <a href="/admin/allegro">Allegro</a>
+      <a href="/admin/zamowienia">Zamówienia</a>
+      <a href="/admin/analytics">Analityka</a>
+    </div>
+    <span class="spacer"></span>
+    <a href="/" class="shop-link" target="_blank">→ Sklep</a>
+    <button class="theme-toggle" id="themeToggle" title="Zmień motyw">🌙</button>
+    <button id="logoutBtn" class="btn btn-ghost" style="color:var(--danger);font-size:13px;">Wyloguj</button>
+  </nav>
+
   <main class="admin-main">
     <slot />
   </main>
 
   <script define:vars={{ API_URL: import.meta.env.PUBLIC_API_URL || 'http://localhost:4000' }}>
-    // ============================================
-    // AUTH GUARD - redirect to login if not authenticated
-    // ============================================
+    // ============================
+    // AUTH GUARD
+    // ============================
     (async () => {
       try {
         const res = await fetch(`${API_URL}/api/admin/auth/verify`, { credentials: 'include' });
         const data = await res.json();
-        if (!data.success) {
-          window.location.href = '/admin/login';
-          return;
-        }
-      } catch {
-        window.location.href = '/admin/login';
-        return;
-      }
-
-      // Show content only after auth passes
+        if (!data.success) { window.location.href = '/admin/login'; return; }
+      } catch { window.location.href = '/admin/login'; return; }
       document.body.style.opacity = '1';
     })();
 
-    // Logout handler
-    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
-      try {
-        await fetch(`${API_URL}/api/admin/auth/logout`, {
-          method: 'POST',
-          credentials: 'include',
-        });
-      } catch {}
+    // ============================
+    // THEME TOGGLE
+    // ============================
+    function getTheme() {
+      return document.documentElement.getAttribute('data-admin-theme') || 'dark';
+    }
+    function setTheme(t) {
+      document.documentElement.setAttribute('data-admin-theme', t);
+      localStorage.setItem('admin-theme', t);
+      updateThemeIcon();
+    }
+    function updateThemeIcon() {
+      const btn = document.getElementById('themeToggle');
+      if (btn) btn.textContent = getTheme() === 'dark' ? '☀️' : '🌙';
+    }
+    updateThemeIcon();
+    document.getElementById('themeToggle')?.addEventListener('click', () => {
+      setTheme(getTheme() === 'dark' ? 'light' : 'dark');
+    });
+
+    // ============================
+    // MOBILE NAV
+    // ============================
+    const hamburger = document.getElementById('hamburgerBtn');
+    const overlay = document.getElementById('mobileOverlay');
+    const drawer = document.getElementById('mobileDrawer');
+    const drawerClose = document.getElementById('drawerClose');
+
+    function openDrawer() {
+      overlay?.classList.add('open');
+      drawer?.classList.add('open');
+    }
+    function closeDrawer() {
+      overlay?.classList.remove('open');
+      drawer?.classList.remove('open');
+    }
+    hamburger?.addEventListener('click', openDrawer);
+    overlay?.addEventListener('click', closeDrawer);
+    drawerClose?.addEventListener('click', closeDrawer);
+
+    // ============================
+    // LOGOUT
+    // ============================
+    async function doLogout() {
+      try { await fetch(`${API_URL}/api/admin/auth/logout`, { method:'POST', credentials:'include' }); } catch {}
       window.location.href = '/admin/login';
+    }
+    document.getElementById('logoutBtn')?.addEventListener('click', doLogout);
+    document.getElementById('logoutBtnMobile')?.addEventListener('click', doLogout);
+
+    // ============================
+    // HIGHLIGHT ACTIVE NAV
+    // ============================
+    const path = window.location.pathname;
+    document.querySelectorAll('.admin-nav .nav-links a, .nav-mobile-drawer a').forEach(a => {
+      const href = a.getAttribute('href');
+      if (href && path.startsWith(href) && href !== '/admin') {
+        a.classList.add('active');
+      } else if (href === '/admin' && path === '/admin') {
+        a.classList.add('active');
+      }
     });
   </script>
-
-  <style>
-    /* Hide content until auth is verified */
-    body { opacity: 0; transition: opacity 0.15s; }
-  </style>
 </body>
 </html>

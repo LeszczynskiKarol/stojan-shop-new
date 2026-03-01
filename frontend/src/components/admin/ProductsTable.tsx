@@ -39,6 +39,7 @@ interface Category {
   slug: string;
   order?: number;
 }
+
 interface Manufacturer {
   id: string;
   name: string;
@@ -62,6 +63,15 @@ interface LinkingModal {
   loading: boolean;
 }
 
+interface ConfirmModal {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  variant: "danger" | "warning";
+  onConfirm: (() => void) | null;
+}
+
 // ============================================================
 // API HELPER
 // ============================================================
@@ -73,7 +83,6 @@ async function api<T = any>(path: string, opts?: RequestInit): Promise<T> {
     ...((opts?.headers as Record<string, string>) || {}),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  // Only add Content-Type for requests with body
   if (opts?.body) headers["Content-Type"] = "application/json";
 
   const res = await fetch(`${API}${path}`, {
@@ -90,7 +99,6 @@ async function api<T = any>(path: string, opts?: RequestInit): Promise<T> {
   return json;
 }
 
-// Raw fetch for Allegro endpoints (no JSON content-type for empty body)
 async function allegroApi<T = any>(
   path: string,
   opts?: RequestInit,
@@ -178,6 +186,52 @@ function getAllegroUrl(p: Product): string | null {
 }
 
 // ============================================================
+// CONFIRM MODAL COMPONENT
+// ============================================================
+function ConfirmDialog({
+  modal,
+  onClose,
+}: {
+  modal: ConfirmModal;
+  onClose: () => void;
+}) {
+  if (!modal.open) return null;
+
+  const iconBg =
+    modal.variant === "danger" ? "rgba(239,68,68,.12)" : "rgba(245,158,11,.12)";
+  const icon = modal.variant === "danger" ? "🗑️" : "⚠️";
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal delete-modal" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-body"
+          style={{ paddingTop: 28, paddingBottom: 8 }}
+        >
+          <div className="delete-icon">{icon}</div>
+          <div className="delete-title">{modal.title}</div>
+          <div className="delete-desc">{modal.description}</div>
+          <div className="delete-actions">
+            <button className="btn btn-outline" onClick={onClose}>
+              Anuluj
+            </button>
+            <button
+              className={`btn ${modal.variant === "danger" ? "btn-danger" : "btn-primary"}`}
+              onClick={() => {
+                modal.onConfirm?.();
+                onClose();
+              }}
+            >
+              {modal.confirmLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // MAIN COMPONENT
 // ============================================================
 export function ProductsTable() {
@@ -210,7 +264,28 @@ export function ProductsTable() {
   } | null>(null);
   const editRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
 
-  // --- MODALS ---
+  // --- CONFIRM MODAL ---
+  const [confirmModal, setConfirmModal] = useState<ConfirmModal>({
+    open: false,
+    title: "",
+    description: "",
+    confirmLabel: "Usuń",
+    variant: "danger",
+    onConfirm: null,
+  });
+
+  const closeConfirm = useCallback(
+    () => setConfirmModal((p) => ({ ...p, open: false, onConfirm: null })),
+    [],
+  );
+
+  const showConfirm = useCallback(
+    (opts: Omit<ConfirmModal, "open">) =>
+      setConfirmModal({ ...opts, open: true }),
+    [],
+  );
+
+  // --- OTHER MODALS ---
   const [descModal, setDescModal] = useState<{
     open: boolean;
     id: string;
@@ -406,7 +481,6 @@ export function ProductsTable() {
         body: JSON.stringify(body),
       });
 
-      // Update local state
       setProducts((prev) =>
         prev.map((p) => {
           if (p.id !== productId) return p;
@@ -461,33 +535,50 @@ export function ProductsTable() {
   };
 
   // ============================================================
-  // DELETE
+  // DELETE (with confirm modal)
   // ============================================================
-  const handleDelete = async (id: string) => {
-    if (!confirm("Czy na pewno chcesz usunąć ten produkt?")) return;
-    try {
-      await api(`/api/admin/products/${id}`, { method: "DELETE" });
-      toast("Produkt usunięty");
-      fetchProducts();
-    } catch (e: any) {
-      toast(e.message, "error");
-    }
+  const handleDelete = (id: string) => {
+    const product = products.find((p) => p.id === id);
+    showConfirm({
+      title: "Usunąć produkt?",
+      description: product
+        ? `Czy na pewno chcesz usunąć "${product.name}"? Ta operacja jest nieodwracalna.`
+        : "Czy na pewno chcesz usunąć ten produkt? Ta operacja jest nieodwracalna.",
+      confirmLabel: "Usuń produkt",
+      variant: "danger",
+      onConfirm: async () => {
+        try {
+          await api(`/api/admin/products/${id}`, { method: "DELETE" });
+          toast("Produkt usunięty");
+          fetchProducts();
+        } catch (e: any) {
+          toast(e.message, "error");
+        }
+      },
+    });
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selected.size === 0) return;
-    if (!confirm(`Usunąć ${selected.size} produktów?`)) return;
-    try {
-      await api("/api/admin/products/bulk-delete", {
-        method: "POST",
-        body: JSON.stringify({ ids: Array.from(selected) }),
-      });
-      toast(`Usunięto ${selected.size} produktów`);
-      setSelected(new Set());
-      fetchProducts();
-    } catch (e: any) {
-      toast(e.message, "error");
-    }
+    showConfirm({
+      title: `Usunąć ${selected.size} produktów?`,
+      description: `Czy na pewno chcesz usunąć ${selected.size} zaznaczonych produktów? Ta operacja jest nieodwracalna.`,
+      confirmLabel: `Usuń ${selected.size} produktów`,
+      variant: "danger",
+      onConfirm: async () => {
+        try {
+          await api("/api/admin/products/bulk-delete", {
+            method: "POST",
+            body: JSON.stringify({ ids: Array.from(selected) }),
+          });
+          toast(`Usunięto ${selected.size} produktów`);
+          setSelected(new Set());
+          fetchProducts();
+        } catch (e: any) {
+          toast(e.message, "error");
+        }
+      },
+    });
   };
 
   // ============================================================
@@ -553,21 +644,31 @@ export function ProductsTable() {
   // AI DESCRIPTION
   // ============================================================
   const generateDescription = async (productId: string) => {
-    if (!confirm("Wygenerować nowy opis AI? Obecny zostanie zastąpiony."))
-      return;
-    setGeneratingAI(productId);
-    try {
-      const res = await api<any>("/api/admin/products/generate-description", {
-        method: "POST",
-        body: JSON.stringify({ productId }),
-      });
-      await updateField(productId, "description", res.data.description);
-      toast("Opis AI wygenerowany");
-    } catch (e: any) {
-      toast(e.message, "error");
-    } finally {
-      setGeneratingAI(null);
-    }
+    showConfirm({
+      title: "Wygenerować nowy opis AI?",
+      description:
+        "Obecny opis zostanie zastąpiony wygenerowanym przez AI. Czy chcesz kontynuować?",
+      confirmLabel: "Generuj opis",
+      variant: "warning",
+      onConfirm: async () => {
+        setGeneratingAI(productId);
+        try {
+          const res = await api<any>(
+            "/api/admin/products/generate-description",
+            {
+              method: "POST",
+              body: JSON.stringify({ productId }),
+            },
+          );
+          await updateField(productId, "description", res.data.description);
+          toast("Opis AI wygenerowany");
+        } catch (e: any) {
+          toast(e.message, "error");
+        } finally {
+          setGeneratingAI(null);
+        }
+      },
+    });
   };
 
   // ============================================================
@@ -605,7 +706,6 @@ export function ProductsTable() {
     try {
       const data = await allegroApi<any>("/api/allegro/unlinked-offers");
       if (data.success && data.data) {
-        // Pre-filter by product name match
         const filtered = data.data.filter((offer: AllegroOffer) => {
           const sl = product.name.toLowerCase();
           const ol = offer.name.toLowerCase();
@@ -641,7 +741,6 @@ export function ProductsTable() {
 
       if (data.success) {
         toast("Produkt powiązany z Allegro");
-        // Update local product state
         setProducts((prev) =>
           prev.map((p) => {
             if (p.id !== linkModal.productId) return p;
@@ -668,9 +767,13 @@ export function ProductsTable() {
           loading: false,
         });
       } else if (data.conflictingProductId) {
-        if (confirm(`${data.error}\n\nCzy chcesz wymusić powiązanie?`)) {
-          return linkProductToAllegro(allegroOfferId, true);
-        }
+        showConfirm({
+          title: "Konflikt powiązania",
+          description: `${data.error}\n\nCzy chcesz wymusić powiązanie?`,
+          confirmLabel: "Wymuś powiązanie",
+          variant: "warning",
+          onConfirm: () => linkProductToAllegro(allegroOfferId, true),
+        });
       } else {
         toast(data.error || "Błąd powiązywania", "error");
       }
@@ -680,35 +783,34 @@ export function ProductsTable() {
   };
 
   const unlinkProduct = async (productId: string, productName: string) => {
-    if (
-      !confirm(
-        `Usunąć powiązanie z Allegro dla "${productName}"?\n\nTo nie usunie oferty z Allegro — tylko odłączy ją od tego produktu.`,
-      )
-    )
-      return;
-
-    try {
-      const data = await allegroApi<any>(
-        `/api/allegro/unlink-product/${productId}`,
-        {
-          method: "DELETE",
-        },
-      );
-      if (data.success) {
-        toast("Powiązanie z Allegro usunięte");
-        setProducts((prev) =>
-          prev.map((p) => {
-            if (p.id !== productId) return p;
-            const { allegro, ...restMp } = p.marketplaces || {};
-            return { ...p, marketplaces: restMp };
-          }),
-        );
-      } else {
-        toast(data.error || "Błąd usuwania powiązania", "error");
-      }
-    } catch (e: any) {
-      toast(e.message, "error");
-    }
+    showConfirm({
+      title: "Odłączyć od Allegro?",
+      description: `Usunąć powiązanie z Allegro dla "${productName}"?\n\nTo nie usunie oferty z Allegro — tylko odłączy ją od tego produktu.`,
+      confirmLabel: "Odłącz",
+      variant: "warning",
+      onConfirm: async () => {
+        try {
+          const data = await allegroApi<any>(
+            `/api/allegro/unlink-product/${productId}`,
+            { method: "DELETE" },
+          );
+          if (data.success) {
+            toast("Powiązanie z Allegro usunięte");
+            setProducts((prev) =>
+              prev.map((p) => {
+                if (p.id !== productId) return p;
+                const { allegro, ...restMp } = p.marketplaces || {};
+                return { ...p, marketplaces: restMp };
+              }),
+            );
+          } else {
+            toast(data.error || "Błąd usuwania powiązania", "error");
+          }
+        } catch (e: any) {
+          toast(e.message, "error");
+        }
+      },
+    });
   };
 
   // ============================================================
@@ -1028,8 +1130,6 @@ export function ProductsTable() {
         return (
           <div>
             <EditCell product={product} field="name" />
-
-            {/* Links section */}
             <div
               style={{
                 marginTop: 4,
@@ -1038,14 +1138,13 @@ export function ProductsTable() {
                 gap: 2,
               }}
             >
-              {/* Shop link */}
               <a
                 href={shopUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
                   fontSize: 11,
-                  color: "#60a5fa",
+                  color: "var(--accent)",
                   display: "flex",
                   alignItems: "center",
                   gap: 3,
@@ -1054,7 +1153,6 @@ export function ProductsTable() {
                 🏪 Link do sklepu ↗
               </a>
 
-              {/* Allegro link or connect button */}
               {aUrl ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <a
@@ -1088,7 +1186,7 @@ export function ProductsTable() {
                     }}
                     style={{
                       fontSize: 10,
-                      color: "#ef4444",
+                      color: "var(--danger)",
                       cursor: "pointer",
                       background: "none",
                       border: "none",
@@ -1110,7 +1208,7 @@ export function ProductsTable() {
                   }}
                   style={{
                     fontSize: 11,
-                    color: "#3b82f6",
+                    color: "var(--accent)",
                     cursor: "pointer",
                     background: "none",
                     border: "none",
@@ -1154,10 +1252,18 @@ export function ProductsTable() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                border: "none",
+                cursor: "pointer",
               }}
               onClick={() => {
-                if (confirm("Usunąć zdjęcie główne?"))
-                  updateField(product.id, "mainImage", "");
+                showConfirm({
+                  title: "Usunąć zdjęcie główne?",
+                  description:
+                    "Zdjęcie główne produktu zostanie usunięte. Czy kontynuować?",
+                  confirmLabel: "Usuń zdjęcie",
+                  variant: "danger",
+                  onConfirm: () => updateField(product.id, "mainImage", ""),
+                });
               }}
             >
               ✕
@@ -1192,7 +1298,6 @@ export function ProductsTable() {
                   onClick={() => setPreviewImg(img)}
                 />
                 <button
-                  className="btn-ghost"
                   style={{
                     position: "absolute",
                     top: 0,
@@ -1207,14 +1312,22 @@ export function ProductsTable() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    border: "none",
+                    cursor: "pointer",
                   }}
                   onClick={() => {
-                    if (confirm("Usunąć?"))
-                      updateField(
-                        product.id,
-                        "galleryImages",
-                        product.galleryImages.filter((_, idx) => idx !== i),
-                      );
+                    showConfirm({
+                      title: "Usunąć zdjęcie z galerii?",
+                      description: `Czy chcesz usunąć zdjęcie ${i + 1} z galerii?`,
+                      confirmLabel: "Usuń",
+                      variant: "danger",
+                      onConfirm: () =>
+                        updateField(
+                          product.id,
+                          "galleryImages",
+                          product.galleryImages.filter((_, idx) => idx !== i),
+                        ),
+                    });
                   }}
                 >
                   ✕
@@ -1374,7 +1487,14 @@ export function ProductsTable() {
                 </span>
                 <button
                   className="btn-ghost btn-sm"
-                  style={{ padding: "0 4px", fontSize: 10 }}
+                  style={{
+                    padding: "0 4px",
+                    fontSize: 10,
+                    background: "none",
+                    border: "none",
+                    color: "var(--text-muted)",
+                    cursor: "pointer",
+                  }}
                   onClick={() =>
                     updateField(
                       product.id,
@@ -1426,20 +1546,33 @@ export function ProductsTable() {
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ fontSize: 11, color: "#60a5fa" }}
+                  style={{ fontSize: 11, color: "var(--accent)" }}
                 >
                   📄 PDF {i + 1}
                 </a>
                 <button
-                  className="btn-ghost"
-                  style={{ padding: "0 4px", fontSize: 10 }}
+                  style={{
+                    padding: "0 4px",
+                    fontSize: 10,
+                    background: "none",
+                    border: "none",
+                    color: "var(--text-muted)",
+                    cursor: "pointer",
+                  }}
                   onClick={() => {
-                    if (confirm(`Usunąć PDF ${i + 1}?`))
-                      updateField(
-                        product.id,
-                        "dataSheets",
-                        sheets.filter((_, idx) => idx !== i),
-                      );
+                    showConfirm({
+                      title: `Usunąć PDF ${i + 1}?`,
+                      description:
+                        "Plik PDF zostanie usunięty z dokumentacji produktu.",
+                      confirmLabel: "Usuń PDF",
+                      variant: "danger",
+                      onConfirm: () =>
+                        updateField(
+                          product.id,
+                          "dataSheets",
+                          sheets.filter((_, idx) => idx !== i),
+                        ),
+                    });
                   }}
                 >
                   ✕
@@ -1498,7 +1631,13 @@ export function ProductsTable() {
               ) : (
                 <button
                   className="btn-ghost btn-sm"
-                  style={{ fontSize: 11, color: "var(--primary)" }}
+                  style={{
+                    fontSize: 11,
+                    color: "var(--primary)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
                   onClick={() =>
                     setTechModal({ open: true, id: product.id, content: "" })
                   }
@@ -1589,6 +1728,7 @@ export function ProductsTable() {
             className="btn btn-ghost btn-icon"
             title="Usuń"
             onClick={() => handleDelete(product.id)}
+            style={{ color: "var(--danger)" }}
           >
             🗑️
           </button>
@@ -1657,9 +1797,9 @@ export function ProductsTable() {
       >
         {(
           [
-            ["all", `Wszystkie`],
-            ["linked", `🅰️ Powiązane z Allegro`],
-            ["unlinked", `⛓️‍💥 Bez Allegro`],
+            ["all", "Wszystkie"],
+            ["linked", "🅰️ Powiązane z Allegro"],
+            ["unlinked", "⛓️‍💥 Bez Allegro"],
           ] as ["all" | "linked" | "unlinked", string][]
         ).map(([key, label]) => (
           <button
@@ -1680,6 +1820,7 @@ export function ProductsTable() {
               color:
                 allegroFilter === key ? "var(--text)" : "var(--text-muted)",
               transition: "all .15s",
+              boxShadow: allegroFilter === key ? "var(--shadow-sm)" : "none",
             }}
           >
             {label}
@@ -1755,7 +1896,6 @@ export function ProductsTable() {
               </thead>
               <tbody>
                 {products.map((product) => {
-                  // Highlight rows without Allegro link
                   const noAllegro = !hasAllegroLink(product);
                   return (
                     <tr
@@ -1816,6 +1956,11 @@ export function ProductsTable() {
           </div>
         </>
       )}
+
+      {/* ================================================================ */}
+      {/* CONFIRM MODAL (shared for all confirmations)                     */}
+      {/* ================================================================ */}
+      <ConfirmDialog modal={confirmModal} onClose={closeConfirm} />
 
       {/* ================================================================ */}
       {/* ALLEGRO LINKING MODAL                                            */}
@@ -2051,7 +2196,7 @@ export function ProductsTable() {
       )}
 
       {/* ================================================================ */}
-      {/* OTHER MODALS (description, tech, manufacturer, params, preview)  */}
+      {/* OTHER MODALS                                                     */}
       {/* ================================================================ */}
 
       {/* DESCRIPTION MODAL */}
@@ -2260,7 +2405,7 @@ export function ProductsTable() {
         >
           <div
             className="modal"
-            style={{ width: 420 }}
+            style={{ width: 420, maxWidth: "95vw" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-header">
@@ -2356,7 +2501,7 @@ export function ProductsTable() {
         >
           <div
             className="modal"
-            style={{ width: 400 }}
+            style={{ width: 400, maxWidth: "95vw" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-header">

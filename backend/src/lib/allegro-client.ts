@@ -4,6 +4,7 @@
 
 import { prisma } from "./prisma.js";
 import { allegroConfig } from "../config/allegro.config.js";
+import { randomUUID } from "crypto";
 
 const CONTENT_TYPE = "application/vnd.allegro.public.v1+json";
 
@@ -268,16 +269,47 @@ export async function getOfferEvents(params: {
   return allegroFetch(`/sale/offer-events${qs ? "?" + qs : ""}`);
 }
 
-/** End (deactivate) an offer */
+/**
+ * End (deactivate) an offer.
+ * Uses PUT /sale/offer-publication-commands/{commandId}
+ * (PATCH /sale/product-offers does NOT support publication.status)
+ */
 export async function endOffer(offerId: string) {
-  return patchOffer(offerId, {
-    publication: { status: "END" },
+  const commandId = randomUUID();
+  return allegroFetch(`/sale/offer-publication-commands/${commandId}`, {
+    method: "PUT",
+    body: {
+      offerCriteria: [
+        {
+          offers: [{ id: offerId }],
+          type: "CONTAINS_OFFERS",
+        },
+      ],
+      publication: {
+        action: "END",
+      },
+    },
   });
 }
 
-/** Activate an offer */
+/**
+ * Activate an offer.
+ * Uses PUT /sale/offer-publication-commands/{commandId}
+ */
 export async function activateOffer(offerId: string) {
-  return patchOffer(offerId, {
-    publication: { status: "ACTIVATE" },
+  const commandId = randomUUID();
+  return allegroFetch(`/sale/offer-publication-commands/${commandId}`, {
+    method: "PUT",
+    body: {
+      offerCriteria: [
+        {
+          offers: [{ id: offerId }],
+          type: "CONTAINS_OFFERS",
+        },
+      ],
+      publication: {
+        action: "ACTIVATE",
+      },
+    },
   });
 }

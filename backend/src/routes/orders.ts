@@ -11,14 +11,14 @@ import {
   sendOrderConfirmation,
   sendShipmentNotification,
   sendAdminNewOrderNotification,
-  sendAdminShipmentNotification,
   buildEmailDataFromOrder,
 } from "../services/emailService.js";
 import { uploadInvoiceToS3 } from "../lib/s3.js";
+import { fireAllegroStockSync } from "../services/allegro-hooks.js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:4321";
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:4821";
 
 // ============================================
 // Helper: generuj numer zamówienia (001/02/2026)
@@ -521,8 +521,6 @@ export async function orderRoutes(app: FastifyInstance) {
 
   // ==========================================
   // POST /api/orders/:id/upload-invoice
-  // Upload PDF → S3 (invoices/ prefix), then append to order.invoiceUrls
-  // Single request: multipart upload + DB update
   // ==========================================
   app.post<{ Params: { id: string } }>(
     "/:id/upload-invoice",
@@ -546,9 +544,6 @@ export async function orderRoutes(app: FastifyInstance) {
             app.log.info(
               `📎 Invoice upload: file="${part.filename}", size=${buffer.length}, mime=${part.mimetype}`,
             );
-            app.log.info(
-              `📎 S3 config: region=${process.env.AWS_REGION || "eu-central-1"}, bucket=${process.env.AWS_S3_BUCKET || "stojan-shop"}, keyId=${(process.env.AWS_ACCESS_KEY_ID || "").substring(0, 8)}...`,
-            );
 
             try {
               const url = await uploadInvoiceToS3(
@@ -560,16 +555,9 @@ export async function orderRoutes(app: FastifyInstance) {
               app.log.info(`✅ Invoice uploaded: ${url}`);
             } catch (s3Err: any) {
               app.log.error(`❌ S3 upload failed: ${s3Err.message}`);
-              app.log.error(
-                `❌ S3 error code: ${s3Err.Code || s3Err.$metadata?.httpStatusCode || "unknown"}`,
-              );
-              app.log.error(
-                `❌ Full S3 error: ${JSON.stringify(s3Err, null, 2)}`,
-              );
               return reply.status(500).send({
                 success: false,
                 error: `S3 upload failed: ${s3Err.message}`,
-                s3Code: s3Err.Code || s3Err.$metadata?.httpStatusCode,
               });
             }
           }
@@ -581,7 +569,6 @@ export async function orderRoutes(app: FastifyInstance) {
             .send({ success: false, error: "Brak plików" });
         }
 
-        // Append new URLs to existing invoiceUrls
         const currentUrls = (order.invoiceUrls as string[]) || [];
         const updatedUrls = [...currentUrls, ...newUrls];
 
@@ -639,10 +626,12 @@ export async function orderRoutes(app: FastifyInstance) {
         }>;
         for (const item of items) {
           try {
-            await prisma.product.update({
+            // ✅ FIX: Jeden increment, potem Allegro sync
+            const updated = await prisma.product.update({
               where: { id: item.productId },
               data: { stock: { increment: item.quantity } },
             });
+            fireAllegroStockSync(item.productId, updated.stock);
           } catch (stockErr) {
             console.warn(
               `⚠️ Nie udało się przywrócić stocku dla produktu ${item.productId}:`,
@@ -702,10 +691,12 @@ export async function orderRoutes(app: FastifyInstance) {
           }>;
           for (const item of items) {
             try {
-              await prisma.product.update({
+              // ✅ FIX: Jeden increment, potem Allegro sync
+              const updated = await prisma.product.update({
                 where: { id: item.productId },
                 data: { stock: { increment: item.quantity } },
               });
+              fireAllegroStockSync(item.productId, updated.stock);
             } catch (stockErr) {
               console.warn(
                 `⚠️ Nie udało się przywrócić stocku dla ${item.productId}:`,
@@ -796,14 +787,18 @@ async function reserveStock(
         );
       }
 
-      await prisma.product.update({
+      // ✅ FIX: Jeden decrement w DB, potem Allegro sync z nową wartością
+      const updated = await prisma.product.update({
         where: { id: item.productId },
         data: { stock: { decrement: item.quantity } },
       });
 
       console.log(
-        `✅ reserveStock: "${product.name}" stock ${product.stock} → ${product.stock - item.quantity}`,
+        `✅ reserveStock: "${product.name}" stock ${product.stock} → ${updated.stock}`,
       );
+
+      // ▶ Sync do Allegro (fire-and-forget)
+      fireAllegroStockSync(item.productId, updated.stock);
     } catch (err) {
       console.error(
         `❌ reserveStock: błąd dla produktu ${item.productId}:`,

@@ -1,5 +1,6 @@
 // backend/src/routes/admin-products.ts
 // Admin panel product management - Fastify + Prisma
+// ✅ Includes automatic Allegro publishing when addToAllegro=true
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import "@fastify/multipart";
@@ -8,6 +9,7 @@ import {
   fireAllegroPriceSync,
   fireAllegroNameSync,
 } from "../services/allegro-hooks.js";
+import { publishProductToAllegro } from "../services/allegro-publish.js";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
@@ -56,7 +58,6 @@ function buildOrderBy(sortField?: string, sortDirection?: string): any {
   return { createdAt: "desc" as Prisma.SortOrder };
 }
 
-// FIX #3: Helper to generate URL-safe slug from product name
 function generateSlug(name: string): string {
   const polishMap: Record<string, string> = {
     ą: "a",
@@ -106,7 +107,6 @@ export async function adminProductRoutes(app: FastifyInstance) {
 
       const where: Prisma.ProductWhereInput = {};
 
-      // Allegro link filter
       const allegroFilter = (request.query as any).allegroFilter as
         | string
         | undefined;
@@ -314,7 +314,7 @@ export async function adminProductRoutes(app: FastifyInstance) {
         data.galleryImages = body.galleryImages;
       if (body.dataSheets !== undefined) data.dataSheets = body.dataSheets;
 
-      // FIX #3b: If name changes, also update the ownStore slug in marketplaces
+      // If name changes, also update the ownStore slug in marketplaces
       if (body.name !== undefined && !body.marketplaces) {
         const currentMp = (existing.marketplaces as any) || {};
         data.marketplaces = {
@@ -382,6 +382,7 @@ export async function adminProductRoutes(app: FastifyInstance) {
 
   // ------------------------------------------
   // POST / — create product
+  // ✅ Automatically publishes to Allegro when addToAllegro=true
   // ------------------------------------------
   app.post<{ Body: any }>("/", async (request, reply) => {
     const body = request.body as Record<string, any>;
@@ -404,10 +405,10 @@ export async function adminProductRoutes(app: FastifyInstance) {
       categorySlug = cat?.slug || "";
     }
 
-    // FIX #3: Generate a proper ownStore slug from product name
+    // Generate a proper ownStore slug from product name
     const productSlug = generateSlug(body.name || "nowy-produkt");
 
-    // Ensure slug uniqueness by checking existing products
+    // Ensure slug uniqueness
     let finalSlug = productSlug;
     const existingWithSlug = await prisma.product.findFirst({
       where: {
@@ -415,11 +416,10 @@ export async function adminProductRoutes(app: FastifyInstance) {
       },
     });
     if (existingWithSlug) {
-      // Append a short unique suffix
       finalSlug = `${productSlug}-${Date.now().toString(36)}`;
     }
 
-    // Build the full marketplaces object with slug and category_path
+    // Build the full marketplaces object
     const marketplaces = {
       ...(body.marketplaces || {}),
       ownStore: {
@@ -428,14 +428,16 @@ export async function adminProductRoutes(app: FastifyInstance) {
         slug: finalSlug,
         category_path: categorySlug ? `/${categorySlug}` : "",
         ...(body.marketplaces?.ownStore || {}),
-        // Ensure slug/category_path are not overridden by empty frontend values
       },
     };
-    // Force our generated slug (frontend doesn't send one)
     marketplaces.ownStore.slug = finalSlug;
     marketplaces.ownStore.category_path = categorySlug
       ? `/${categorySlug}`
       : "";
+
+    // Remove allegro from initial marketplaces — will be set by publish service
+    // (frontend sends allegro.active/price but we need productId from Allegro API)
+    delete marketplaces.allegro;
 
     const product = await prisma.product.create({
       data: {
@@ -482,7 +484,65 @@ export async function adminProductRoutes(app: FastifyInstance) {
       });
     }
 
-    // Reload with categories
+    // ═══════════════════════════════════════════════════════
+    // ▶ ALLEGRO: Auto-publish when addToAllegro=true
+    // If Allegro fails → ROLLBACK: delete product from shop
+    // ═══════════════════════════════════════════════════════
+
+    if (body.addToAllegro) {
+      console.log(
+        `🅰️ addToAllegro=true → publishing "${product.name}" to Allegro...`,
+      );
+      console.log(
+        `🔍 DEBUG body.model="${body.model}", body.allegroDescription="${body.allegroDescription}", body.addToAllegro=${body.addToAllegro}`,
+      );
+
+      let allegroError: string | undefined;
+      let allegroValidationErrors: string[] | undefined;
+
+      try {
+        const allegroResult = await publishProductToAllegro(product.id, {
+          allegroPrice:
+            parseFloat(
+              body.marketplaces?.allegro?.price || body.allegroPrice || "0",
+            ) || undefined,
+          allegroDescription: body.allegroDescription || undefined,
+          model: body.model || undefined,
+        });
+
+        if (allegroResult.success) {
+          console.log(
+            `✅ Published to Allegro: ${allegroResult.allegroOfferId} → ${allegroResult.allegroUrl}`,
+          );
+        } else {
+          allegroError = allegroResult.error;
+          allegroValidationErrors = allegroResult.validationErrors;
+        }
+      } catch (allegroErr: any) {
+        console.error(`⚠️ Allegro publish exception: ${allegroErr.message}`);
+        allegroError = allegroErr.message;
+      }
+
+      // If Allegro failed → ROLLBACK: delete product + category link
+      if (allegroError) {
+        console.warn(
+          `🗑️ Rolling back product "${product.name}" (Allegro failed)`,
+        );
+        await prisma.productCategory.deleteMany({
+          where: { productId: product.id },
+        });
+        await prisma.product.delete({ where: { id: product.id } });
+
+        return reply.status(400).send({
+          success: false,
+          error: `Allegro: ${allegroError}`,
+          allegroValidationErrors,
+        });
+      }
+    }
+    // ═══════════════════════════════════════════════════════
+
+    // Reload with categories (and updated marketplaces if Allegro succeeded)
     const result = await prisma.product.findUnique({
       where: { id: product.id },
       include: {
@@ -494,7 +554,65 @@ export async function adminProductRoutes(app: FastifyInstance) {
       },
     });
 
-    return reply.status(201).send({ success: true, data: mapProduct(result) });
+    return reply.status(201).send({
+      success: true,
+      data: mapProduct(result),
+    });
+  });
+
+  // ------------------------------------------
+  // POST /:id/publish-allegro — publish existing product to Allegro
+  // ------------------------------------------
+  app.post<{
+    Params: { id: string };
+    Body: {
+      allegroPrice?: number;
+      allegroDescription?: string;
+      model?: string;
+    };
+  }>("/:id/publish-allegro", async (request, reply) => {
+    const { id } = request.params;
+    const body = request.body || {};
+
+    try {
+      const result = await publishProductToAllegro(id, {
+        allegroPrice: body.allegroPrice
+          ? parseFloat(String(body.allegroPrice))
+          : undefined,
+        allegroDescription: body.allegroDescription || undefined,
+        model: body.model || undefined,
+      });
+
+      if (!result.success) {
+        return reply.status(400).send({
+          success: false,
+          error: result.error,
+          validationErrors: result.validationErrors,
+        });
+      }
+
+      const updated = await prisma.product.findUnique({
+        where: { id },
+        include: {
+          categories: {
+            include: {
+              category: { select: { id: true, name: true, slug: true } },
+            },
+          },
+        },
+      });
+
+      return reply.send({
+        success: true,
+        data: mapProduct(updated),
+        allegro: {
+          offerId: result.allegroOfferId,
+          url: result.allegroUrl,
+        },
+      });
+    } catch (err: any) {
+      return reply.status(500).send({ success: false, error: err.message });
+    }
   });
 
   // ------------------------------------------

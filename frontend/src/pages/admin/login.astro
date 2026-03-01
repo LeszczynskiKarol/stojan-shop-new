@@ -1,6 +1,6 @@
 ---
 // frontend/src/pages/admin/login.astro
-// Standalone login page - no AdminLayout (user is not authenticated yet)
+// Standalone login page with brute-force protection feedback
 ---
 <!DOCTYPE html>
 <html lang="pl">
@@ -19,6 +19,7 @@
       --primary: #6366f1;
       --primary-hover: #818cf8;
       --danger: #ef4444;
+      --warning: #f59e0b;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -82,6 +83,10 @@
       border-color: var(--primary);
       box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
     }
+    .form-group input:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
     .btn-login {
       width: 100%;
       padding: 12px;
@@ -110,6 +115,25 @@
       display: none;
     }
     .error-msg.visible { display: block; }
+    .lockout-msg {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: var(--warning);
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+      text-align: center;
+      line-height: 1.5;
+    }
+    .lockout-msg.visible { display: block; }
+    .lockout-msg .countdown {
+      font-size: 20px;
+      font-weight: 700;
+      display: block;
+      margin-top: 6px;
+    }
     .spinner {
       display: inline-block;
       width: 16px;
@@ -129,6 +153,11 @@
     <div class="login-logo">
       <h1>⚡ Stojan Admin</h1>
       <p>Panel zarządzania sklepem</p>
+    </div>
+
+    <div id="lockout" class="lockout-msg">
+      🔒 Zbyt wiele nieudanych prób.<br>
+      Spróbuj ponownie za: <span class="countdown" id="countdown"></span>
     </div>
 
     <div id="error" class="error-msg"></div>
@@ -153,7 +182,13 @@
   <script define:vars={{ API_URL: import.meta.env.PUBLIC_API_URL || 'http://localhost:4000' }}>
     const form = document.getElementById('loginForm');
     const errorEl = document.getElementById('error');
+    const lockoutEl = document.getElementById('lockout');
+    const countdownEl = document.getElementById('countdown');
     const submitBtn = document.getElementById('submitBtn');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+
+    let lockoutTimer = null;
 
     // Check if already logged in
     fetch(`${API_URL}/api/admin/auth/verify`, { credentials: 'include' })
@@ -163,20 +198,49 @@
       })
       .catch(() => {});
 
+    function startLockoutCountdown(seconds) {
+      // Disable form
+      submitBtn.disabled = true;
+      usernameInput.disabled = true;
+      passwordInput.disabled = true;
+      errorEl.classList.remove('visible');
+      lockoutEl.classList.add('visible');
+
+      let remaining = seconds;
+      function updateCountdown() {
+        const min = Math.floor(remaining / 60);
+        const sec = remaining % 60;
+        countdownEl.textContent = `${min}:${String(sec).padStart(2, '0')}`;
+
+        if (remaining <= 0) {
+          clearInterval(lockoutTimer);
+          lockoutEl.classList.remove('visible');
+          submitBtn.disabled = false;
+          usernameInput.disabled = false;
+          passwordInput.disabled = false;
+          return;
+        }
+        remaining--;
+      }
+      updateCountdown();
+      if (lockoutTimer) clearInterval(lockoutTimer);
+      lockoutTimer = setInterval(updateCountdown, 1000);
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorEl.classList.remove('visible');
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<span class="spinner"></span> Logowanie...';
 
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
+      const username = usernameInput.value;
+      const password = passwordInput.value;
 
       try {
         const res = await fetch(`${API_URL}/api/admin/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include', // IMPORTANT: sends/receives cookies
+          credentials: 'include',
           body: JSON.stringify({ username, password }),
         });
 
@@ -184,10 +248,18 @@
 
         if (data.success) {
           window.location.href = '/admin/products';
-        } else {
-          errorEl.textContent = data.error || 'Błąd logowania';
-          errorEl.classList.add('visible');
+          return;
         }
+
+        // Lockout response (429)
+        if (res.status === 429 && data.retryAfter) {
+          startLockoutCountdown(data.retryAfter);
+          return;
+        }
+
+        // Normal error
+        errorEl.textContent = data.error || 'Błąd logowania';
+        errorEl.classList.add('visible');
       } catch (err) {
         errorEl.textContent = 'Błąd połączenia z serwerem';
         errorEl.classList.add('visible');

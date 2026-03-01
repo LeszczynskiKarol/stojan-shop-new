@@ -55,6 +55,11 @@ export async function syncStockToAllegro(
       console.log(
         `🛑 Ending Allegro offer ${allegroId} (stock=0) for "${product.name}"`,
       );
+
+      // First set stock to 0, then end (deactivate) offer
+      await patchOffer(allegroId, {
+        stock: { available: 0, unit: "UNIT" },
+      });
       await endOffer(allegroId);
 
       await prisma.product.update({
@@ -79,6 +84,7 @@ export async function syncStockToAllegro(
         stock: { available: newStock, unit: "UNIT" },
       });
 
+      // Reactivate if was inactive
       if (mp?.allegro?.active === false) {
         try {
           await activateOffer(allegroId);
@@ -209,6 +215,7 @@ let lastEventId: string | null = null;
 
 /**
  * Poll Allegro offer events and sync changes back to shop.
+ * ✅ FIX: Removed duplicated event processing loop
  */
 export async function pollAllegroEvents(): Promise<SyncResult> {
   const result: SyncResult = { success: true, synced: 0, errors: [] };
@@ -227,16 +234,6 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
       type: ["OFFER_STOCK_CHANGED", "OFFER_PRICE_CHANGED"],
     });
 
-    console.log(
-      "📡 Allegro events raw response:",
-      JSON.stringify(events, null, 2).slice(0, 2000),
-    );
-    console.log(`📡 lastEventId used: ${lastEventId || "(none — first poll)"}`);
-
-    console.log(
-      "📡 Allegro events raw response:",
-      JSON.stringify(events, null, 2).slice(0, 2000),
-    );
     console.log(`📡 lastEventId used: ${lastEventId || "(none — first poll)"}`);
 
     if (!events?.offerEvents?.length) {
@@ -246,11 +243,13 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
 
     console.log(`📡 Got ${events.offerEvents.length} events from Allegro`);
 
+    // ✅ Single loop — process each event once
     for (const event of events.offerEvents) {
       try {
         const allegroOfferId = event.offer?.id;
         if (!allegroOfferId) continue;
 
+        // Find linked product in our DB
         const product = await prisma.product.findFirst({
           where: {
             marketplaces: {
@@ -262,7 +261,7 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
 
         if (!product) continue;
 
-        // Event doesn't contain stock/price — fetch current state from Allegro
+        // Fetch current state from Allegro (event payload may be incomplete)
         const offer = await getOffer(allegroOfferId);
         const mp = product.marketplaces as any;
 
@@ -325,85 +324,6 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
         result.errors.push(`Event ${event.id}: ${err.message}`);
       }
     }
-
-    console.log(`📡 Got ${events.offerEvents.length} events from Allegro`);
-
-    for (const event of events.offerEvents) {
-      try {
-        const allegroOfferId = event.offer?.id;
-        if (!allegroOfferId) continue;
-
-        const product = await prisma.product.findFirst({
-          where: {
-            marketplaces: {
-              path: ["allegro", "productId"],
-              equals: allegroOfferId,
-            },
-          },
-        });
-
-        if (!product) continue;
-
-        const mp = product.marketplaces as any;
-
-        if (event.type === "OFFER_STOCK_CHANGED") {
-          const newStock = event.offer?.stock?.available;
-          if (newStock !== undefined && newStock !== product.stock) {
-            console.log(
-              `📥 Allegro stock event: "${product.name}" ${product.stock} → ${newStock}`,
-            );
-            await prisma.product.update({
-              where: { id: product.id },
-              data: {
-                stock: newStock,
-                marketplaces: {
-                  ...mp,
-                  allegro: {
-                    ...mp.allegro,
-                    active: newStock > 0,
-                    lastSyncAt: new Date().toISOString(),
-                  },
-                },
-              },
-            });
-            result.synced++;
-          }
-        }
-
-        if (event.type === "OFFER_PRICE_CHANGED") {
-          const newPrice = parseFloat(
-            event.offer?.sellingMode?.price?.amount || "0",
-          );
-          if (newPrice > 0) {
-            const currentPrice = Number(product.price);
-            if (newPrice !== currentPrice) {
-              console.log(
-                `📥 Allegro price event: "${product.name}" ${currentPrice} → ${newPrice}`,
-              );
-              await prisma.product.update({
-                where: { id: product.id },
-                data: {
-                  price: newPrice,
-                  marketplaces: {
-                    ...mp,
-                    allegro: {
-                      ...mp.allegro,
-                      price: newPrice,
-                      lastSyncAt: new Date().toISOString(),
-                    },
-                  },
-                },
-              });
-              result.synced++;
-            }
-          }
-        }
-
-        lastEventId = event.id;
-      } catch (err: any) {
-        result.errors.push(`Event ${event.id}: ${err.message}`);
-      }
-    }
   } catch (err: any) {
     result.success = false;
     result.errors.push(err.message);
@@ -436,7 +356,6 @@ export async function importAllegroOffers(): Promise<{
   }
 
   try {
-    // Fetch all offers from Allegro (paginated)
     let offset = 0;
     const limit = 100;
     let allOffers: any[] = [];
@@ -472,7 +391,6 @@ export async function importAllegroOffers(): Promise<{
         });
 
         if (alreadyLinked) {
-          // Update existing link data (stock, price, active status)
           const mp = alreadyLinked.marketplaces as any;
           await prisma.product.update({
             where: { id: alreadyLinked.id },
@@ -494,7 +412,7 @@ export async function importAllegroOffers(): Promise<{
           continue;
         }
 
-        // Try to match by name (case-insensitive exact match)
+        // Try to match by name
         const matchByName = await prisma.product.findFirst({
           where: {
             name: { equals: offerName, mode: "insensitive" },
@@ -523,7 +441,6 @@ export async function importAllegroOffers(): Promise<{
           continue;
         }
 
-        // No match found — skip (never create new products from Allegro)
         result.skipped++;
         console.log(`⏭️ No match for Allegro offer: "${offerName}" — skipping`);
       } catch (err: any) {
@@ -545,11 +462,6 @@ export async function importAllegroOffers(): Promise<{
 // FULL RECONCILIATION (Allegro → Shop, manual only)
 // ============================================
 
-/**
- * Full reconciliation — compare all linked products with Allegro and fix mismatches.
- * Direction: Allegro → Shop (pull current Allegro state into shop DB)
- * This is triggered MANUALLY from admin panel only, never automatically.
- */
 export async function fullReconciliation(): Promise<SyncResult> {
   const result: SyncResult = { success: true, synced: 0, errors: [] };
 
@@ -620,7 +532,6 @@ export async function fullReconciliation(): Promise<SyncResult> {
 
         await new Promise((r) => setTimeout(r, 200));
       } catch (err: any) {
-        // ⬇️ KEY CHANGE: detect 404 = offer gone from Allegro → auto-unlink
         if (err.message?.includes("404")) {
           console.warn(
             `⚠️ Allegro offer ${product.allegro_id} returns 404 for "${product.name}" — unlinking`,
@@ -672,8 +583,6 @@ async function unlinkAllegroFromProduct(
 
 // ============================================
 //    Detect orphaned links (bulk comparison)
-//    Compares linked Allegro IDs in DB against actual seller offers.
-//    Faster than fetching each offer individually.
 // ============================================
 
 export async function detectOrphanedLinks(): Promise<{
@@ -690,10 +599,9 @@ export async function detectOrphanedLinks(): Promise<{
   }
 
   try {
-    // 1. Get ALL seller offers from Allegro (just IDs)
     const allegroOfferIds = new Set<string>();
     let offset = 0;
-    const limit = 1000; // max allowed by Allegro API
+    const limit = 1000;
 
     while (true) {
       const data = await getSellerOffers(offset, limit);
@@ -709,7 +617,6 @@ export async function detectOrphanedLinks(): Promise<{
       `🔍 Allegro has ${allegroOfferIds.size} total offers for this seller`,
     );
 
-    // 2. Get all linked Allegro IDs from our DB
     const linkedProducts = await prisma.$queryRaw<
       Array<{ id: string; name: string; allegro_id: string }>
     >`
@@ -724,7 +631,6 @@ export async function detectOrphanedLinks(): Promise<{
       `🔍 Shop has ${linkedProducts.length} products linked to Allegro`,
     );
 
-    // 3. Find orphans: linked in DB but NOT in Allegro offers list
     for (const product of linkedProducts) {
       if (!allegroOfferIds.has(product.allegro_id)) {
         console.warn(

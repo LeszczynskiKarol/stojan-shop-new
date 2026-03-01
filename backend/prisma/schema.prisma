@@ -1,4 +1,4 @@
-// Stojan Shop - Prisma Schema
+// Stojan Shop - Prisma Schema NOWY SKLEP
 // Migracja z TypeORM entities
 
 generator client {

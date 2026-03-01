@@ -777,7 +777,7 @@ const bannerWarning: React.CSSProperties = {
   marginBottom: "12px",
   fontSize: "13px",
   fontWeight: 600,
-  color: "#fbbf24",
+  color: "#cf9604",
   display: "flex",
   alignItems: "center",
   gap: "8px",

@@ -673,7 +673,11 @@ export function AdminOrders() {
                       </div>
 
                       {/* ── HOVER CLOUD ── */}
-                      <div className="absolute z-20 invisible group-hover:visible backdrop-blur-md bg-[hsl(var(--background))]/95 p-4 rounded-lg shadow-lg border border-[hsl(var(--border))] -translate-y-full left-0 top-0 mt-1 min-w-[500px] transition-all duration-150">
+                      <div
+                        className="fixed z-[9999] invisible group-hover:visible p-4 rounded-lg shadow-2xl border border-[hsl(var(--border))] min-w-[540px] max-w-[600px] max-h-[80vh] overflow-y-auto left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none group-hover:pointer-events-auto"
+                        style={{ background: "var(--bg-card, #1a1d27)" }}
+                      >
+                        {" "}
                         <div className="space-y-4">
                           {/* Products */}
                           <div>

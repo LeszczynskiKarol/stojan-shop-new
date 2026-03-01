@@ -1,7 +1,7 @@
 // frontend/src/components/admin/AddProductForm.tsx
 // Product creation form with optional Allegro listing
-// Stack: React + Tailwind + lucide-react (Astro island, no Next.js)
-// DARK MODE — matches AdminLayout CSS variables
+// Stack: React + Tailwind + lucide-react (Astro island)
+// THEME-AWARE — uses AdminLayout CSS variables (--bg, --bg-card, --border, etc.)
 
 import { useState, useEffect, useRef } from "react";
 import {
@@ -52,7 +52,6 @@ interface FormData {
   hasBreak: boolean;
   hasEx: boolean;
   hasForeignCooling: boolean;
-  // Allegro
   addToAllegro: boolean;
   allegroPrice: string;
   allegroModel: string;
@@ -97,8 +96,6 @@ const ALLEGRO_CATEGORIES = [
   "motoreduktory",
 ];
 
-// Ordered main categories shown in the add-product form
-// Each entry is a slug keyword matched via .includes()
 const MAIN_CATEGORY_ORDER = [
   "trojfazowe",
   "motoreduktory",
@@ -204,7 +201,6 @@ export default function AddProductForm() {
 
   const isAllegroSupported = ALLEGRO_CATEGORIES.includes(selectedCategory);
 
-  // Filtered manufacturers for dropdown
   const filteredMfgs = manufacturers.filter((m) =>
     m.name
       .toLowerCase()
@@ -223,10 +219,7 @@ export default function AddProductForm() {
     try {
       const res = await fetch(`${API}/api/admin/products/manufacturers`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders(),
-        },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         credentials: "include",
         body: JSON.stringify({ name }),
       });
@@ -256,8 +249,6 @@ export default function AddProductForm() {
   };
 
   // ---- Image Upload ----
-  // FIX #1: Changed endpoint from /api/uploads/products to /api/admin/products/upload/images|datasheets
-  //         and changed form field name from "images" to "file" to match backend's request.parts()
   const uploadImages = async (
     files: FileList,
     type: "images" | "datasheets" = "images",
@@ -300,7 +291,6 @@ export default function AddProductForm() {
     }
   };
 
-  // FIX #1b: PDF upload now uses the correct "datasheets" type
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
     try {
@@ -324,10 +314,7 @@ export default function AddProductForm() {
     try {
       const res = await fetch(`${API}/api/ai/generate-description`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders(),
-        },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         credentials: "include",
         body: JSON.stringify({
           product: {
@@ -350,10 +337,7 @@ export default function AddProductForm() {
         throw new Error(data.error || "Brak opisu");
       }
     } catch (e: any) {
-      setMessage({
-        type: "error",
-        text: `Błąd generowania: ${e.message}`,
-      });
+      setMessage({ type: "error", text: `Błąd generowania: ${e.message}` });
     } finally {
       setGeneratingDesc(false);
     }
@@ -435,26 +419,23 @@ export default function AddProductForm() {
 
       const res = await fetch(`${API}/api/admin/products`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders(),
-        },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         credentials: "include",
         body: JSON.stringify(payload),
       });
 
       const data = await res.json();
 
+      // NOWY KOD:
       if (data.success) {
         localStorage.removeItem(STORAGE_KEY);
-
-        // FIX #2: Redirect to product list after successful creation
         window.location.href = "/admin/products";
       } else {
         setMessage({
           type: "error",
           text: data.error || "Błąd dodawania produktu",
         });
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
     } catch (e: any) {
       setMessage({ type: "error", text: e.message });
@@ -464,47 +445,61 @@ export default function AddProductForm() {
   };
 
   // ============================================
-  // STYLES — matching AdminLayout dark theme
+  // STYLES — using CSS variables from AdminLayout
+  // All colors reference var(--bg), var(--bg-card), var(--border), etc.
+  // so they adapt to both dark and light themes automatically.
   // ============================================
   const S = {
-    section: "rounded-lg border border-[#2d3348] bg-[#1a1d27] p-5",
+    section: "rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-5",
     sectionHeader:
-      "mb-4 text-xs font-semibold uppercase tracking-wider text-[#8b8fa3]",
-    label: "mb-1 block text-xs font-medium text-[#8b8fa3]",
+      "mb-4 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]",
+    label: "mb-1 block text-xs font-medium text-[var(--text-muted)]",
     input:
-      "w-full rounded px-3 py-2 text-sm bg-[#1e2130] border border-[#2d3348] text-[#e4e6ef] outline-none transition-colors focus:border-[#6366f1] placeholder:text-[#555a6e]",
+      "w-full rounded-md px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text)] outline-none transition-colors focus:border-[var(--primary)] focus:shadow-[0_0_0_2px_rgba(99,102,241,0.15)] placeholder:text-[var(--text-muted)]/50",
     select:
-      "w-full rounded px-3 py-2 text-sm bg-[#1e2130] border border-[#2d3348] text-[#e4e6ef] outline-none transition-colors focus:border-[#6366f1]",
+      "w-full rounded-md px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text)] outline-none transition-colors focus:border-[var(--primary)]",
     textarea:
-      "w-full rounded px-3 py-2 text-sm bg-[#1e2130] border border-[#2d3348] text-[#e4e6ef] outline-none transition-colors focus:border-[#6366f1] placeholder:text-[#555a6e] font-mono",
+      "w-full rounded-md px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text)] outline-none transition-colors focus:border-[var(--primary)] focus:shadow-[0_0_0_2px_rgba(99,102,241,0.15)] placeholder:text-[var(--text-muted)]/50 font-mono",
     checkbox:
-      "rounded border-[#2d3348] bg-[#1e2130] text-[#6366f1] focus:ring-[#6366f1] focus:ring-offset-0 cursor-pointer",
-    checkLabel: "flex items-center gap-2 text-sm text-[#e4e6ef] cursor-pointer",
+      "rounded border-[var(--border)] bg-[var(--bg-input)] text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 cursor-pointer",
+    checkLabel:
+      "flex items-center gap-2 text-sm text-[var(--text)] cursor-pointer",
     btnPrimary:
-      "inline-flex items-center gap-2 rounded-md bg-[#6366f1] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#818cf8] disabled:opacity-50 transition-colors",
+      "inline-flex items-center gap-2 rounded-md bg-[var(--primary)] px-5 py-2.5 text-sm font-medium text-white hover:bg-[var(--primary-hover)] disabled:opacity-50 transition-colors",
     btnOutline:
-      "inline-flex items-center gap-2 rounded-md border border-[#2d3348] px-4 py-2 text-sm text-[#8b8fa3] hover:text-[#e4e6ef] hover:border-[#8b8fa3] transition-colors",
-    btnGhost: "text-sm text-[#8b8fa3] hover:text-[#e4e6ef] transition-colors",
+      "inline-flex items-center gap-2 rounded-md border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--text-muted)] transition-colors",
+    btnGhost:
+      "text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors",
     btnDanger:
-      "rounded p-1.5 text-[#ef4444] hover:bg-[#7f1d1d]/30 transition-colors",
+      "rounded p-1.5 text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors",
     btnAI:
-      "inline-flex items-center gap-1.5 rounded-md bg-[#6366f1]/15 px-3 py-1.5 text-xs font-medium text-[#818cf8] hover:bg-[#6366f1]/25 disabled:opacity-50 transition-colors",
+      "inline-flex items-center gap-1.5 rounded-md bg-[var(--primary)]/15 px-3 py-1.5 text-xs font-medium text-[var(--primary-hover)] hover:bg-[var(--primary)]/25 disabled:opacity-50 transition-colors",
     btnAdd:
-      "inline-flex items-center gap-1 text-xs text-[#818cf8] hover:text-[#a5b4fc] transition-colors",
+      "inline-flex items-center gap-1 text-xs text-[var(--primary-hover)] hover:text-[var(--primary)] transition-colors",
     msgSuccess:
-      "rounded-md border border-[#166534] bg-[#166534]/20 px-4 py-3 text-sm text-[#4ade80]",
+      "rounded-md border border-[var(--success)]/40 bg-[var(--success)]/10 px-4 py-3 text-sm text-[var(--success)]",
     msgError:
-      "rounded-md border border-[#7f1d1d] bg-[#7f1d1d]/20 px-4 py-3 text-sm text-[#f87171]",
-    imageThumb: "h-32 w-32 rounded-lg border border-[#2d3348] object-cover",
-    imageThumbSm: "h-24 w-24 rounded-lg border border-[#2d3348] object-cover",
+      "rounded-md border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]",
+    imageThumb:
+      "h-32 w-32 rounded-lg border border-[var(--border)] object-cover",
+    imageThumbSm:
+      "h-24 w-24 rounded-lg border border-[var(--border)] object-cover",
     uploadZone:
-      "flex items-center justify-center rounded-lg border-2 border-dashed border-[#2d3348] text-[#8b8fa3] hover:border-[#6366f1] hover:text-[#818cf8] transition-colors cursor-pointer",
+      "flex items-center justify-center rounded-lg border-2 border-dashed border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors cursor-pointer",
     pdfBadge:
-      "flex items-center gap-1.5 rounded bg-[#252836] px-2.5 py-1 text-xs text-[#e4e6ef]",
+      "flex items-center gap-1.5 rounded bg-[var(--bg-hover)] px-2.5 py-1 text-xs text-[var(--text)]",
     allegroHeader:
-      "flex w-full items-center justify-between px-5 py-3.5 text-left hover:bg-[#252836] transition-colors",
+      "flex w-full items-center justify-between px-5 py-3.5 text-left hover:bg-[var(--bg-hover)] transition-colors",
     allegroIcon:
-      "flex h-6 w-6 items-center justify-center rounded bg-[#f59e0b] text-white text-xs font-bold",
+      "flex h-6 w-6 items-center justify-center rounded bg-[var(--warning)] text-white text-xs font-bold",
+    // Dropdown styles
+    dropdown:
+      "absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--bg-input)] shadow-lg",
+    dropdownItem:
+      "w-full px-3 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--primary)]/15 transition-colors",
+    dropdownEmpty: "px-3 py-2 text-xs text-[var(--text-muted)]",
+    dropdownCreate:
+      "w-full border-t border-[var(--border)] px-3 py-2 text-left text-sm font-medium text-[var(--primary-hover)] hover:bg-[var(--primary)]/15 transition-colors disabled:opacity-50",
   } as const;
 
   return (
@@ -548,7 +543,7 @@ export default function AddProductForm() {
                 autoComplete="off"
               />
               {mfgOpen && (
-                <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-md border border-[#2d3348] bg-[#1e2130] shadow-lg">
+                <div className={S.dropdown}>
                   {filteredMfgs.length > 0 ? (
                     filteredMfgs.slice(0, 30).map((m) => (
                       <button
@@ -559,15 +554,13 @@ export default function AddProductForm() {
                           setMfgSearch("");
                           setMfgOpen(false);
                         }}
-                        className="w-full px-3 py-2 text-left text-sm text-[#e4e6ef] hover:bg-[#6366f1]/20 transition-colors"
+                        className={S.dropdownItem}
                       >
                         {m.name}
                       </button>
                     ))
                   ) : (
-                    <div className="px-3 py-2 text-xs text-[#555a6e]">
-                      Brak wyników
-                    </div>
+                    <div className={S.dropdownEmpty}>Brak wyników</div>
                   )}
                   {(mfgSearch || form.manufacturer).trim() &&
                     !mfgExactMatch && (
@@ -579,7 +572,7 @@ export default function AddProductForm() {
                             (mfgSearch || form.manufacturer).trim(),
                           )
                         }
-                        className="w-full border-t border-[#2d3348] px-3 py-2 text-left text-sm font-medium text-[#818cf8] hover:bg-[#6366f1]/20 transition-colors disabled:opacity-50"
+                        className={S.dropdownCreate}
                       >
                         {creatingMfg
                           ? "Dodawanie..."
@@ -759,9 +752,9 @@ export default function AddProductForm() {
         </div>
 
         {/* Custom parameters */}
-        <div className="mt-5 border-t border-[#2d3348] pt-4">
+        <div className="mt-5 border-t border-[var(--border)] pt-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-[#8b8fa3]">
+            <span className="text-sm font-medium text-[var(--text-muted)]">
               Dodatkowe parametry
             </span>
             <button
@@ -832,7 +825,7 @@ export default function AddProductForm() {
                 <button
                   type="button"
                   onClick={() => setMainImage("")}
-                  className="absolute -right-2 -top-2 rounded-full bg-[#ef4444] p-0.5 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute -right-2 -top-2 rounded-full bg-[var(--danger)] p-0.5 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -877,7 +870,7 @@ export default function AddProductForm() {
                     onClick={() =>
                       setGalleryImages(galleryImages.filter((_, j) => j !== i))
                     }
-                    className="absolute -right-1 -top-1 rounded-full bg-[#ef4444] p-0.5 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute -right-1 -top-1 rounded-full bg-[var(--danger)] p-0.5 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -919,7 +912,7 @@ export default function AddProductForm() {
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#818cf8] hover:underline"
+                  className="text-[var(--primary-hover)] hover:underline"
                 >
                   PDF #{i + 1}
                 </a>
@@ -928,7 +921,7 @@ export default function AddProductForm() {
                   onClick={() =>
                     setDataSheets(dataSheets.filter((_, j) => j !== i))
                   }
-                  className="text-[#ef4444] hover:text-[#f87171]"
+                  className="text-[var(--danger)] hover:text-[var(--danger-hover)]"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -1007,7 +1000,7 @@ export default function AddProductForm() {
       {/* ============================================ */}
       {/* ALLEGRO SECTION */}
       {/* ============================================ */}
-      <section className="rounded-lg border border-[#2d3348] bg-[#1a1d27] overflow-hidden">
+      <section className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
         <button
           type="button"
           onClick={() => setShowAllegroSection(!showAllegroSection)}
@@ -1015,41 +1008,41 @@ export default function AddProductForm() {
         >
           <div className="flex items-center gap-2.5">
             <div className={S.allegroIcon}>A</div>
-            <span className="text-sm font-semibold text-[#e4e6ef]">
+            <span className="text-sm font-semibold text-[var(--text)]">
               Allegro
             </span>
             {allegroConnected ? (
-              <span className="rounded bg-[#166534]/30 px-2 py-0.5 text-[10px] font-semibold text-[#4ade80]">
+              <span className="rounded bg-[var(--success)]/20 px-2 py-0.5 text-[10px] font-semibold text-[var(--success)]">
                 POŁĄCZONO
               </span>
             ) : (
-              <span className="rounded bg-[#7f1d1d]/30 px-2 py-0.5 text-[10px] font-semibold text-[#f87171]">
+              <span className="rounded bg-[var(--danger)]/20 px-2 py-0.5 text-[10px] font-semibold text-[var(--danger)]">
                 NIEPOŁĄCZONO
               </span>
             )}
           </div>
           {showAllegroSection ? (
-            <ChevronUp className="h-4 w-4 text-[#8b8fa3]" />
+            <ChevronUp className="h-4 w-4 text-[var(--text-muted)]" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-[#8b8fa3]" />
+            <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
           )}
         </button>
 
         {showAllegroSection && (
-          <div className="border-t border-[#2d3348] px-5 pb-5 pt-4">
+          <div className="border-t border-[var(--border)] px-5 pb-5 pt-4">
             {!allegroConnected ? (
-              <p className="text-sm text-[#8b8fa3]">
+              <p className="text-sm text-[var(--text-muted)]">
                 Połącz z Allegro w{" "}
                 <a
                   href="/admin/allegro"
-                  className="text-[#818cf8] hover:underline"
+                  className="text-[var(--primary-hover)] hover:underline"
                 >
                   panelu Allegro
                 </a>
                 , aby móc dodawać oferty.
               </p>
             ) : !isAllegroSupported ? (
-              <div className="rounded-md border border-[#f59e0b]/30 bg-[#f59e0b]/10 p-3 text-sm text-[#fbbf24]">
+              <div className="rounded-md border border-[var(--warning)]/30 bg-[var(--warning)]/10 p-3 text-sm text-[var(--warning)]">
                 Allegro dostępne tylko dla: silniki elektryczne (wszystkie
                 podkategorie) i motoreduktory.
               </div>
@@ -1066,7 +1059,7 @@ export default function AddProductForm() {
                 </label>
 
                 {form.addToAllegro && (
-                  <div className="ml-6 space-y-3 border-l-2 border-[#f59e0b]/30 pl-4">
+                  <div className="ml-6 space-y-3 border-l-2 border-[var(--warning)]/30 pl-4">
                     <Field label="Cena Allegro [PLN] (opcjonalnie)" s={S}>
                       <input
                         value={form.allegroPrice}
