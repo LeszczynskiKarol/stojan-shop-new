@@ -280,7 +280,9 @@ function emailWrapper(content: string): string {
           <!-- CONTENT -->
           <tr>
             <td style="padding:0;">
-              ${content}
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                ${content}
+              </table>
             </td>
           </tr>
 
@@ -418,6 +420,7 @@ export async function sendOrderConfirmation(
 
   const content = `
     <!-- Hero section -->
+    <tr>
     <td style="padding:32px 32px 24px;text-align:center;">
       <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
         <tr>
@@ -434,6 +437,7 @@ export async function sendOrderConfirmation(
         ${data.paymentMethod === "prepaid" ? "Potwierdzamy otrzymanie płatności." : "Płatność: za pobraniem przy dostawie."}
       </p>
     </td>
+    </tr>
 
     <!-- Delivery estimate -->
     <tr>
@@ -573,6 +577,7 @@ export async function sendShipmentNotification(
 
   const content = `
     <!-- Hero -->
+    <tr>
     <td style="padding:32px 32px 24px;text-align:center;">
       <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
         <tr>
@@ -586,6 +591,7 @@ export async function sendShipmentNotification(
         Zamówienie <strong style="color:#1e293b;">#${escapeHtml(data.orderNumber)}</strong> zostało przekazane kurierowi.
       </p>
     </td>
+    </tr>
 
     <!-- Delivery estimate -->
     <tr>
@@ -709,6 +715,7 @@ export async function sendAdminNewOrderNotification(
     data.paymentMethod === "cod" ? "🔴 POBRANIE" : "🟢 Online";
 
   const content = `
+    <tr>
     <td style="padding:32px;">
       <h1 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#1e293b;">🛒 Nowe zamówienie #${escapeHtml(data.orderNumber)}</h1>
       <p style="margin:0 0 24px;font-size:14px;color:#64748b;">
@@ -783,6 +790,7 @@ export async function sendAdminNewOrderNotification(
 
       ${s.notes ? `<div style="margin-top:16px;padding:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;"><p style="margin:0;font-size:13px;color:#92400e;"><strong>💬 Uwagi:</strong> ${escapeHtml(s.notes)}</p></div>` : ""}
     </td>
+    </tr>
   `;
 
   const html = emailWrapper(content);
@@ -804,7 +812,8 @@ export async function sendAdminShipmentNotification(
     s.companyName || `${s.firstName || ""} ${s.lastName || ""}`.trim();
 
   const content = `
-    <td style="padding:32px;">
+        <tr>
+        <td style="padding:32px;">
       <h1 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#1e293b;">📦 Zamówienie #${escapeHtml(data.orderNumber)} wysłane</h1>
       <p style="margin:0 0 16px;font-size:14px;color:#64748b;">
         ${new Date().toLocaleString("pl-PL")} — Email wysyłkowy wysłany do klienta
@@ -821,6 +830,8 @@ export async function sendAdminShipmentNotification(
         </tr>
       </table>
     </td>
+        </tr>
+
   `;
 
   const html = emailWrapper(content);
