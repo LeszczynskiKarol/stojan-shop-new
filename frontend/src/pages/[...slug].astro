@@ -4,6 +4,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import { getLegalPage } from '@/lib/api';
 
 const slug = Astro.params.slug;
+const requestedPath = Astro.url.pathname;
 
 // Only handle known legal/info page slugs
 const LEGAL_SLUGS = new Set([
@@ -19,23 +20,87 @@ const LEGAL_SLUGS = new Set([
   'o-nas',
 ]);
 
+let is404 = false;
+let page = null;
+
 if (!slug || slug.includes('/') || !LEGAL_SLUGS.has(slug)) {
-  return new Response(null, { status: 404, statusText: 'Not Found' });
-}
-
-const page = await getLegalPage(slug);
-
-if (!page) {
-  return new Response(null, { status: 404, statusText: 'Not Found' });
+  is404 = true;
+  Astro.response.status = 404;
+} else {
+  page = await getLegalPage(slug);
+  if (!page) {
+    is404 = true;
+    Astro.response.status = 404;
+  }
 }
 ---
 
-<BaseLayout
-  title={`${page.title} | Silniki Elektryczne`}
-  description={page.title}
->
-  <div class="container mx-auto px-4 py-12 max-w-4xl">
-    <h1 class="text-3xl font-bold mb-8 text-foreground">{page.title}</h1>
-    <div class="prose dark:prose-invert max-w-none" set:html={page.content} />
-  </div>
-</BaseLayout>
+{is404 ? (
+  <BaseLayout
+    title="Strona nie znaleziona | Stojan Shop"
+    description="Strona, której szukasz, nie istnieje lub została przeniesiona."
+    noIndex={true}
+  >
+    <div class="container mx-auto px-4 py-16 max-w-2xl text-center">
+      <div class="mb-8">
+        <span class="text-7xl font-bold text-primary">404</span>
+      </div>
+
+      <h1 class="text-2xl font-bold text-foreground mb-4">
+        Strona nie została znaleziona
+      </h1>
+
+      <p class="text-muted-foreground mb-8">
+        Strona, której szukasz, nie istnieje, została przeniesiona lub jest tymczasowo niedostępna.
+      </p>
+
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a
+          href="/"
+          class="inline-flex items-center justify-center px-6 py-3 bg-primary text-primary-foreground font-semibold rounded-lg hover:opacity-90 transition-opacity"
+        >
+          Strona główna
+        </a>
+        <a
+          href="/trojfazowe"
+          class="inline-flex items-center justify-center px-6 py-3 border border-border text-foreground font-medium rounded-lg hover:bg-accent transition-colors"
+        >
+          Silniki trójfazowe
+        </a>
+        <a
+          href="/motoreduktory"
+          class="inline-flex items-center justify-center px-6 py-3 border border-border text-foreground font-medium rounded-lg hover:bg-accent transition-colors"
+        >
+          Motoreduktory
+        </a>
+      </div>
+
+      <div class="mt-12 p-4 bg-muted rounded-lg">
+        <p class="text-sm text-muted-foreground">
+          Szukasz konkretnego silnika? Skorzystaj z wyszukiwarki w górnym menu
+          lub <a href="/kontakt" class="text-primary hover:underline">skontaktuj się z nami</a>.
+        </p>
+      </div>
+    </div>
+
+    <script is:inline define:vars={{ requestedPath }}>
+      if (typeof gtag === 'function') {
+        gtag('event', 'page_not_found', {
+          page_path: requestedPath,
+          page_referrer: document.referrer || '(direct)',
+          page_location: window.location.href
+        });
+      }
+    </script>
+  </BaseLayout>
+) : (
+  <BaseLayout
+    title={`${page.title} | Silniki Elektryczne`}
+    description={page.title}
+  >
+    <div class="container mx-auto px-4 py-12 max-w-4xl">
+      <h1 class="text-3xl font-bold mb-8 text-foreground">{page.title}</h1>
+      <div class="prose dark:prose-invert max-w-none" set:html={page.content} />
+    </div>
+  </BaseLayout>
+)}
