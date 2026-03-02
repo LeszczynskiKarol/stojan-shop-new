@@ -329,9 +329,10 @@ export async function adminProductRoutes(app: FastifyInstance) {
       await prisma.product.update({ where: { id }, data });
 
       // ▶ ALLEGRO SYNC HOOKS
-      if (body.stock !== undefined) {
+      if (body.stock !== undefined && parseInt(body.stock) !== existing.stock) {
         fireAllegroStockSync(id, parseInt(body.stock) || 0);
       }
+
       if (body.price !== undefined) {
         const newPrice =
           body.marketplaces?.ownStore?.price ?? parseFloat(body.price);

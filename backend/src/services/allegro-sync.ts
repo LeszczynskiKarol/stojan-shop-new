@@ -52,9 +52,10 @@ export async function syncStockToAllegro(
 
   try {
     if (newStock <= 0) {
-      console.log(
-        `🛑 Ending Allegro offer ${allegroId} (stock=0) for "${product.name}"`,
-      );
+      if (mp?.allegro?.active === false) {
+        console.log(`ℹ️ Offer ${allegroId} already ended, skipping`);
+        return; // ← NOWE
+      }
 
       // First set stock to 0, then end (deactivate) offer
       await patchOffer(allegroId, {
@@ -76,26 +77,21 @@ export async function syncStockToAllegro(
         },
       });
     } else {
-      console.log(
-        `📦 Syncing stock to Allegro: ${allegroId} → ${newStock} for "${product.name}"`,
-      );
-
-      await patchOffer(allegroId, {
-        stock: { available: newStock, unit: "UNIT" },
-      });
-
-      // Reactivate if was inactive
+      // ✅ FIX: reactivate FIRST
       if (mp?.allegro?.active === false) {
         try {
           await activateOffer(allegroId);
           console.log(`✅ Reactivated Allegro offer ${allegroId}`);
+          await new Promise((r) => setTimeout(r, 1500));
         } catch (err: any) {
-          console.warn(
-            `⚠️ Could not reactivate offer ${allegroId}:`,
-            err.message,
-          );
+          console.warn(`⚠️ Could not reactivate ${allegroId}:`, err.message);
+          return; // ← nie próbuj PATCH jeśli activate failuje
         }
       }
+
+      await patchOffer(allegroId, {
+        stock: { available: newStock, unit: "UNIT" },
+      });
 
       await prisma.product.update({
         where: { id: productId },
@@ -138,7 +134,10 @@ export async function syncPriceToAllegro(
   const mp = product.marketplaces as any;
   const allegroId = mp?.allegro?.productId;
   if (!allegroId) return;
-
+  if (mp?.allegro?.active === false) {
+    console.log(`ℹ️ Offer ${allegroId} is ended, skipping price sync`);
+    return;
+  }
   const connected = await isAllegroConnected();
   if (!connected) return;
 
@@ -211,7 +210,20 @@ export async function syncNameToAllegro(
 // ALLEGRO → SHOP (pull changes from Allegro)
 // ============================================
 
-let lastEventId: string | null = null;
+async function getLastEventId(): Promise<string | null> {
+  const setting = await prisma.setting.findUnique({
+    where: { key: "allegro_last_event_id" },
+  });
+  return setting?.value || null;
+}
+
+async function saveLastEventId(id: string): Promise<void> {
+  await prisma.setting.upsert({
+    where: { key: "allegro_last_event_id" },
+    update: { value: id },
+    create: { key: "allegro_last_event_id", value: id },
+  });
+}
 
 /**
  * Poll Allegro offer events and sync changes back to shop.
@@ -228,8 +240,10 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
   }
 
   try {
+    const lastEventId = await getLastEventId();
     const events = await getOfferEvents({
       from: lastEventId || undefined,
+
       limit: 100,
       type: ["OFFER_STOCK_CHANGED", "OFFER_PRICE_CHANGED"],
     });
@@ -316,7 +330,7 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
           }
         }
 
-        lastEventId = event.id;
+        await saveLastEventId(event.id);
 
         // Rate limit between Allegro API calls
         await new Promise((r) => setTimeout(r, 200));

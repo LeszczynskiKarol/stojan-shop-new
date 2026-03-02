@@ -444,3 +444,13 @@ model AnalyticsEvent {
   @@index([type, createdAt])
   @@map("analytics_events")
 }
+
+
+model Setting {
+  key       String   @id
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}

@@ -11,7 +11,7 @@ import { isAllegroConnected } from "../lib/allegro-client.js";
 let eventPollInterval: ReturnType<typeof setInterval> | null = null;
 let orphanInterval: ReturnType<typeof setInterval> | null = null;
 
-const EVENT_POLL_MS = 10 * 60 * 1000; // Poll events every 10 min
+const EVENT_POLL_MS = 3 * 60 * 1000; // Poll events every 3 min
 const ORPHAN_CHECK_MS = 24 * 60 * 60 * 1000; // 24h
 
 /**
