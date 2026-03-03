@@ -215,6 +215,13 @@ const fmt = (v: number) =>
 
 const fmtPln = (v: number) => `${fmt(v)} zł`;
 
+function toLocalDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function fmtDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
   const m = Math.floor(seconds / 60);
@@ -300,11 +307,9 @@ export default function AnalyticsDashboard() {
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(1);
-    return d.toISOString().split("T")[0];
+    return toLocalDate(d);
   });
-  const [endDate, setEndDate] = useState(
-    () => new Date().toISOString().split("T")[0],
-  );
+  const [endDate, setEndDate] = useState(() => toLocalDate(new Date()));
   const [groupBy, setGroupBy] = useState("day");
 
   // Sessions tab state
@@ -441,14 +446,14 @@ export default function AnalyticsDashboard() {
       case "prevMonth":
         start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const end = new Date(now.getFullYear(), now.getMonth(), 0);
-        setStartDate(start.toISOString().split("T")[0]);
-        setEndDate(end.toISOString().split("T")[0]);
+        setStartDate(toLocalDate(start));
+        setEndDate(toLocalDate(end));
         return;
       default:
         return;
     }
-    setStartDate(start.toISOString().split("T")[0]);
-    setEndDate(now.toISOString().split("T")[0]);
+    setStartDate(toLocalDate(start));
+    setEndDate(toLocalDate(now));
   };
 
   // ============================================

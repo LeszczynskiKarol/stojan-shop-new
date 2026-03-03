@@ -141,7 +141,10 @@ const CHART_COLORS = [
 ];
 
 function toISODate(d: Date): string {
-  return d.toISOString().split("T")[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function getDefaultRange(): { start: string; end: string } {
@@ -489,7 +492,7 @@ export default function OrdersAnalytics() {
                     />
                     <Tooltip
                       content={<ChartTooltip />}
-                      formatter={(v: number) => [fmt(v), "Przychód"]}
+                      formatter={(v) => [fmt(Number(v ?? 0)), "Przychód"]}
                     />
                     <Area
                       type="monotone"
@@ -557,7 +560,7 @@ export default function OrdersAnalytics() {
                       cy="50%"
                       outerRadius={100}
                       innerRadius={50}
-                      label={({ label, count }) => `${label}: ${count}`}
+                      label={({ name, value }) => `${name}: ${value}`}
                       labelLine={{ stroke: "var(--text-muted)" }}
                     >
                       {data.statusBreakdown.map((entry) => (
@@ -568,7 +571,7 @@ export default function OrdersAnalytics() {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(v: number, name: string) => [v, name]}
+                      formatter={(v, name) => [Number(v ?? 0), String(name)]}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -732,9 +735,11 @@ export default function OrdersAnalytics() {
                     />
                     <Tooltip
                       content={<ChartTooltip />}
-                      formatter={(v: number, name: string) => [
-                        name.includes("Przychód") ? fmt(v) : v,
-                        name,
+                      formatter={(v, name) => [
+                        String(name).includes("Przychód")
+                          ? fmt(Number(v ?? 0))
+                          : Number(v ?? 0),
+                        String(name),
                       ]}
                     />
                     <Bar
@@ -948,7 +953,7 @@ export default function OrdersAnalytics() {
                   />
                   <Tooltip
                     content={<ChartTooltip />}
-                    formatter={(v: number) => [fmt(v), "Śr. wartość"]}
+                    formatter={(v) => [fmt(Number(v ?? 0)), "Śr. wartość"]}
                   />
                   <Area
                     type="monotone"
