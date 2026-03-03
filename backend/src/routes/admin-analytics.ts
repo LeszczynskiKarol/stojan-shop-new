@@ -92,13 +92,16 @@ export async function adminAnalyticsRoutes(app: FastifyInstance) {
       .filter((s) => s.hasOrdered && s.orderId)
       .map((s) => s.orderId!);
 
-    let cancelledOrderIds = new Set<string>();
+    let validOrderIds = new Set<string>();
     if (orderIds.length > 0) {
-      const cancelledOrders = await prisma.order.findMany({
-        where: { id: { in: orderIds }, status: "cancelled" },
+      const validOrders = await prisma.order.findMany({
+        where: {
+          id: { in: orderIds },
+          status: { in: ["paid", "shipped", "delivered"] },
+        },
         select: { id: true },
       });
-      cancelledOrderIds = new Set(cancelledOrders.map((o) => o.id));
+      validOrderIds = new Set(validOrders.map((o) => o.id));
     }
 
     // Cross-check prevSessions
@@ -107,22 +110,25 @@ export async function adminAnalyticsRoutes(app: FastifyInstance) {
       .map((s) => s.orderId!);
 
     if (prevOrderIds.length > 0) {
-      const prevCancelledOrders = await prisma.order.findMany({
-        where: { id: { in: prevOrderIds }, status: "cancelled" },
+      const prevValidOrders = await prisma.order.findMany({
+        where: {
+          id: { in: prevOrderIds },
+          status: { in: ["paid", "shipped", "delivered"] },
+        },
         select: { id: true },
       });
-      const prevCancelledIds = new Set(prevCancelledOrders.map((o) => o.id));
+      const prevValidIds = new Set(prevValidOrders.map((o) => o.id));
       for (const s of prevSessions) {
-        if (s.orderId && prevCancelledIds.has(s.orderId)) {
+        if (s.orderId && !prevValidIds.has(s.orderId)) {
           s.hasOrdered = false;
           s.orderValue = null;
         }
       }
     }
 
-    // Nadpisz flagi w pamięci (nie w DB) dla anulowanych
+    // Nadpisz flagi: wyklucz sesje z nieważnymi zamówieniami (cancelled, pending, USUNIĘTE)
     for (const s of sessions) {
-      if (s.orderId && cancelledOrderIds.has(s.orderId)) {
+      if (s.orderId && !validOrderIds.has(s.orderId)) {
         s.hasOrdered = false;
         s.orderValue = null;
       }

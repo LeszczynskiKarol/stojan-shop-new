@@ -760,6 +760,15 @@ export async function orderRoutes(app: FastifyInstance) {
   // ==========================================
   app.delete<{ Params: { id: string } }>("/:id", async (request, reply) => {
     try {
+      try {
+        await prisma.analyticsSession.updateMany({
+          where: { orderId: request.params.id },
+          data: { hasOrdered: false, orderId: null, orderValue: null },
+        });
+      } catch (e) {
+        console.warn("⚠️ Analytics reset failed:", e);
+      }
+
       await prisma.order.delete({ where: { id: request.params.id } });
       return reply.send({ success: true, message: "Zamówienie usunięte" });
     } catch (err: any) {
@@ -775,6 +784,15 @@ export async function orderRoutes(app: FastifyInstance) {
       const { ids } = request.body as { ids: string[] };
       if (!ids?.length) {
         return reply.status(400).send({ success: false, error: "Brak ids" });
+      }
+
+      try {
+        await prisma.analyticsSession.updateMany({
+          where: { orderId: { in: ids } },
+          data: { hasOrdered: false, orderId: null, orderValue: null },
+        });
+      } catch (e) {
+        console.warn("⚠️ Analytics reset failed:", e);
       }
 
       await prisma.order.deleteMany({ where: { id: { in: ids } } });
