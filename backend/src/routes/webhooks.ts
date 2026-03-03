@@ -172,6 +172,15 @@ export async function webhookRoutes(app: FastifyInstance) {
           app.log.info(
             `❌ Order ${order.orderNumber} anulowany (sesja wygasła)`,
           );
+
+          try {
+            await prisma.analyticsSession.updateMany({
+              where: { orderId },
+              data: { hasOrdered: false, orderId: null, orderValue: null },
+            });
+          } catch (e) {
+            console.warn("⚠️ Analytics reset failed:", e);
+          }
           break;
         }
 

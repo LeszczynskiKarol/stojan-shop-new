@@ -79,12 +79,54 @@ export async function adminAnalyticsRoutes(app: FastifyInstance) {
           id: true,
           source: true,
           hasOrdered: true,
+          orderId: true,
           orderValue: true,
           isBounce: true,
           duration: true,
         },
       }),
     ]);
+
+    // Cross-check: wyklucz sesje z anulowanymi zamówieniami
+    const orderIds = sessions
+      .filter((s) => s.hasOrdered && s.orderId)
+      .map((s) => s.orderId!);
+
+    let cancelledOrderIds = new Set<string>();
+    if (orderIds.length > 0) {
+      const cancelledOrders = await prisma.order.findMany({
+        where: { id: { in: orderIds }, status: "cancelled" },
+        select: { id: true },
+      });
+      cancelledOrderIds = new Set(cancelledOrders.map((o) => o.id));
+    }
+
+    // Cross-check prevSessions
+    const prevOrderIds = prevSessions
+      .filter((s) => s.hasOrdered && s.orderId)
+      .map((s) => s.orderId!);
+
+    if (prevOrderIds.length > 0) {
+      const prevCancelledOrders = await prisma.order.findMany({
+        where: { id: { in: prevOrderIds }, status: "cancelled" },
+        select: { id: true },
+      });
+      const prevCancelledIds = new Set(prevCancelledOrders.map((o) => o.id));
+      for (const s of prevSessions) {
+        if (s.orderId && prevCancelledIds.has(s.orderId)) {
+          s.hasOrdered = false;
+          s.orderValue = null;
+        }
+      }
+    }
+
+    // Nadpisz flagi w pamięci (nie w DB) dla anulowanych
+    for (const s of sessions) {
+      if (s.orderId && cancelledOrderIds.has(s.orderId)) {
+        s.hasOrdered = false;
+        s.orderValue = null;
+      }
+    }
 
     // ═══════════════════════════════════════════
     // 1. OVERVIEW METRICS

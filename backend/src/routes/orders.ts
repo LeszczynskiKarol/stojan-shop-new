@@ -662,6 +662,16 @@ export async function orderRoutes(app: FastifyInstance) {
         },
       });
 
+      // ▶ Reset analytics session — usuń anulowane z konwersji
+      try {
+        await prisma.analyticsSession.updateMany({
+          where: { orderId: order.id },
+          data: { hasOrdered: false, orderId: null, orderValue: null },
+        });
+      } catch (e) {
+        console.warn("⚠️ Analytics reset failed:", e);
+      }
+
       return reply.send({
         success: true,
         message: "Zamówienie anulowane",
@@ -725,6 +735,15 @@ export async function orderRoutes(app: FastifyInstance) {
             isStockReserved: false,
           },
         });
+
+        try {
+          await prisma.analyticsSession.updateMany({
+            where: { orderId: id },
+            data: { hasOrdered: false, orderId: null, orderValue: null },
+          });
+        } catch (e) {
+          console.warn("⚠️ Analytics reset failed:", e);
+        }
       }
 
       return reply.send({
