@@ -833,22 +833,31 @@ export default function CategoryProducts({
           </FG>
         )}
 
-        {opts.conditions.length > 1 && (
-          <FG title="Stan">
-            {opts.conditions.map(([v, c]) => (
-              <CBox
-                key={v}
-                checked={filters.conditions.includes(v)}
-                onChange={() => toggle("conditions", v)}
-                label={COND_LABEL[v] || v}
-                count={c}
-              />
-            ))}
+        {/* RPM RANGE BUTTONS */}
+        {!isMotoreduktory && opts.availableRpmRanges.length > 0 && (
+          <FG title="Obroty — szybki wybór">
+            <div className="cp-rpm-btns">
+              {opts.availableRpmRanges.map((rpmKey) => {
+                const isActive = filters.rpmRanges.includes(rpmKey);
+                return (
+                  <button
+                    key={rpmKey}
+                    onClick={() => toggleRpmRange(rpmKey)}
+                    className={`cp-rpm-btn${isActive ? " active" : ""}`}
+                  >
+                    <span className="cp-rpm-val">{rpmKey}</span>
+                    <span className="cp-rpm-unit">obr/min</span>
+                    {isActive && <Check size={12} className="cp-rpm-chk" />}
+                    <span className="cp-rpm-cnt">{rpmRangeCounts[rpmKey]}</span>
+                  </button>
+                );
+              })}
+            </div>
           </FG>
         )}
 
         {/* RPM RANGE SLIDER (hidden for motoreduktory) */}
-        {!isMotoreduktory && opts.maxRpm > 0 && opts.rpms.length > 1 && (
+        {opts.maxRpm > 0 && opts.rpms.length > 1 && (
           <FG title="Przedział obrotów (obr/min)">
             <DualRangeSlider
               min={opts.minRpm}
@@ -903,26 +912,17 @@ export default function CategoryProducts({
           </FG>
         )}
 
-        {/* RPM RANGE BUTTONS */}
-        {!isMotoreduktory && opts.availableRpmRanges.length > 0 && (
-          <FG title="Obroty — szybki wybór">
-            <div className="cp-rpm-btns">
-              {opts.availableRpmRanges.map((rpmKey) => {
-                const isActive = filters.rpmRanges.includes(rpmKey);
-                return (
-                  <button
-                    key={rpmKey}
-                    onClick={() => toggleRpmRange(rpmKey)}
-                    className={`cp-rpm-btn${isActive ? " active" : ""}`}
-                  >
-                    <span className="cp-rpm-val">{rpmKey}</span>
-                    <span className="cp-rpm-unit">obr/min</span>
-                    {isActive && <Check size={12} className="cp-rpm-chk" />}
-                    <span className="cp-rpm-cnt">{rpmRangeCounts[rpmKey]}</span>
-                  </button>
-                );
-              })}
-            </div>
+        {opts.conditions.length > 1 && (
+          <FG title="Stan">
+            {opts.conditions.map(([v, c]) => (
+              <CBox
+                key={v}
+                checked={filters.conditions.includes(v)}
+                onChange={() => toggle("conditions", v)}
+                label={COND_LABEL[v] || v}
+                count={c}
+              />
+            ))}
           </FG>
         )}
 
