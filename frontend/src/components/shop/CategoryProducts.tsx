@@ -912,6 +912,20 @@ export default function CategoryProducts({
           </FG>
         )}
 
+        {opts.rpms.length > 1 && (
+          <FG title="Obroty — dokładne [obr/min]" col defaultOpen={false}>
+            {opts.rpms.map(([v, c]) => (
+              <CBox
+                key={v}
+                checked={filters.rpms.includes(v)}
+                onChange={() => toggle("rpms", v)}
+                label={`${v} obr/min`}
+                count={c}
+              />
+            ))}
+          </FG>
+        )}
+
         {opts.conditions.length > 1 && (
           <FG title="Stan">
             {opts.conditions.map(([v, c]) => (
@@ -942,20 +956,6 @@ export default function CategoryProducts({
                 }
                 count={c}
                 ellipsis
-              />
-            ))}
-          </FG>
-        )}
-
-        {opts.rpms.length > 1 && (
-          <FG title="Obroty — dokładne [obr/min]" col defaultOpen={false}>
-            {opts.rpms.map(([v, c]) => (
-              <CBox
-                key={v}
-                checked={filters.rpms.includes(v)}
-                onChange={() => toggle("rpms", v)}
-                label={`${v} obr/min`}
-                count={c}
               />
             ))}
           </FG>
