@@ -13,6 +13,9 @@ import {
   isAllegroConnected,
 } from "../lib/allegro-client.js";
 
+const log = (msg: string): void =>
+  console.log(`[${new Date().toISOString()}] ${msg}`);
+
 // ============================================
 // TYPES
 // ============================================
@@ -53,7 +56,7 @@ export async function syncStockToAllegro(
   try {
     if (newStock <= 0) {
       if (mp?.allegro?.active === false) {
-        console.log(`ℹ️ Offer ${allegroId} already ended, skipping`);
+        log(`ℹ️ Offer ${allegroId} already ended, skipping`);
         return; // ← NOWE
       }
 
@@ -81,7 +84,7 @@ export async function syncStockToAllegro(
       if (mp?.allegro?.active === false) {
         try {
           await activateOffer(allegroId);
-          console.log(`✅ Reactivated Allegro offer ${allegroId}`);
+          log(`✅ Reactivated Allegro offer ${allegroId}`);
           await new Promise((r) => setTimeout(r, 1500));
         } catch (err: any) {
           console.warn(`⚠️ Could not reactivate ${allegroId}:`, err.message);
@@ -108,7 +111,7 @@ export async function syncStockToAllegro(
       });
     }
 
-    console.log(`✅ Allegro stock synced: ${allegroId} → ${newStock}`);
+    log(`✅ Allegro stock synced: ${allegroId} → ${newStock}`);
   } catch (err: any) {
     console.error(
       `❌ Failed to sync stock to Allegro for ${productId}:`,
@@ -135,14 +138,14 @@ export async function syncPriceToAllegro(
   const allegroId = mp?.allegro?.productId;
   if (!allegroId) return;
   if (mp?.allegro?.active === false) {
-    console.log(`ℹ️ Offer ${allegroId} is ended, skipping price sync`);
+    log(`ℹ️ Offer ${allegroId} is ended, skipping price sync`);
     return;
   }
   const connected = await isAllegroConnected();
   if (!connected) return;
 
   try {
-    console.log(`💰 Syncing price to Allegro: ${allegroId} → ${newPrice} PLN`);
+    log(`💰 Syncing price to Allegro: ${allegroId} → ${newPrice} PLN`);
 
     await patchOffer(allegroId, {
       sellingMode: {
@@ -164,7 +167,7 @@ export async function syncPriceToAllegro(
       },
     });
 
-    console.log(`✅ Allegro price synced: ${allegroId} → ${newPrice}`);
+    log(`✅ Allegro price synced: ${allegroId} → ${newPrice}`);
   } catch (err: any) {
     console.error(
       `❌ Failed to sync price to Allegro for ${productId}:`,
@@ -197,7 +200,7 @@ export async function syncNameToAllegro(
   try {
     const truncated = newName.slice(0, 75);
     await patchOffer(allegroId, { name: truncated });
-    console.log(`✅ Allegro name synced: ${allegroId}`);
+    log(`✅ Allegro name synced: ${allegroId}`);
   } catch (err: any) {
     console.error(
       `❌ Failed to sync name to Allegro for ${productId}:`,
@@ -248,14 +251,11 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
       type: ["OFFER_STOCK_CHANGED", "OFFER_PRICE_CHANGED"],
     });
 
-    console.log(`📡 lastEventId used: ${lastEventId || "(none — first poll)"}`);
-
     if (!events?.offerEvents?.length) {
-      console.log("📡 No events returned from Allegro");
       return result;
     }
 
-    console.log(`📡 Got ${events.offerEvents.length} events from Allegro`);
+    log(`📡 Got ${events.offerEvents.length} events from Allegro`);
 
     // ✅ Single loop — process each event once
     for (const event of events.offerEvents) {
@@ -282,7 +282,7 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
         if (event.type === "OFFER_STOCK_CHANGED") {
           const newStock = offer.stock?.available ?? 0;
           if (newStock !== product.stock) {
-            console.log(
+            log(
               `📥 Allegro stock event: "${product.name}" ${product.stock} → ${newStock}`,
             );
             await prisma.product.update({
@@ -308,7 +308,7 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
           if (newPrice > 0) {
             const currentPrice = Number(product.price);
             if (newPrice !== currentPrice) {
-              console.log(
+              log(
                 `📥 Allegro price event: "${product.name}" ${currentPrice} → ${newPrice}`,
               );
               await prisma.product.update({
@@ -384,7 +384,7 @@ export async function importAllegroOffers(): Promise<{
       await new Promise((r) => setTimeout(r, 200));
     }
 
-    console.log(`📦 Fetched ${allOffers.length} offers from Allegro`);
+    log(`📦 Fetched ${allOffers.length} offers from Allegro`);
 
     for (const offer of allOffers) {
       try {
@@ -451,12 +451,12 @@ export async function importAllegroOffers(): Promise<{
             },
           });
           result.matched++;
-          console.log(`🔗 Matched: "${offerName}" → ${matchByName.id}`);
+          log(`🔗 Matched: "${offerName}" → ${matchByName.id}`);
           continue;
         }
 
         result.skipped++;
-        console.log(`⏭️ No match for Allegro offer: "${offerName}" — skipping`);
+        log(`⏭️ No match for Allegro offer: "${offerName}" — skipping`);
       } catch (err: any) {
         result.errors.push(`Offer ${offer.id}: ${err.message}`);
       }
@@ -466,7 +466,7 @@ export async function importAllegroOffers(): Promise<{
     console.error("❌ Allegro import failed:", err.message);
   }
 
-  console.log(
+  log(
     `📊 Import result: ${result.matched} matched, ${result.skipped} skipped, ${result.errors.length} errors`,
   );
   return result;
@@ -500,7 +500,7 @@ export async function fullReconciliation(): Promise<SyncResult> {
       WHERE marketplaces->'allegro'->>'productId' IS NOT NULL
     `;
 
-    console.log(`🔄 Reconciling ${linkedProducts.length} linked products`);
+    log(`🔄 Reconciling ${linkedProducts.length} linked products`);
 
     for (const product of linkedProducts) {
       try {
@@ -510,7 +510,7 @@ export async function fullReconciliation(): Promise<SyncResult> {
         let changed = false;
 
         if (allegroStock !== product.stock) {
-          console.log(
+          log(
             `🔄 Stock mismatch "${product.name}": shop=${product.stock}, allegro=${allegroStock}`,
           );
           await prisma.product.update({
@@ -565,7 +565,7 @@ export async function fullReconciliation(): Promise<SyncResult> {
     result.errors.push(err.message);
   }
 
-  console.log(
+  log(
     `🔄 Reconciliation done: ${result.synced} synced, ${result.errors.length} errors`,
   );
   return result;
@@ -590,7 +590,7 @@ async function unlinkAllegroFromProduct(
     data: { marketplaces: restMp },
   });
 
-  console.log(
+  log(
     `🔗❌ Unlinked Allegro offer ${allegroId} from "${product.name}" — reason: ${reason}`,
   );
 }
@@ -627,9 +627,7 @@ export async function detectOrphanedLinks(): Promise<{
       await new Promise((r) => setTimeout(r, 200));
     }
 
-    console.log(
-      `🔍 Allegro has ${allegroOfferIds.size} total offers for this seller`,
-    );
+    log(`🔍 Allegro has ${allegroOfferIds.size} total offers for this seller`);
 
     const linkedProducts = await prisma.$queryRaw<
       Array<{ id: string; name: string; allegro_id: string }>
@@ -641,9 +639,7 @@ export async function detectOrphanedLinks(): Promise<{
     `;
 
     result.checked = linkedProducts.length;
-    console.log(
-      `🔍 Shop has ${linkedProducts.length} products linked to Allegro`,
-    );
+    log(`🔍 Shop has ${linkedProducts.length} products linked to Allegro`);
 
     for (const product of linkedProducts) {
       if (!allegroOfferIds.has(product.allegro_id)) {
@@ -662,7 +658,7 @@ export async function detectOrphanedLinks(): Promise<{
       }
     }
 
-    console.log(
+    log(
       `🔍 Orphan detection done: ${result.checked} checked, ${result.unlinked} unlinked`,
     );
   } catch (err: any) {
