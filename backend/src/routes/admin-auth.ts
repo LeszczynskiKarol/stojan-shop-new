@@ -274,6 +274,14 @@ export async function adminAuthRoutes(app: FastifyInstance) {
           maxAge: TOKEN_EXPIRY,
         });
 
+        reply.setCookie("admin_session", "1", {
+          httpOnly: false,
+          secure: true,
+          sameSite: "none" as const,
+          path: "/",
+          maxAge: TOKEN_EXPIRY,
+        });
+
         console.log(`✅ Admin login z IP: ${ip}`);
 
         return { success: true, data: { username, role: "admin" } };
@@ -286,6 +294,12 @@ export async function adminAuthRoutes(app: FastifyInstance) {
   // ------------------------------------------
   app.post("/logout", async (_request, reply) => {
     reply.clearCookie(COOKIE_NAME, COOKIE_OPTIONS);
+    reply.clearCookie("admin_session", {
+      secure: true,
+      sameSite: "none" as const,
+      path: "/",
+    });
+
     return { success: true, message: "Wylogowano" };
   });
 

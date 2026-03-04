@@ -71,14 +71,6 @@ export function CheckoutSuccess() {
           index: i,
         })),
       });
-
-      // Google Ads conversion
-      window.gtag("event", "conversion", {
-        send_to: "AW-988030143/MXlzCNyahrcZEL_JkNcD",
-        transaction_id: order.id,
-        value: Number(order.total),
-        currency: "PLN",
-      });
     }
   }, [order]);
 

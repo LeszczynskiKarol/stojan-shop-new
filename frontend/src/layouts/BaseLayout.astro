@@ -117,6 +117,16 @@ const currentYear = new Date().getFullYear();
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- wyłączenie zbierania danych dla admina w google analytics -->
+<script is:inline>
+  (function() {
+    if (document.cookie.includes('admin_session=1')) {
+      window['ga-disable-G-VPV7V6L3KW'] = true;
+      window['ga-disable-AW-988030143'] = true;
+    }
+  })();
+</script>
+  
   <!-- ═══ CONSENT MODE V2 + GOOGLE TAGS ═══ -->
   <!-- 1. Consent defaults (MUST be first!) -->
   <script is:inline>
