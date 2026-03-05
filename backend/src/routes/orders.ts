@@ -238,11 +238,14 @@ export async function orderRoutes(app: FastifyInstance) {
           quantity: 1,
         });
 
+        const successBase =
+          (body as any).returnUrl?.replace(/\/$/, "") || FRONTEND_URL;
+
         const session = await stripe.checkout.sessions.create({
           payment_method_types: ["card", "p24", "blik"],
           line_items: lineItems,
           mode: "payment",
-          success_url: `${FRONTEND_URL}/checkout/sukces?session_id={CHECKOUT_SESSION_ID}`,
+          success_url: `${successBase}/zamowienie/sukces?session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${FRONTEND_URL}/checkout?stripe_cancel=true`,
           customer_email: body.shipping.email,
           metadata: {
