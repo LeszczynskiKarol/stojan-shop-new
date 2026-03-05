@@ -3,11 +3,7 @@
 // Import these in orders.ts, admin-products.ts, webhooks.ts
 // All calls are non-blocking (catch errors internally).
 
-import {
-  syncStockToAllegro,
-  syncPriceToAllegro,
-  syncNameToAllegro,
-} from "./allegro-sync.js";
+import { syncStockToAllegro, syncNameToAllegro } from "./allegro-sync.js";
 
 /**
  * Call after stock changes (order placed, cancelled, admin edit).
@@ -20,22 +16,6 @@ export function fireAllegroStockSync(
   syncStockToAllegro(productId, newStock).catch((err) =>
     console.error(
       `[allegro-hook] stock sync failed for ${productId}:`,
-      err.message,
-    ),
-  );
-}
-
-/**
- * Call after price changes (admin edit).
- * Fire-and-forget — never throws.
- */
-export function fireAllegroPriceSync(
-  productId: string,
-  newPrice: number,
-): void {
-  syncPriceToAllegro(productId, newPrice).catch((err) =>
-    console.error(
-      `[allegro-hook] price sync failed for ${productId}:`,
       err.message,
     ),
   );

@@ -57,7 +57,7 @@ export async function syncStockToAllegro(
     if (newStock <= 0) {
       if (mp?.allegro?.active === false) {
         log(`ℹ️ Offer ${allegroId} already ended, skipping`);
-        return; // ← NOWE
+        return;
       }
 
       // First set stock to 0, then end (deactivate) offer
@@ -80,7 +80,7 @@ export async function syncStockToAllegro(
         },
       });
     } else {
-      // ✅ FIX: reactivate FIRST
+      // Reactivate FIRST if offer was ended
       if (mp?.allegro?.active === false) {
         try {
           await activateOffer(allegroId);
@@ -88,7 +88,7 @@ export async function syncStockToAllegro(
           await new Promise((r) => setTimeout(r, 1500));
         } catch (err: any) {
           console.warn(`⚠️ Could not reactivate ${allegroId}:`, err.message);
-          return; // ← nie próbuj PATCH jeśli activate failuje
+          return;
         }
       }
 
@@ -115,62 +115,6 @@ export async function syncStockToAllegro(
   } catch (err: any) {
     console.error(
       `❌ Failed to sync stock to Allegro for ${productId}:`,
-      err.message,
-    );
-  }
-}
-
-/**
- * Sync price for a single product to Allegro
- */
-export async function syncPriceToAllegro(
-  productId: string,
-  newPrice: number,
-): Promise<void> {
-  const product = await prisma.product.findUnique({
-    where: { id: productId },
-    select: { id: true, name: true, marketplaces: true },
-  });
-
-  if (!product) return;
-
-  const mp = product.marketplaces as any;
-  const allegroId = mp?.allegro?.productId;
-  if (!allegroId) return;
-  if (mp?.allegro?.active === false) {
-    log(`ℹ️ Offer ${allegroId} is ended, skipping price sync`);
-    return;
-  }
-  const connected = await isAllegroConnected();
-  if (!connected) return;
-
-  try {
-    log(`💰 Syncing price to Allegro: ${allegroId} → ${newPrice} PLN`);
-
-    await patchOffer(allegroId, {
-      sellingMode: {
-        price: { amount: String(newPrice), currency: "PLN" },
-      },
-    });
-
-    await prisma.product.update({
-      where: { id: productId },
-      data: {
-        marketplaces: {
-          ...mp,
-          allegro: {
-            ...mp.allegro,
-            price: newPrice,
-            lastSyncAt: new Date().toISOString(),
-          },
-        },
-      },
-    });
-
-    log(`✅ Allegro price synced: ${allegroId} → ${newPrice}`);
-  } catch (err: any) {
-    console.error(
-      `❌ Failed to sync price to Allegro for ${productId}:`,
       err.message,
     );
   }
@@ -229,8 +173,8 @@ async function saveLastEventId(id: string): Promise<void> {
 }
 
 /**
- * Poll Allegro offer events and sync changes back to shop.
- * ✅ FIX: Removed duplicated event processing loop
+ * Poll Allegro offer events and sync stock changes back to shop.
+ * NOTE: Price changes are intentionally ignored — prices are managed in shop only.
  */
 export async function pollAllegroEvents(): Promise<SyncResult> {
   const result: SyncResult = { success: true, synced: 0, errors: [] };
@@ -246,9 +190,8 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
     const lastEventId = await getLastEventId();
     const events = await getOfferEvents({
       from: lastEventId || undefined,
-
       limit: 100,
-      type: ["OFFER_STOCK_CHANGED", "OFFER_PRICE_CHANGED"],
+      type: ["OFFER_STOCK_CHANGED"],
     });
 
     if (!events?.offerEvents?.length) {
@@ -257,7 +200,6 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
 
     log(`📡 Got ${events.offerEvents.length} events from Allegro`);
 
-    // ✅ Single loop — process each event once
     for (const event of events.offerEvents) {
       try {
         const allegroOfferId = event.offer?.id;
@@ -303,33 +245,6 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
           }
         }
 
-        if (event.type === "OFFER_PRICE_CHANGED") {
-          const newPrice = parseFloat(offer.sellingMode?.price?.amount || "0");
-          if (newPrice > 0) {
-            const currentPrice = Number(product.price);
-            if (newPrice !== currentPrice) {
-              log(
-                `📥 Allegro price event: "${product.name}" ${currentPrice} → ${newPrice}`,
-              );
-              await prisma.product.update({
-                where: { id: product.id },
-                data: {
-                  price: newPrice,
-                  marketplaces: {
-                    ...mp,
-                    allegro: {
-                      ...mp.allegro,
-                      price: newPrice,
-                      lastSyncAt: new Date().toISOString(),
-                    },
-                  },
-                },
-              });
-              result.synced++;
-            }
-          }
-        }
-
         await saveLastEventId(event.id);
 
         // Rate limit between Allegro API calls
@@ -353,7 +268,7 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
 
 /**
  * Import all Allegro offers and match/link them to shop products by name.
- * ONLY links — never creates new products.
+ * ONLY links — never creates new products, never touches prices.
  */
 export async function importAllegroOffers(): Promise<{
   total: number;
@@ -390,7 +305,6 @@ export async function importAllegroOffers(): Promise<{
       try {
         const offerId = offer.id;
         const offerName = offer.name || "";
-        const offerPrice = parseFloat(offer.sellingMode?.price?.amount || "0");
         const offerStock = offer.stock?.available || 0;
         const isActive = offer.publication?.status === "ACTIVE";
 
@@ -415,7 +329,6 @@ export async function importAllegroOffers(): Promise<{
                 allegro: {
                   ...mp.allegro,
                   active: isActive,
-                  price: offerPrice,
                   url: `https://allegro.pl/oferta/${offerId}`,
                   lastSyncAt: new Date().toISOString(),
                 },
@@ -443,7 +356,6 @@ export async function importAllegroOffers(): Promise<{
                 allegro: {
                   active: isActive,
                   productId: offerId,
-                  price: offerPrice,
                   url: `https://allegro.pl/oferta/${offerId}`,
                   lastSyncAt: new Date().toISOString(),
                 },
@@ -490,11 +402,10 @@ export async function fullReconciliation(): Promise<SyncResult> {
         id: string;
         name: string;
         stock: number;
-        price: string;
         allegro_id: string;
       }>
     >`
-      SELECT id, name, stock, price::text,
+      SELECT id, name, stock,
         marketplaces->'allegro'->>'productId' as allegro_id
       FROM products
       WHERE marketplaces->'allegro'->>'productId' IS NOT NULL
@@ -507,40 +418,33 @@ export async function fullReconciliation(): Promise<SyncResult> {
         const offer = await getOffer(product.allegro_id);
         const allegroStock = offer.stock?.available ?? 0;
 
-        let changed = false;
-
         if (allegroStock !== product.stock) {
           log(
             `🔄 Stock mismatch "${product.name}": shop=${product.stock}, allegro=${allegroStock}`,
           );
-          await prisma.product.update({
-            where: { id: product.id },
-            data: { stock: allegroStock },
-          });
-          changed = true;
-        }
-
-        if (changed) {
           const fullProduct = await prisma.product.findUnique({
             where: { id: product.id },
             select: { marketplaces: true },
           });
           const mp = fullProduct?.marketplaces as any;
-          if (mp?.allegro) {
-            await prisma.product.update({
-              where: { id: product.id },
-              data: {
-                marketplaces: {
-                  ...mp,
-                  allegro: {
-                    ...mp.allegro,
-                    active: allegroStock > 0,
-                    lastSyncAt: new Date().toISOString(),
-                  },
-                },
-              },
-            });
-          }
+          await prisma.product.update({
+            where: { id: product.id },
+            data: {
+              stock: allegroStock,
+              ...(mp?.allegro
+                ? {
+                    marketplaces: {
+                      ...mp,
+                      allegro: {
+                        ...mp.allegro,
+                        active: allegroStock > 0,
+                        lastSyncAt: new Date().toISOString(),
+                      },
+                    },
+                  }
+                : {}),
+            },
+          });
           result.synced++;
         }
 
