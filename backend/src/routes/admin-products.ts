@@ -6,7 +6,6 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import "@fastify/multipart";
 import {
   fireAllegroStockSync,
-  fireAllegroPriceSync,
   fireAllegroNameSync,
 } from "../services/allegro-hooks.js";
 import { publishProductToAllegro } from "../services/allegro-publish.js";
@@ -333,11 +332,6 @@ export async function adminProductRoutes(app: FastifyInstance) {
         fireAllegroStockSync(id, parseInt(body.stock) || 0);
       }
 
-      if (body.price !== undefined) {
-        const newPrice =
-          body.marketplaces?.ownStore?.price ?? parseFloat(body.price);
-        fireAllegroPriceSync(id, newPrice);
-      }
       if (body.name !== undefined) {
         fireAllegroNameSync(id, body.name);
       }

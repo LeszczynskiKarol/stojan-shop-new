@@ -7,7 +7,6 @@ import { FastifyInstance } from "fastify";
 import { allegroFetch, isAllegroConnected } from "../lib/allegro-client.js";
 import {
   syncStockToAllegro,
-  syncPriceToAllegro,
   importAllegroOffers,
   fullReconciliation,
   pollAllegroEvents,
@@ -154,7 +153,6 @@ export async function allegroRoutes(app: FastifyInstance) {
         }
 
         await syncStockToAllegro(id, product.stock);
-        await syncPriceToAllegro(id, Number(product.price));
 
         return reply.send({
           success: true,
