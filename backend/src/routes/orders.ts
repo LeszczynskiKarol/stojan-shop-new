@@ -865,8 +865,8 @@ async function reserveStock(
         err,
       );
     }
-    fireSatelliteRebuild("stock_reserved");
   }
+  fireSatelliteRebuild("stock_reserved");
 }
 
 export { reserveStock };
