@@ -4,6 +4,7 @@
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import "@fastify/multipart";
+import { fireSatelliteRebuild } from "../services/rebuild-satellite.js";
 import {
   fireAllegroStockSync,
   fireAllegroNameSync,
@@ -336,6 +337,17 @@ export async function adminProductRoutes(app: FastifyInstance) {
         fireAllegroNameSync(id, body.name);
       }
 
+      if (
+        body.stock !== undefined ||
+        body.price !== undefined ||
+        body.name !== undefined
+      ) {
+        fireSatelliteRebuild(
+          "admin_product_update",
+          (data as any).marketplaces?.ownStore?.slug || id,
+        );
+      }
+
       // Categories (M2M)
       if (body.categoryId !== undefined) {
         await prisma.productCategory.deleteMany({ where: { productId: id } });
@@ -357,6 +369,8 @@ export async function adminProductRoutes(app: FastifyInstance) {
         },
       });
 
+      fireSatelliteRebuild("admin_product_created");
+
       return { success: true, data: mapProduct(result) };
     },
   );
@@ -372,6 +386,7 @@ export async function adminProductRoutes(app: FastifyInstance) {
         .status(404)
         .send({ success: false, error: "Produkt nie znaleziony" });
     await prisma.product.delete({ where: { id } });
+    fireSatelliteRebuild("admin_product_deleted");
     return { success: true, message: "Produkt usunięty" };
   });
 

@@ -13,6 +13,7 @@
     "db:import": "tsx scripts/import-from-dump.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-codebuild": "^3.1003.0",
     "@aws-sdk/client-s3": "^3.995.0",
     "@aws-sdk/client-ses": "^3.996.0",
     "@fastify/cookie": "^11.0.2",

@@ -3,6 +3,7 @@ import { FastifyInstance } from "fastify";
 import Stripe from "stripe";
 import { prisma } from "../lib/prisma.js";
 import { trackOrderServerSide } from "../services/analyticsHooks.js";
+import { fireSatelliteRebuild } from "../services/rebuild-satellite.js";
 import "@fastify/multipart";
 import {
   calculateShippingCost,
@@ -658,6 +659,10 @@ export async function orderRoutes(app: FastifyInstance) {
         stockRestored = true;
       }
 
+      if (stockRestored) {
+        fireSatelliteRebuild("order_cancelled");
+      }
+
       await prisma.order.update({
         where: { id: request.params.id },
         data: {
@@ -752,6 +757,8 @@ export async function orderRoutes(app: FastifyInstance) {
           console.warn("⚠️ Analytics reset failed:", e);
         }
       }
+
+      fireSatelliteRebuild("orders_cancelled_bulk");
 
       return reply.send({
         success: true,
@@ -858,6 +865,7 @@ async function reserveStock(
         err,
       );
     }
+    fireSatelliteRebuild("stock_reserved");
   }
 }
 
