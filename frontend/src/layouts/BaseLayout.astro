@@ -401,15 +401,7 @@ const currentYear = new Date().getFullYear();
         </div>
 
         <!-- Realizacja zamówienia -->
-        <div class="col-span-6 lg:col-span-2">
-          <h3 class="font-bold mb-3 text-sm text-foreground">Realizacja zamówienia</h3>
-          <div class="text-xs text-muted-foreground space-y-1">
-            {orderLinks.map((l) => (
-              <a href={l.href} class="block hover:underline hover:text-primary transition-colors">
-                {l.label}
-              </a>
-            ))}
-          </div>
+        <div class="col-span-6 lg:col-span-2">        
           <h3 class="font-bold mb-3 mt-6 text-sm text-foreground">Pozostałe</h3>
           <div class="text-xs text-muted-foreground space-y-1">
             <a href="/skup-silnikow" class="block hover:underline hover:text-primary transition-colors">Skup silników</a>
