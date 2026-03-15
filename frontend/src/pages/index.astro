@@ -44,9 +44,30 @@ if (categories) {
   }
 }
 
-// Fetch one product per category for cover image
-const categoryCovers: Record<string, string> = {};
+// Hardcoded category cover images
+const categoryCovers: Record<string, string> = {
+  'trojfazowe': 'https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1757663605185.JPG',
+  'motoreduktory': 'https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1739345191561.JPG',
+  'jednofazowe': '', // zostaje dynamicznie poniżej
+  'z-hamulcem': '',   // zostaje dynamicznie poniżej
+  'dwubiegowe': 'https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1760704042447.JPG',
+  'pompy': 'https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1763367165801.JPG',
+  'wentylatory-przemyslowe': '', // zostaje dynamicznie poniżej
+  'akcesoria': '/images/categories/akcesoria-collage.jpg', // kolaż — musisz dodać plik
+};
+
+// Fetch 4 images for accessories collage
+let accessoryImages: string[] = [];
+try {
+  const accResult = await getProducts('category=akcesoria&inStock=true&limit=4&sort=purchaseCount&order=desc');
+  accessoryImages = (accResult?.products || [])
+    .map((p: any) => p.mainImage || p.images?.[0])
+    .filter(Boolean);
+} catch {}
+
+// Dla kategorii bez hardcoded image — pobierz z produktu (z-hamulcem, jednofazowe, wentylatory)
 for (const slug of CATEGORY_ORDER) {
+  if (categoryCovers[slug]) continue; // już ma hardcoded
   const cat = catMap.get(slug);
   if (cat) {
     try {
@@ -264,37 +285,51 @@ function stripHtml(html: string | null | undefined): string {
     </div>
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {orderedCategories.map((cat, idx) => (
-        <a
-          href={`/${cat.slug}`}
-          class="group block bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all duration-200"
-        >
-          <div class="aspect-[16/10] overflow-hidden bg-accent relative">
-            {cat.coverImage ? (
+  
+    <a href={`/${cat.slug}`}
+    class="group block bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all duration-200"
+  >
+    <div class="aspect-[16/10] overflow-hidden bg-accent relative">
+      {cat.slug === 'akcesoria' && accessoryImages.length >= 4 ? (
+        <div class="w-full h-full grid grid-cols-2 grid-rows-2 gap-px bg-border">
+          {accessoryImages.slice(0, 4).map((img, i) => (
+            <div class="bg-card overflow-hidden">
               <img
-                src={cat.coverImage}
-                alt={cat.name}
-                class="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
-                loading={idx < 4 ? "eager" : "lazy"}
-                width="400"
-                height="250"
+                src={img}
+                alt={`${cat.name} ${i + 1}`}
+                class="w-full h-full object-contain p-1.5 group-hover:scale-105 transition-transform duration-300"
+                loading="lazy"
+                width="200"
+                height="125"
               />
-            ) : (
-              <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5">
-                <svg class="w-12 h-12 text-primary/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                  <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                </svg>
-              </div>
-            )}
-            
-          </div>
-          <div class="p-4">
-            <h3 class="font-semibold text-card-foreground group-hover:text-primary transition-colors text-base">
-              {cat.name}
-            </h3>
-            
-          </div>
-        </a>
-      ))}
+            </div>
+          ))}
+        </div>
+      ) : cat.coverImage ? (
+        <img
+          src={cat.coverImage}
+          alt={cat.name}
+          class="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+          loading={idx < 4 ? "eager" : "lazy"}
+          width="400"
+          height="250"
+        />
+      ) : (
+        <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5">
+          <svg class="w-12 h-12 text-primary/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+        </div>
+      )}
+    </div>
+    <div class="p-4">
+      <h3 class="font-semibold text-card-foreground group-hover:text-primary transition-colors text-base">
+        {cat.name}
+      </h3>
+    </div>
+  </a>
+))}
+
     </div>
   </section>
 
@@ -383,3 +418,8 @@ function stripHtml(html: string | null | undefined): string {
     </div>
   </section>
 </BaseLayout>
+
+
+
+
+
