@@ -14,8 +14,7 @@ jobs:
           host: ${{ secrets.STOJAN_HOST }}
           username: ec2-user
           key: ${{ secrets.STOJAN_SSH_KEY }}
-          script_stop: true
-          timeout: 300s
+          command_timeout: 300s
           script: |
             cd /home/ec2-user/stojan-shop-new
 
