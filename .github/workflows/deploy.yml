@@ -36,7 +36,7 @@ jobs:
             git pull origin main
             echo "=== Backend ==="
             cd backend
-            npm ci --production
+            npm ci
             npx prisma migrate deploy
             cd ..
             echo "=== Frontend ==="
