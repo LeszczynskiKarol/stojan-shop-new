@@ -38,6 +38,9 @@ jobs:
           key: ${{ secrets.STOJAN_SSH_KEY }}
           command_timeout: 300s
           script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+
             cd /home/ec2-user/stojan-shop-new
 
             echo "=== Stop PM2 ==="
@@ -64,8 +67,14 @@ jobs:
             cd ..
 
             echo "=== Start PM2 ==="
-            pm2 start stojan-backend
-            pm2 start stojan-frontend
+            cd backend
+            pm2 delete stojan-backend || true
+            pm2 start dist/index.js --name stojan-backend
+            cd ../frontend
+            pm2 delete stojan-frontend || true
+            pm2 start dist/server/entry.mjs --name stojan-frontend
+            cd ..
+            pm2 save
             echo "=== Done ==="
             pm2 list
 
