@@ -1,8 +1,10 @@
 // backend/src/services/allegro-sync.ts
+
 // Business logic for bidirectional Allegro ↔ Shop synchronization
 // Called from routes, order hooks, and scheduled tasks
 
 import { prisma } from "../lib/prisma.js";
+
 import {
   patchOffer,
   getOffer,
