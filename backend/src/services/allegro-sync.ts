@@ -191,7 +191,7 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
     const events = await getOfferEvents({
       from: lastEventId || undefined,
       limit: 100,
-      type: ["OFFER_STOCK_CHANGED"],
+      type: ["OFFER_STOCK_CHANGED", "OFFER_ENDED"],
     });
 
     if (!events?.offerEvents?.length) {
@@ -242,6 +242,50 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
               },
             });
             result.synced++;
+          }
+        }
+
+        if (event.type === "OFFER_ENDED") {
+          const endedBy = event.offer?.publication?.endedBy;
+          if (endedBy === "EMPTY_STOCK") {
+            log(
+              `📥 Allegro OFFER_ENDED (EMPTY_STOCK): "${product.name}" ${product.stock} → 0`,
+            );
+            if (product.stock !== 0) {
+              await prisma.product.update({
+                where: { id: product.id },
+                data: {
+                  stock: 0,
+                  marketplaces: {
+                    ...mp,
+                    allegro: {
+                      ...mp.allegro,
+                      active: false,
+                      lastSyncAt: new Date().toISOString(),
+                    },
+                  },
+                },
+              });
+              result.synced++;
+            }
+          } else {
+            // Oferta zakończona ręcznie (USER) lub z innego powodu
+            log(
+              `ℹ️ Allegro OFFER_ENDED (${endedBy}): "${product.name}" — only marking inactive`,
+            );
+            await prisma.product.update({
+              where: { id: product.id },
+              data: {
+                marketplaces: {
+                  ...mp,
+                  allegro: {
+                    ...mp.allegro,
+                    active: false,
+                    lastSyncAt: new Date().toISOString(),
+                  },
+                },
+              },
+            });
           }
         }
 

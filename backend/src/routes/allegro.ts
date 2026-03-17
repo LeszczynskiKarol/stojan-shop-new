@@ -93,13 +93,13 @@ export async function allegroRoutes(app: FastifyInstance) {
         success: true,
         data: {
           allEvents: {
-            count: allEvents?.events?.length ?? 0,
-            sample: (allEvents?.events || []).slice(0, 3),
+            count: allEvents?.offerEvents?.length ?? 0,
+            sample: (allEvents?.offerEvents || []).slice(0, 3),
             rawKeys: Object.keys(allEvents || {}),
           },
           typedEvents: {
-            count: typedEvents?.events?.length ?? 0,
-            sample: (typedEvents?.events || []).slice(0, 3),
+            count: typedEvents?.offerEvents?.length ?? 0,
+            sample: (typedEvents?.offerEvents || []).slice(0, 3),
           },
         },
       });
