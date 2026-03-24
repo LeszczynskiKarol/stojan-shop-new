@@ -63,11 +63,15 @@ jobs:
             npm ci
             npm run build
 
-            echo "=== Reload PM2 ==="
+            echo "=== Restart PM2 ==="
             cd /home/ec2-user/stojan-shop-new/backend
-            pm2 reload ecosystem.config.cjs
+            pm2 delete stojan-backend || true
+            pm2 start ecosystem.config.cjs
+
             cd /home/ec2-user/stojan-shop-new/frontend
-            pm2 reload ecosystem.config.cjs
+            pm2 delete stojan-frontend || true
+            pm2 start ecosystem.config.cjs
+
             pm2 save
 
             sleep 3
