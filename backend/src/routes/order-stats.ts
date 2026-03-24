@@ -430,4 +430,69 @@ export async function orderStatsRoutes(app: FastifyInstance) {
       },
     };
   });
+
+  // ------------------------------------------
+  // GET /customer-orders?email=xxx — zamówienia konkretnego klienta
+  // ------------------------------------------
+  app.get("/customer-orders", async (request, reply) => {
+    const query = request.query as { email?: string };
+
+    if (!query.email) {
+      return reply.status(400).send({ success: false, error: "Brak email" });
+    }
+
+    const orders = await prisma.order.findMany({
+      where: {
+        shipping: {
+          path: ["email"],
+          equals: query.email,
+        },
+        status: { in: ["paid", "shipped", "delivered", "cancelled"] },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Podsumowanie
+    const activeOrders = orders.filter((o) =>
+      ["paid", "shipped", "delivered"].includes(o.status),
+    );
+    const totalRevenue = activeOrders.reduce((s, o) => s + Number(o.total), 0);
+    const totalWeight = activeOrders.reduce(
+      (s, o) => s + Number(o.totalWeight || 0),
+      0,
+    );
+
+    return {
+      success: true,
+      data: {
+        orders: orders.map((o) => ({
+          id: o.id,
+          orderNumber: o.orderNumber,
+          status: o.status,
+          paymentMethod: o.paymentMethod,
+          items: o.items,
+          shipping: o.shipping,
+          subtotal: Number(o.subtotal),
+          shippingCost: Number(o.shippingCost),
+          total: Number(o.total),
+          totalWeight: Number(o.totalWeight),
+          invoiceUrls: o.invoiceUrls,
+          cancellationReason: o.cancellationReason,
+          cancelledAt: o.cancelledAt,
+          createdAt: o.createdAt,
+        })),
+        summary: {
+          totalOrders: orders.length,
+          activeOrders: activeOrders.length,
+          cancelledOrders: orders.length - activeOrders.length,
+          totalRevenue: round2(totalRevenue),
+          avgOrderValue:
+            activeOrders.length > 0
+              ? round2(totalRevenue / activeOrders.length)
+              : 0,
+          totalWeight: round2(totalWeight),
+        },
+      },
+    };
+  });
 }

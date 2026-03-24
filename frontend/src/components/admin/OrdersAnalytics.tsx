@@ -209,6 +209,7 @@ const PRESETS = [
 export default function OrdersAnalytics() {
   const defaults = getDefaultRange();
   const [startDate, setStartDate] = useState(defaults.start);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [endDate, setEndDate] = useState(defaults.end);
   const [groupBy, setGroupBy] = useState<"day" | "week" | "month">("day");
   const [data, setData] = useState<StatsData | null>(null);
@@ -564,135 +565,6 @@ export default function OrdersAnalytics() {
             </Card>
           </div>
 
-          {/* ═══════════ CHARTS ROW 2 ═══════════ */}
-          <div
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
-          >
-            {/* Status breakdown pie 
-            <Card title="Podział wg statusów">
-              <div
-                style={{ height: 300, display: "flex", alignItems: "center" }}
-              >
-                <ResponsiveContainer width="60%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={data.statusBreakdown}
-                      dataKey="count"
-                      nameKey="label"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      innerRadius={50}
-                      label={({ name, value }) => `${name}: ${value}`}
-                      labelLine={{ stroke: "var(--text-muted)" }}
-                    >
-                      {data.statusBreakdown.map((entry) => (
-                        <Cell
-                          key={entry.status}
-                          fill={STATUS_COLORS[entry.status] || "#888"}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(v, name) => [Number(v ?? 0), String(name)]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div style={{ flex: 1, fontSize: 12 }}>
-                  {data.statusBreakdown.map((s) => (
-                    <div
-                      key={s.status}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        padding: "4px 0",
-                        borderBottom: "1px solid var(--border)",
-                      }}
-                    >
-                      <span
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: "50%",
-                            background: STATUS_COLORS[s.status] || "#888",
-                            display: "inline-block",
-                          }}
-                        />
-                        {s.label}
-                      </span>
-                      <span style={{ fontWeight: 600 }}>
-                        {s.count} ({fmt(s.value)})
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Card>*/}
-
-            {/* Payment methods */}
-            <Card title="Metody płatności">
-              <div style={{ padding: "12px 0" }}>
-                {data.paymentBreakdown.map((p) => (
-                  <div key={p.method} style={{ marginBottom: 16 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: 13,
-                        marginBottom: 4,
-                      }}
-                    >
-                      <span>{p.method}</span>
-                      <span style={{ fontWeight: 600 }}>
-                        {fmtFull(p.value)}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        width: "100%",
-                        background: "var(--bg)",
-                        borderRadius: 4,
-                        height: 8,
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: `${p.pct}%`,
-                          background: p.method.includes("Online")
-                            ? "#6366f1"
-                            : "#f59e0b",
-                          height: "100%",
-                          borderRadius: 4,
-                          transition: "width 0.5s",
-                        }}
-                      />
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: 11,
-                        color: "var(--text-muted)",
-                        marginTop: 2,
-                      }}
-                    >
-                      <span>{p.count} zamówień</span>
-                      <span>{p.pct.toFixed(1)}%</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-
           {/* ═══════════ CHARTS ROW 3 ═══════════ */}
           <div
             style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
@@ -948,6 +820,12 @@ export default function OrdersAnalytics() {
                 )}
               </div>
             </Card>
+          </div>
+
+          {/* ═══════════ CHARTS ROW 2 ═══════════ */}
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
+          >
             {topCustomers && topCustomers.customers.length > 0 && (
               <Card title="👑 Powracający klienci">
                 <div>
@@ -994,13 +872,23 @@ export default function OrdersAnalytics() {
                     .map((c: any, i: number) => (
                       <div
                         key={c.email}
+                        onClick={() => setSelectedCustomer(c)}
                         style={{
                           display: "flex",
                           alignItems: "center",
                           gap: 10,
                           padding: "8px 0",
                           borderBottom: "1px solid var(--border)",
+                          cursor: "pointer",
+                          transition: "background 0.15s",
                         }}
+                        onMouseOver={(e) =>
+                          (e.currentTarget.style.background =
+                            "rgba(99,102,241,0.05)")
+                        }
+                        onMouseOut={(e) =>
+                          (e.currentTarget.style.background = "transparent")
+                        }
                       >
                         <div
                           style={{
@@ -1079,6 +967,61 @@ export default function OrdersAnalytics() {
                 </div>
               </Card>
             )}
+            {/* Payment methods */}
+            <Card title="Metody płatności">
+              <div style={{ padding: "12px 0" }}>
+                {data.paymentBreakdown.map((p) => (
+                  <div key={p.method} style={{ marginBottom: 16 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: 13,
+                        marginBottom: 4,
+                      }}
+                    >
+                      <span>{p.method}</span>
+                      <span style={{ fontWeight: 600 }}>
+                        {fmtFull(p.value)}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        width: "100%",
+                        background: "var(--bg)",
+                        borderRadius: 4,
+                        height: 8,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${p.pct}%`,
+                          background: p.method.includes("Online")
+                            ? "#6366f1"
+                            : "#f59e0b",
+                          height: "100%",
+                          borderRadius: 4,
+                          transition: "width 0.5s",
+                        }}
+                      />
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: 11,
+                        color: "var(--text-muted)",
+                        marginTop: 2,
+                      }}
+                    >
+                      <span>{p.count} zamówień</span>
+                      <span>{p.pct.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
 
           {/* ═══════════ AVG VALUE OVER TIME ═══════════ */}
@@ -1122,6 +1065,12 @@ export default function OrdersAnalytics() {
             </div>
           </Card>
         </>
+      )}
+      {selectedCustomer && (
+        <CustomerOrdersModal
+          customer={selectedCustomer}
+          onClose={() => setSelectedCustomer(null)}
+        />
       )}
     </div>
   );
@@ -1207,6 +1156,551 @@ function KpiCard({
         {subtext && (
           <span style={{ color: "var(--text-muted)" }}>{subtext}</span>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Customer Orders Modal
+// ============================================
+interface CustomerOrdersModalProps {
+  customer: any;
+  onClose: () => void;
+}
+
+function CustomerOrdersModal({ customer, onClose }: CustomerOrdersModalProps) {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `${API}/api/orders/stats/customer-orders?email=${encodeURIComponent(customer.email)}`,
+        );
+        const json = await res.json();
+        if (json.success) {
+          setOrders(json.data.orders);
+          setSummary(json.data.summary);
+        }
+      } catch {}
+      setLoading(false);
+    })();
+  }, [customer.email]);
+
+  const statusLabels: Record<string, string> = {
+    pending: "Oczekujące",
+    paid: "Opłacone",
+    shipped: "Wysłane",
+    delivered: "Dostarczone",
+    cancelled: "Anulowane",
+  };
+
+  const statusColors: Record<string, { bg: string; text: string }> = {
+    paid: { bg: "rgba(34,197,94,0.15)", text: "#22c55e" },
+    shipped: { bg: "rgba(59,130,246,0.15)", text: "#3b82f6" },
+    delivered: { bg: "rgba(168,85,247,0.15)", text: "#a855f7" },
+    pending: { bg: "rgba(245,158,11,0.15)", text: "#f59e0b" },
+    cancelled: { bg: "rgba(239,68,68,0.15)", text: "#ef4444" },
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.6)",
+        backdropFilter: "blur(4px)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--bg-card, #1a1d27)",
+          border: "1px solid var(--border)",
+          borderRadius: 12,
+          width: "100%",
+          maxWidth: 800,
+          maxHeight: "85vh",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: "16px 20px",
+            borderBottom: "1px solid var(--border)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>
+              {customer.companyName ||
+                `${customer.firstName} ${customer.lastName}`}
+            </div>
+            <div
+              style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}
+            >
+              {customer.email} • {customer.city}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "transparent",
+              border: "none",
+              fontSize: 20,
+              cursor: "pointer",
+              color: "var(--text-muted)",
+              padding: "4px 8px",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Summary KPIs */}
+        {summary && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: 8,
+              padding: "12px 20px",
+              borderBottom: "1px solid var(--border)",
+              background: "rgba(99,102,241,0.05)",
+            }}
+          >
+            {[
+              { label: "Zamówienia", value: String(summary.activeOrders) },
+              { label: "Przychód", value: fmt(summary.totalRevenue) },
+              { label: "Śr. wartość", value: fmt(summary.avgOrderValue) },
+              {
+                label: "Łączna waga",
+                value: `${summary.totalWeight.toFixed(1)} kg`,
+              },
+            ].map((kpi) => (
+              <div key={kpi.label} style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>{kpi.value}</div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: "var(--text-muted)",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {kpi.label}
+                </div>
+              </div>
+            ))}
+            {summary.cancelledOrders > 0 && (
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  textAlign: "center",
+                  fontSize: 11,
+                  color: "#ef4444",
+                  marginTop: 4,
+                }}
+              >
+                + {summary.cancelledOrders} anulowane
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Orders list */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 20px 20px" }}>
+          {loading ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: 40,
+                color: "var(--text-muted)",
+              }}
+            >
+              ⏳ Ładowanie zamówień...
+            </div>
+          ) : orders.length === 0 ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: 40,
+                color: "var(--text-muted)",
+              }}
+            >
+              Brak zamówień
+            </div>
+          ) : (
+            orders.map((order) => {
+              const items = (order.items || []) as any[];
+              const shipping = order.shipping as any;
+              const sc = statusColors[order.status] || statusColors.pending;
+              const isExpanded = expandedOrder === order.id;
+
+              return (
+                <div
+                  key={order.id}
+                  style={{
+                    marginTop: 12,
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    overflow: "hidden",
+                  }}
+                >
+                  {/* Order header — klikalne */}
+                  <div
+                    onClick={() =>
+                      setExpandedOrder(isExpanded ? null : order.id)
+                    }
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 14px",
+                      cursor: "pointer",
+                      background: isExpanded
+                        ? "rgba(99,102,241,0.05)"
+                        : "transparent",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseOver={(e) => {
+                      if (!isExpanded)
+                        e.currentTarget.style.background =
+                          "rgba(255,255,255,0.03)";
+                    }}
+                    onMouseOut={(e) => {
+                      if (!isExpanded)
+                        e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                    >
+                      {/* Status badge */}
+                      <span
+                        style={{
+                          padding: "3px 8px",
+                          borderRadius: 12,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          background: sc.bg,
+                          color: sc.text,
+                        }}
+                      >
+                        {statusLabels[order.status] || order.status}
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>
+                        {order.orderNumber}
+                      </span>
+                      <span
+                        style={{ fontSize: 12, color: "var(--text-muted)" }}
+                      >
+                        {new Date(order.createdAt).toLocaleDateString("pl-PL")}
+                      </span>
+                      {order.paymentMethod === "cod" && (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            background: "rgba(239,68,68,0.15)",
+                            color: "#ef4444",
+                            padding: "2px 6px",
+                            borderRadius: 8,
+                          }}
+                        >
+                          COD
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 12 }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>
+                        {fmt(order.total)}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "var(--text-muted)",
+                          transition: "transform 0.2s",
+                          transform: isExpanded
+                            ? "rotate(180deg)"
+                            : "rotate(0)",
+                        }}
+                      >
+                        ▼
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Expanded content */}
+                  {isExpanded && (
+                    <div
+                      style={{
+                        borderTop: "1px solid var(--border)",
+                        padding: "14px",
+                      }}
+                    >
+                      {/* Produkty */}
+                      <div style={{ marginBottom: 12 }}>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "var(--text-muted)",
+                            textTransform: "uppercase",
+                            marginBottom: 6,
+                          }}
+                        >
+                          Produkty
+                        </div>
+                        {items.map((item: any, idx: number) => (
+                          <div
+                            key={idx}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              padding: "6px 0",
+                              borderBottom:
+                                idx < items.length - 1
+                                  ? "1px solid var(--border)"
+                                  : "none",
+                            }}
+                          >
+                            {(item.mainImage || item.image) && (
+                              <img
+                                src={item.mainImage || item.image}
+                                alt=""
+                                style={{
+                                  width: 40,
+                                  height: 40,
+                                  objectFit: "cover",
+                                  borderRadius: 4,
+                                  border: "1px solid var(--border)",
+                                }}
+                              />
+                            )}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 500,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {item.name}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: "var(--text-muted)",
+                                }}
+                              >
+                                {item.quantity} szt. × {fmt(item.price)}
+                                {item.weight ? ` • ${item.weight} kg` : ""}
+                              </div>
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                flexShrink: 0,
+                              }}
+                            >
+                              {fmt(item.price * item.quantity)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Dane klienta + podsumowanie */}
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr",
+                          gap: 12,
+                        }}
+                      >
+                        {/* Adres */}
+                        <div style={{ fontSize: 11, lineHeight: 1.6 }}>
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              color: "var(--text-muted)",
+                              textTransform: "uppercase",
+                              marginBottom: 4,
+                            }}
+                          >
+                            {shipping?.nip ? "Faktura VAT" : "Adres dostawy"}
+                          </div>
+                          <div style={{ fontWeight: 500 }}>
+                            {shipping?.companyName ||
+                              `${shipping?.firstName} ${shipping?.lastName}`}
+                          </div>
+                          {shipping?.nip && (
+                            <div style={{ color: "#ef4444", fontWeight: 600 }}>
+                              NIP: {shipping.nip}
+                            </div>
+                          )}
+                          <div>{shipping?.street}</div>
+                          <div>
+                            {shipping?.postalCode} {shipping?.city}
+                          </div>
+                          <div
+                            style={{ marginTop: 4, color: "var(--text-muted)" }}
+                          >
+                            Tel: {shipping?.phone}
+                          </div>
+                        </div>
+
+                        {/* Podsumowanie kwot */}
+                        <div style={{ fontSize: 11, lineHeight: 1.6 }}>
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              color: "var(--text-muted)",
+                              textTransform: "uppercase",
+                              marginBottom: 4,
+                            }}
+                          >
+                            Podsumowanie
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <span>Produkty:</span>
+                            <span>{fmt(order.subtotal)}</span>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <span>Wysyłka:</span>
+                            <span>{fmt(order.shippingCost)}</span>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              fontWeight: 700,
+                              fontSize: 13,
+                              borderTop: "1px solid var(--border)",
+                              paddingTop: 4,
+                              marginTop: 4,
+                            }}
+                          >
+                            <span>Razem:</span>
+                            <span>{fmt(order.total)}</span>
+                          </div>
+                          <div
+                            style={{ marginTop: 4, color: "var(--text-muted)" }}
+                          >
+                            Waga: {order.totalWeight?.toFixed(1)} kg •{" "}
+                            {order.paymentMethod === "cod"
+                              ? "Pobranie"
+                              : "Online"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Faktury */}
+                      {order.invoiceUrls &&
+                        (order.invoiceUrls as any[]).length > 0 && (
+                          <div style={{ marginTop: 10, fontSize: 11 }}>
+                            <span style={{ color: "var(--text-muted)" }}>
+                              Faktury:{" "}
+                            </span>
+                            {(order.invoiceUrls as string[]).map((url, i) => (
+                              <a
+                                key={i}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: "#6366f1", marginRight: 8 }}
+                              >
+                                📄 Faktura {i + 1}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+
+                      {/* Anulowanie */}
+                      {order.status === "cancelled" &&
+                        order.cancellationReason && (
+                          <div
+                            style={{
+                              marginTop: 10,
+                              padding: "8px 10px",
+                              background: "rgba(239,68,68,0.1)",
+                              borderRadius: 6,
+                              fontSize: 11,
+                            }}
+                          >
+                            <span style={{ fontWeight: 600, color: "#ef4444" }}>
+                              Anulowano:{" "}
+                            </span>
+                            {order.cancellationReason}
+                            {order.cancelledAt && (
+                              <span
+                                style={{
+                                  color: "var(--text-muted)",
+                                  marginLeft: 8,
+                                }}
+                              >
+                                (
+                                {new Date(order.cancelledAt).toLocaleDateString(
+                                  "pl-PL",
+                                )}
+                                )
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                      {/* Uwagi */}
+                      {shipping?.notes && (
+                        <div
+                          style={{
+                            marginTop: 10,
+                            padding: "8px 10px",
+                            background: "rgba(245,158,11,0.1)",
+                            borderRadius: 6,
+                            fontSize: 11,
+                          }}
+                        >
+                          <span style={{ fontWeight: 600 }}>💬 Uwagi: </span>
+                          {shipping.notes}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );
