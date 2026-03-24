@@ -215,6 +215,7 @@ export default function OrdersAnalytics() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [topCustomers, setTopCustomers] = useState<any>(null);
+  const [customersVisible, setCustomersVisible] = useState(5);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
@@ -259,6 +260,10 @@ export default function OrdersAnalytics() {
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
+
+  useEffect(() => {
+    setCustomersVisible(5);
+  }, [topCustomers]);
 
   const applyPreset = (preset: (typeof PRESETS)[0]) => {
     const range = preset.fn();
@@ -563,7 +568,7 @@ export default function OrdersAnalytics() {
           <div
             style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
           >
-            {/* Status breakdown pie */}
+            {/* Status breakdown pie 
             <Card title="Podział wg statusów">
               <div
                 style={{ height: 300, display: "flex", alignItems: "center" }}
@@ -629,7 +634,7 @@ export default function OrdersAnalytics() {
                   ))}
                 </div>
               </div>
-            </Card>
+            </Card>*/}
 
             {/* Payment methods */}
             <Card title="Metody płatności">
@@ -985,7 +990,7 @@ export default function OrdersAnalytics() {
 
                   {/* Lista klientów */}
                   {topCustomers.customers
-                    .slice(0, 10)
+                    .slice(0, customersVisible)
                     .map((c: any, i: number) => (
                       <div
                         key={c.email}
@@ -1043,6 +1048,34 @@ export default function OrdersAnalytics() {
                         </div>
                       </div>
                     ))}
+                  {/* Przycisk "Pokaż więcej" */}
+                  {topCustomers.customers.length > customersVisible && (
+                    <button
+                      onClick={() => setCustomersVisible((prev) => prev + 10)}
+                      style={{
+                        width: "100%",
+                        padding: "10px 0",
+                        marginTop: 8,
+                        background: "transparent",
+                        border: "1px solid var(--border)",
+                        borderRadius: 6,
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: "var(--text-muted)",
+                        cursor: "pointer",
+                      }}
+                      onMouseOver={(e) =>
+                        (e.currentTarget.style.background = "var(--bg)")
+                      }
+                      onMouseOut={(e) =>
+                        (e.currentTarget.style.background = "transparent")
+                      }
+                    >
+                      Pokaż więcej (
+                      {topCustomers.customers.length - customersVisible}{" "}
+                      pozostało)
+                    </button>
+                  )}
                 </div>
               </Card>
             )}

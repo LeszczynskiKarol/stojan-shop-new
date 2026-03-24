@@ -386,9 +386,9 @@ export async function orderStatsRoutes(app: FastifyInstance) {
         shipping->>'lastName',
         shipping->>'companyName',
         shipping->>'city'
-      HAVING COUNT(*) >= ${minOrders}
-      ORDER BY SUM(total::numeric) DESC
-      LIMIT 50
+        HAVING COUNT(*) >= ${minOrders}
+        ORDER BY COUNT(*) DESC, SUM(total::numeric) DESC
+        LIMIT 500
     `;
 
     const result = customers.map((c) => ({
