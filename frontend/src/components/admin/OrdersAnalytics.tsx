@@ -199,7 +199,7 @@ const PRESETS = [
   },
   {
     label: "Wszystko",
-    fn: () => ({ start: "2025-01-04", end: toISODate(new Date()) }),
+    fn: () => ({ start: "2025-02-04", end: toISODate(new Date()) }),
   },
 ];
 
