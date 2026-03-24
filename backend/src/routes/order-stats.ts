@@ -325,4 +325,109 @@ export async function orderStatsRoutes(app: FastifyInstance) {
       },
     };
   });
+
+  // Dodaj na końcu orderStatsRoutes, przed zamknięciem funkcji
+
+  // ------------------------------------------
+  // GET /top-customers — klienci z >= 2 zamówieniami
+  // Query: startDate, endDate, minOrders (default 2)
+  // ------------------------------------------
+  app.get("/top-customers", async (request) => {
+    const query = request.query as {
+      startDate?: string;
+      endDate?: string;
+      minOrders?: string;
+    };
+
+    const now = new Date();
+    const endDate = query.endDate ? new Date(query.endDate) : now;
+    const startDate = query.startDate
+      ? new Date(query.startDate)
+      : new Date("2025-01-01");
+    endDate.setHours(23, 59, 59, 999);
+    const minOrders = parseInt(query.minOrders || "2");
+
+    const customers = await prisma.$queryRaw<
+      Array<{
+        email: string;
+        first_name: string;
+        last_name: string;
+        company_name: string | null;
+        city: string;
+        order_count: bigint;
+        total_revenue: number;
+        avg_order_value: number;
+        first_order: Date;
+        last_order: Date;
+        payment_methods: string[];
+      }>
+    >`
+      SELECT
+        shipping->>'email' AS email,
+        shipping->>'firstName' AS first_name,
+        shipping->>'lastName' AS last_name,
+        shipping->>'companyName' AS company_name,
+        shipping->>'city' AS city,
+        COUNT(*)::bigint AS order_count,
+        SUM(total::numeric)::float AS total_revenue,
+        AVG(total::numeric)::float AS avg_order_value,
+        MIN("createdAt") AS first_order,
+        MAX("createdAt") AS last_order,
+        ARRAY_AGG(DISTINCT payment_method) AS payment_methods
+      FROM orders
+      WHERE status IN ('paid', 'shipped', 'delivered')
+        AND "createdAt" >= ${startDate}
+        AND "createdAt" <= ${endDate}
+        AND shipping->>'email' IS NOT NULL
+        AND shipping->>'email' != ''
+      GROUP BY
+        shipping->>'email',
+        shipping->>'firstName',
+        shipping->>'lastName',
+        shipping->>'companyName',
+        shipping->>'city'
+      HAVING COUNT(*) >= ${minOrders}
+      ORDER BY SUM(total::numeric) DESC
+      LIMIT 50
+    `;
+
+    const result = customers.map((c) => ({
+      email: c.email,
+      firstName: c.first_name || "",
+      lastName: c.last_name || "",
+      companyName: c.company_name || null,
+      city: c.city || "",
+      orderCount: Number(c.order_count),
+      totalRevenue: round2(c.total_revenue),
+      avgOrderValue: round2(c.avg_order_value),
+      firstOrder: c.first_order,
+      lastOrder: c.last_order,
+      paymentMethods: c.payment_methods,
+    }));
+
+    // Summary stats
+    const totalRepeatCustomers = result.length;
+    const totalRepeatRevenue = result.reduce((s, c) => s + c.totalRevenue, 0);
+    const totalRepeatOrders = result.reduce((s, c) => s + c.orderCount, 0);
+
+    return {
+      success: true,
+      data: {
+        customers: result,
+        summary: {
+          totalRepeatCustomers,
+          totalRepeatRevenue: round2(totalRepeatRevenue),
+          totalRepeatOrders,
+          avgOrdersPerCustomer:
+            totalRepeatCustomers > 0
+              ? round2(totalRepeatOrders / totalRepeatCustomers)
+              : 0,
+          avgRevenuePerCustomer:
+            totalRepeatCustomers > 0
+              ? round2(totalRepeatRevenue / totalRepeatCustomers)
+              : 0,
+        },
+      },
+    };
+  });
 }

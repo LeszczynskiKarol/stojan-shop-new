@@ -214,6 +214,7 @@ export default function OrdersAnalytics() {
   const [data, setData] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [topCustomers, setTopCustomers] = useState<any>(null);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
@@ -237,6 +238,23 @@ export default function OrdersAnalytics() {
       setLoading(false);
     }
   }, [startDate, endDate, groupBy]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const params = new URLSearchParams({
+          startDate,
+          endDate,
+          minOrders: "2",
+        });
+        const res = await fetch(
+          `${API}/api/orders/stats/top-customers?${params}`,
+        );
+        const json = await res.json();
+        if (json.success) setTopCustomers(json.data);
+      } catch {}
+    })();
+  }, [startDate, endDate]);
 
   useEffect(() => {
     fetchStats();
@@ -925,6 +943,109 @@ export default function OrdersAnalytics() {
                 )}
               </div>
             </Card>
+            {topCustomers && topCustomers.customers.length > 0 && (
+              <Card title="👑 Powracający klienci">
+                <div>
+                  {/* Mini KPI */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, 1fr)",
+                      gap: 8,
+                      marginBottom: 16,
+                      padding: "8px 0",
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 20, fontWeight: 700 }}>
+                        {topCustomers.summary.totalRepeatCustomers}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                        klientów (≥2 zam.)
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 20, fontWeight: 700 }}>
+                        {fmt(topCustomers.summary.totalRepeatRevenue)}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                        łączny przychód
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 20, fontWeight: 700 }}>
+                        {topCustomers.summary.avgOrdersPerCustomer.toFixed(1)}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                        śr. zamówień/klient
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Lista klientów */}
+                  {topCustomers.customers
+                    .slice(0, 10)
+                    .map((c: any, i: number) => (
+                      <div
+                        key={c.email}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          padding: "8px 0",
+                          borderBottom: "1px solid var(--border)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: "50%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: "#fff",
+                            flexShrink: 0,
+                            background:
+                              i === 0
+                                ? "#f59e0b"
+                                : i === 1
+                                  ? "#9ca3af"
+                                  : i === 2
+                                    ? "#cd7f32"
+                                    : "var(--border)",
+                          }}
+                        >
+                          {i + 1}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500 }}>
+                            {c.companyName || `${c.firstName} ${c.lastName}`}
+                          </div>
+                          <div
+                            style={{ fontSize: 11, color: "var(--text-muted)" }}
+                          >
+                            {c.city} • {c.email}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700 }}>
+                            {fmt(c.totalRevenue)}
+                          </div>
+                          <div
+                            style={{ fontSize: 11, color: "var(--text-muted)" }}
+                          >
+                            {c.orderCount} zam. • śr. {fmt(c.avgOrderValue)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </Card>
+            )}
           </div>
 
           {/* ═══════════ AVG VALUE OVER TIME ═══════════ */}
