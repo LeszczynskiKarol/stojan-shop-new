@@ -10,8 +10,7 @@ export interface ShippingRate {
 export const SHIPPING_RATES: ShippingRate[] = [
   { minWeight: 0, maxWeight: 9, prepaidCost: 19, codCost: 23 },
   { minWeight: 9.5, maxWeight: 27.5, prepaidCost: 27, codCost: 29 },
-  { minWeight: 28, maxWeight: 30, prepaidCost: 33, codCost: 35 },
-  { minWeight: 30.5, maxWeight: 36.5, prepaidCost: 50, codCost: 60 },
+  { minWeight: 28, maxWeight: 36.5, prepaidCost: 50, codCost: 60 },
   { minWeight: 37, maxWeight: 90, prepaidCost: 145, codCost: 155 },
   { minWeight: 91, maxWeight: 185, prepaidCost: 165, codCost: 175 },
   { minWeight: 186, maxWeight: 375, prepaidCost: 235, codCost: 245 },

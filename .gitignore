@@ -54,13 +54,9 @@ frontend/package-lock.json
 backend/dist/
 backend/uploads/
 backend/temp/
-backend/src/index.ts
 backend/node_modules/
 backend/package-lock.json
 
 # Testing
 coverage/
 .nyc_output/
-
-*.yaml
-*.yaml

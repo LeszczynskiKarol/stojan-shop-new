@@ -76,7 +76,7 @@ jobs:
             cd ../frontend
             pm2 start dist/server/entry.mjs --name stojan-frontend --interpreter $NODE_BIN --cwd /home/ec2-user/stojan-shop-new/frontend
             cd ..
-            pm2 start /home/ec2-user/logs-app/index.js --name stojan-logs --interpreter $NODE_BIN || true
+            pm2 start /home/ec2-user/logs-app/ecosystem.config.cjs || true
             pm2 save
 
             sleep 3
