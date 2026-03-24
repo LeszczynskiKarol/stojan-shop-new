@@ -40,14 +40,9 @@ jobs:
           script: |
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
-
-            NODE_BIN=$(which node)
-            echo "=== Using node: $NODE_BIN ($(node --version)) ==="
+            echo "=== Using node: $(which node) ($(node --version)) ==="
 
             cd /home/ec2-user/stojan-shop-new
-
-            echo "=== Kill PM2 daemon ==="
-            pm2 kill
 
             echo "=== Git pull ==="
             git fetch origin main
@@ -61,22 +56,18 @@ jobs:
             npx prisma migrate deploy
             echo "=== Verify dotenv ==="
             node -e "import('dotenv').then(() => console.log('dotenv OK')).catch(e => { console.error('FAIL', e.message); process.exit(1) })"
-            cd ..
 
             echo "=== Frontend ==="
-            cd frontend
+            cd ../frontend
             rm -rf node_modules
             npm ci
             npm run build
-            cd ..
 
-            echo "=== Start PM2 (fresh daemon) ==="
-            cd backend
-            pm2 start dist/index.js --name stojan-backend --interpreter $NODE_BIN --cwd /home/ec2-user/stojan-shop-new/backend
-            cd ../frontend
-            pm2 start dist/server/entry.mjs --name stojan-frontend --interpreter $NODE_BIN --cwd /home/ec2-user/stojan-shop-new/frontend
-            cd ..
-            pm2 start /home/ec2-user/logs-app/ecosystem.config.cjs || true
+            echo "=== Reload PM2 ==="
+            cd /home/ec2-user/stojan-shop-new/backend
+            pm2 reload ecosystem.config.cjs
+            cd /home/ec2-user/stojan-shop-new/frontend
+            pm2 reload ecosystem.config.cjs
             pm2 save
 
             sleep 3
