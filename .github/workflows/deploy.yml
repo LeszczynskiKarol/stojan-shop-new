@@ -53,9 +53,11 @@ jobs:
             npm ci
 
             echo "=== Backend build ==="
-            cd backend
-            npm run build
+            cd /home/ec2-user/stojan-shop-new/backend
             npx prisma migrate deploy
+            npx prisma db push
+            npx prisma generate
+            npm run build || { echo "TSC BUILD FAILED"; exit 1; }
 
             echo "=== Frontend build ==="
             cd ../frontend
