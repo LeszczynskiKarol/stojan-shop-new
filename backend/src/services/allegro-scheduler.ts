@@ -20,6 +20,11 @@ const ORPHAN_CHECK_MS = 24 * 60 * 60 * 1000; // 24h
  * Only event polling — reconciliation is manual only.
  */
 export function startAllegroScheduler(): void {
+  if (process.env.NODE_ENV === "development") {
+    console.log("⏰ Allegro scheduler DISABLED in development mode");
+    return;
+  }
+
   console.log(
     "⏰ Starting Allegro scheduler (event polling + orphan detection)...",
   );

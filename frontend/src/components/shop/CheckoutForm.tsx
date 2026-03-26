@@ -3,6 +3,7 @@
 // Czyta produkty z cart (stojan_cart), wysyła do /api/orders
 import { useState, useEffect, useCallback } from "react";
 import { cart, type CartItem } from "@/lib/cart";
+import { PostalCodeCityField } from "./PostalCodeCityField";
 
 const API_URL =
   (import.meta as any).env?.PUBLIC_API_URL || "http://localhost:4000";
@@ -231,11 +232,6 @@ export function CheckoutForm() {
     calculateShipping();
   }, [calculateShipping]);
 
-  // === HELPERS ===
-  const formatPostal = (v: string) => {
-    const d = v.replace(/\D/g, "");
-    return d.length > 2 ? `${d.slice(0, 2)}-${d.slice(2, 5)}` : d;
-  };
   const formatNip = (v: string) => v.replace(/\D/g, "").slice(0, 10);
   const fmt = (v: number) =>
     v.toLocaleString("pl-PL", {
@@ -477,22 +473,15 @@ export function CheckoutForm() {
         {/* Address */}
         <Section title="Adres">
           <div className="space-y-3">
-            <div className="grid sm:grid-cols-[140px_1fr] gap-3">
-              <Field
-                label="Kod pocztowy *"
-                value={postalCode}
-                onChange={(v) => setPostalCode(formatPostal(v))}
-                error={errors.postalCode}
-                maxLength={6}
-                placeholder="00-000"
-              />
-              <Field
-                label="Miejscowość *"
-                value={city}
-                onChange={setCity}
-                error={errors.city}
-              />
-            </div>
+            <PostalCodeCityField
+              postalCode={postalCode}
+              onPostalCodeChange={setPostalCode}
+              city={city}
+              onCityChange={setCity}
+              postalError={errors.postalCode}
+              cityError={errors.city}
+              idPrefix="billing"
+            />
             <Field
               label="Ulica i numer *"
               value={street}
@@ -518,22 +507,15 @@ export function CheckoutForm() {
                 <p className="text-sm font-medium text-[hsl(var(--foreground))]">
                   Adres dostawy
                 </p>
-                <div className="grid sm:grid-cols-[140px_1fr] gap-3">
-                  <Field
-                    label="Kod pocztowy *"
-                    value={shipPostal}
-                    onChange={(v) => setShipPostal(formatPostal(v))}
-                    error={errors.shipPostal}
-                    maxLength={6}
-                    placeholder="00-000"
-                  />
-                  <Field
-                    label="Miejscowość *"
-                    value={shipCity}
-                    onChange={setShipCity}
-                    error={errors.shipCity}
-                  />
-                </div>
+                <PostalCodeCityField
+                  postalCode={shipPostal}
+                  onPostalCodeChange={setShipPostal}
+                  city={shipCity}
+                  onCityChange={setShipCity}
+                  postalError={errors.shipPostal}
+                  cityError={errors.shipCity}
+                  idPrefix="shipping"
+                />
                 <Field
                   label="Ulica i numer *"
                   value={shipStreet}

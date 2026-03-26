@@ -32,7 +32,7 @@ export default defineConfig({
 
   vite: {
     server: {
-      allowedHosts: ["app-reactapp.ngrok.app"],
+      allowedHosts: ["dev.torweb.pl"],
     },
     define: {
       "import.meta.env.API_URL": JSON.stringify(

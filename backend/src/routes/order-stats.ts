@@ -4,6 +4,7 @@
 
 import { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
+import { geocodePostalCode } from "../lib/postal-geocode.js";
 
 // ============================================
 // HELPERS
@@ -239,20 +240,38 @@ export async function orderStatsRoutes(app: FastifyInstance) {
     // ═══════════════════════════════════════════
     // 7. TOP CITIES
     // ═══════════════════════════════════════════
-    const cityMap = new Map<string, { count: number; value: number }>();
+    const cityMap = new Map<
+      string,
+      {
+        count: number;
+        value: number;
+        postalCode: string | null;
+      }
+    >();
     for (const order of activeOrders) {
       const shipping = order.shipping as any;
       const city = (shipping?.city || "Nieznane").trim();
-      const cur = cityMap.get(city) || { count: 0, value: 0 };
+      const cur = cityMap.get(city) || { count: 0, value: 0, postalCode: null };
       cityMap.set(city, {
         count: cur.count + 1,
         value: cur.value + Number(order.total),
+        // Keep first postal code seen for this city (for geocoding)
+        postalCode: cur.postalCode || shipping?.postalCode || null,
       });
     }
     const topCities = Array.from(cityMap.entries())
-      .map(([city, d]) => ({ city, count: d.count, value: round2(d.value) }))
+      .map(([city, d]) => {
+        const coords = geocodePostalCode(d.postalCode || "");
+        return {
+          city,
+          count: d.count,
+          value: round2(d.value),
+          lat: coords?.[0] ?? null,
+          lng: coords?.[1] ?? null,
+        };
+      })
       .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+      .slice(0, 20);
 
     // ═══════════════════════════════════════════
     // 8. DAY OF WEEK DISTRIBUTION

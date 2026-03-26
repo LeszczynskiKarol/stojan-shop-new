@@ -3,6 +3,8 @@
 // Import these in orders.ts, admin-products.ts, webhooks.ts
 // All calls are non-blocking (catch errors internally).
 
+const isDev = () => process.env.NODE_ENV === "development";
+
 import { syncStockToAllegro, syncNameToAllegro } from "./allegro-sync.js";
 
 /**
@@ -13,6 +15,7 @@ export function fireAllegroStockSync(
   productId: string,
   newStock: number,
 ): void {
+  if (isDev()) return;
   syncStockToAllegro(productId, newStock).catch((err) =>
     console.error(
       `[allegro-hook] stock sync failed for ${productId}:`,
@@ -26,6 +29,7 @@ export function fireAllegroStockSync(
  * Fire-and-forget — never throws.
  */
 export function fireAllegroNameSync(productId: string, newName: string): void {
+  if (isDev()) return;
   syncNameToAllegro(productId, newName).catch((err) =>
     console.error(
       `[allegro-hook] name sync failed for ${productId}:`,
@@ -40,6 +44,7 @@ export function fireAllegroNameSync(productId: string, newName: string): void {
 export function fireAllegroStockSyncBatch(
   items: Array<{ productId: string; newStock: number }>,
 ): void {
+  if (isDev()) return;
   for (const item of items) {
     fireAllegroStockSync(item.productId, item.newStock);
   }
