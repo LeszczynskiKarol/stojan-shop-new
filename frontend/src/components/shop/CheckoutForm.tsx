@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { cart, type CartItem } from "@/lib/cart";
 import { PostalCodeCityField } from "./PostalCodeCityField";
+import { NipLookupField } from "./NipLookupField";
 
 const API_URL =
   (import.meta as any).env?.PUBLIC_API_URL || "http://localhost:4000";
@@ -410,12 +411,6 @@ export function CheckoutForm() {
           <div className="space-y-3">
             {isCompany ? (
               <>
-                <Field
-                  label="Nazwa firmy *"
-                  value={companyName}
-                  onChange={setCompanyName}
-                  error={errors.companyName}
-                />
                 <label className="flex items-center gap-2 text-sm cursor-pointer py-1">
                   <input
                     type="checkbox"
@@ -427,15 +422,27 @@ export function CheckoutForm() {
                     Faktura VAT
                   </span>
                 </label>
+
                 {wantsInvoice && (
-                  <Field
-                    label="NIP *"
-                    value={nip}
-                    onChange={(v) => setNip(formatNip(v))}
+                  <NipLookupField
+                    nip={nip}
+                    onNipChange={setNip}
+                    onCompanyFound={(data) => {
+                      // Auto-fill company name, address
+                      if (data.name) setCompanyName(data.name);
+                      if (data.street) setStreet(data.street);
+                      if (data.postalCode) setPostalCode(data.postalCode);
+                      if (data.city) setCity(data.city);
+                    }}
                     error={errors.nip}
-                    maxLength={10}
                   />
                 )}
+                <Field
+                  label="Nazwa firmy *"
+                  value={companyName}
+                  onChange={setCompanyName}
+                  error={errors.companyName}
+                />
               </>
             ) : (
               <div className="grid sm:grid-cols-2 gap-3">

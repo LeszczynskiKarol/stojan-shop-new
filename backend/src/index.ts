@@ -17,6 +17,7 @@ import { productRoutes } from "./routes/products.js";
 import { shopProductRoutes } from "./routes/shop-products.js";
 import { categoryRoutes } from "./routes/categories.js";
 import { adminAuthRoutes, requireAdmin } from "./routes/admin-auth.js";
+import { nipLookupRoutes } from "./routes/nip-lookup.js";
 import { adminProductRoutes } from "./routes/admin-products.js";
 import { orderRoutes } from "./routes/orders.js";
 import { userRoutes } from "./routes/users.js";
@@ -145,6 +146,7 @@ app.register(async function protectedRoutes(protectedApp) {
 // ============================================
 await app.register(productRoutes, { prefix: "/api/products" });
 await app.register(categoryRoutes, { prefix: "/api/categories" });
+await app.register(nipLookupRoutes, { prefix: "/api/nip" });
 await app.register(manufacturerRoutes, { prefix: "/api/manufacturers" });
 await app.register(orderRoutes, { prefix: "/api/orders" });
 await app.register(userRoutes, { prefix: "/api/users" });
