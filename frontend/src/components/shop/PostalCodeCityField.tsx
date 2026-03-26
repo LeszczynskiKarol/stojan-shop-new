@@ -59,7 +59,10 @@ export function PostalCodeCityField({
       if (postalCache.has(code)) {
         const cached = postalCache.get(code)!;
         setSuggestions(cached);
-        if (cached.length === 1) {
+        // If city already matches one of the options — don't show dropdown
+        if (city && cached.some((o) => o.name === city)) {
+          setShowDropdown(false);
+        } else if (cached.length === 1) {
           onCityChange(cached[0].name);
           setShowDropdown(false);
         } else if (cached.length > 1) {
@@ -94,12 +97,10 @@ export function PostalCodeCityField({
         const data = await res.json();
         const items: any[] = Array.isArray(data) ? data : [data];
 
-        // Deduplicate by city NAME — user doesn't care about gmina/powiat distinction
         const seen = new Map<string, CityOption>();
         for (const item of items) {
           const cityName = (item.miejscowosc || "").trim();
           if (!cityName) continue;
-          // Keep first occurrence, prefer entry with gmina info
           if (!seen.has(cityName)) {
             seen.set(cityName, {
               name: cityName,
@@ -114,17 +115,18 @@ export function PostalCodeCityField({
         postalCache.set(code, options);
         setSuggestions(options);
 
-        if (options.length === 1) {
-          // Auto-fill when exactly one city
+        // If city already matches one of the options (e.g. filled by NIP lookup) — don't show dropdown
+        if (city && options.some((o) => o.name === city)) {
+          setShowDropdown(false);
+          setManualMode(false);
+        } else if (options.length === 1) {
           onCityChange(options[0].name);
           setShowDropdown(false);
           setManualMode(false);
         } else if (options.length > 1) {
-          // Show dropdown for multiple cities
           setShowDropdown(true);
           setManualMode(false);
         } else {
-          // No results — manual mode
           setManualMode(true);
         }
       } catch {
@@ -134,7 +136,7 @@ export function PostalCodeCityField({
         setIsLoading(false);
       }
     },
-    [onCityChange],
+    [onCityChange, city],
   );
 
   // ── Trigger fetch when postal code is complete ──
