@@ -51,86 +51,91 @@ export function PostalCodeCityField({
   };
 
   // ── Fetch cities for postal code ──
-  const fetchCities = useCallback(async (code: string) => {
-    if (!/^\d{2}-\d{3}$/.test(code)) return;
+  const fetchCities = useCallback(
+    async (code: string) => {
+      if (!/^\d{2}-\d{3}$/.test(code)) return;
 
-    // Check cache
-    if (postalCache.has(code)) {
-      const cached = postalCache.get(code)!;
-      setSuggestions(cached);
-      if (cached.length === 1) {
-        onCityChange(cached[0].name);
-        setShowDropdown(false);
-      } else if (cached.length > 1) {
-        setShowDropdown(true);
-      }
-      return;
-    }
-
-    setIsLoading(true);
-    setFetchError("");
-
-    try {
-      const res = await fetch(`${POSTAL_API}/${code}`, {
-        headers: { Accept: "application/json" },
-      });
-
-      if (res.status === 429) {
-        setFetchError("Limit zapytań API — wpisz miejscowość ręcznie");
-        setManualMode(true);
-        return;
-      }
-
-      if (res.status === 404) {
-        setFetchError("Nie znaleziono kodu");
-        setSuggestions([]);
-        setManualMode(true);
-        return;
-      }
-
-      if (!res.ok) throw new Error("API error");
-
-      const data = await res.json();
-      const items: any[] = Array.isArray(data) ? data : [data];
-
-      // Deduplicate by city + gmina
-      const seen = new Map<string, CityOption>();
-      for (const item of items) {
-        const key = `${item.miejscowosc}_${item.gmina}`;
-        if (!seen.has(key)) {
-          seen.set(key, {
-            name: item.miejscowosc,
-            gmina: item.gmina || "",
-            powiat: item.powiat || "",
-            wojewodztwo: item.wojewodztwo || "",
-          });
+      // Check cache
+      if (postalCache.has(code)) {
+        const cached = postalCache.get(code)!;
+        setSuggestions(cached);
+        if (cached.length === 1) {
+          onCityChange(cached[0].name);
+          setShowDropdown(false);
+        } else if (cached.length > 1) {
+          setShowDropdown(true);
         }
+        return;
       }
 
-      const options = Array.from(seen.values());
-      postalCache.set(code, options);
-      setSuggestions(options);
+      setIsLoading(true);
+      setFetchError("");
 
-      if (options.length === 1) {
-        // Auto-fill when exactly one city
-        onCityChange(options[0].name);
-        setShowDropdown(false);
-        setManualMode(false);
-      } else if (options.length > 1) {
-        // Show dropdown for multiple cities
-        setShowDropdown(true);
-        setManualMode(false);
-      } else {
-        // No results — manual mode
+      try {
+        const res = await fetch(`${POSTAL_API}/${code}`, {
+          headers: { Accept: "application/json" },
+        });
+
+        if (res.status === 429) {
+          setFetchError("Limit zapytań API — wpisz miejscowość ręcznie");
+          setManualMode(true);
+          return;
+        }
+
+        if (res.status === 404) {
+          setFetchError("Nie znaleziono kodu");
+          setSuggestions([]);
+          setManualMode(true);
+          return;
+        }
+
+        if (!res.ok) throw new Error("API error");
+
+        const data = await res.json();
+        const items: any[] = Array.isArray(data) ? data : [data];
+
+        // Deduplicate by city NAME — user doesn't care about gmina/powiat distinction
+        const seen = new Map<string, CityOption>();
+        for (const item of items) {
+          const cityName = (item.miejscowosc || "").trim();
+          if (!cityName) continue;
+          // Keep first occurrence, prefer entry with gmina info
+          if (!seen.has(cityName)) {
+            seen.set(cityName, {
+              name: cityName,
+              gmina: item.gmina || "",
+              powiat: item.powiat || "",
+              wojewodztwo: item.wojewodztwo || "",
+            });
+          }
+        }
+
+        const options = Array.from(seen.values());
+        postalCache.set(code, options);
+        setSuggestions(options);
+
+        if (options.length === 1) {
+          // Auto-fill when exactly one city
+          onCityChange(options[0].name);
+          setShowDropdown(false);
+          setManualMode(false);
+        } else if (options.length > 1) {
+          // Show dropdown for multiple cities
+          setShowDropdown(true);
+          setManualMode(false);
+        } else {
+          // No results — manual mode
+          setManualMode(true);
+        }
+      } catch {
+        setFetchError("Błąd pobierania — wpisz miejscowość ręcznie");
         setManualMode(true);
+      } finally {
+        setIsLoading(false);
       }
-    } catch {
-      setFetchError("Błąd pobierania — wpisz miejscowość ręcznie");
-      setManualMode(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [onCityChange]);
+    },
+    [onCityChange],
+  );
 
   // ── Trigger fetch when postal code is complete ──
   useEffect(() => {
@@ -146,7 +151,10 @@ export function PostalCodeCityField({
   // ── Close dropdown on outside click ──
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setShowDropdown(false);
       }
     };
@@ -240,24 +248,24 @@ export function PostalCodeCityField({
           className={inputClass(cityError)}
         />
 
-        {cityError && (
-          <p className="text-xs text-red-500 mt-1">{cityError}</p>
-        )}
+        {cityError && <p className="text-xs text-red-500 mt-1">{cityError}</p>}
 
         {fetchError && !cityError && (
           <p className="text-xs text-amber-500 mt-1">{fetchError}</p>
         )}
 
         {/* Auto-fill indicator */}
-        {suggestions.length === 1 && city === suggestions[0].name && !manualMode && (
-          <button
-            type="button"
-            onClick={enableManualMode}
-            className="text-[10px] text-[hsl(var(--primary))] hover:underline mt-0.5"
-          >
-            Inna miejscowość? Wpisz ręcznie
-          </button>
-        )}
+        {suggestions.length === 1 &&
+          city === suggestions[0].name &&
+          !manualMode && (
+            <button
+              type="button"
+              onClick={enableManualMode}
+              className="text-[10px] text-[hsl(var(--primary))] hover:underline mt-0.5"
+            >
+              Inna miejscowość? Wpisz ręcznie
+            </button>
+          )}
 
         {/* Dropdown for multiple cities */}
         {showDropdown && suggestions.length > 1 && (
