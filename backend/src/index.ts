@@ -16,6 +16,7 @@ import { adminAnalyticsRoutes } from "./routes/admin-analytics.js";
 import { productRoutes } from "./routes/products.js";
 import { shopProductRoutes } from "./routes/shop-products.js";
 import { categoryRoutes } from "./routes/categories.js";
+import { adminShippingRoutes } from "./routes/admin-shipping.js";
 import { adminAuthRoutes, requireAdmin } from "./routes/admin-auth.js";
 import { nipLookupRoutes } from "./routes/nip-lookup.js";
 import { adminProductRoutes } from "./routes/admin-products.js";
@@ -138,6 +139,10 @@ app.register(async function protectedRoutes(protectedApp) {
 
   await protectedApp.register(adminAnalyticsRoutes, {
     prefix: "/api/admin/analytics",
+  });
+
+  await protectedApp.register(adminShippingRoutes, {
+    prefix: "/api/admin/shipping",
   });
 });
 

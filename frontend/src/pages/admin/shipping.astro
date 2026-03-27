@@ -1,0 +1,9 @@
+---
+// frontend/src/pages/admin/shipping.astro
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import ShippingSettings from '../../components/admin/ShippingSettings';
+---
+
+<AdminLayout title="Stawki wysyłki">
+  <ShippingSettings client:load />
+</AdminLayout>
