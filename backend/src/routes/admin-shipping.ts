@@ -3,6 +3,7 @@
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { prisma } from "../lib/prisma.js";
+import { invalidateShippingCache } from "../config/shipping.config.js";
 
 // ============================================
 // TYPES
@@ -144,6 +145,7 @@ export async function adminShippingRoutes(app: FastifyInstance) {
       }
 
       await saveShippingRatesToDb(result.data);
+      invalidateShippingCache();
       return { success: true, data: { rates: result.data } };
     },
   );

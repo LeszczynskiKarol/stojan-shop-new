@@ -6,8 +6,8 @@ import { trackOrderServerSide } from "../services/analyticsHooks.js";
 import { fireSatelliteRebuild } from "../services/rebuild-satellite.js";
 import "@fastify/multipart";
 import {
-  calculateShippingCost,
-  isCodAvailable,
+  calculateShippingCostAsync,
+  isCodAvailableAsync,
 } from "../config/shipping.config.js";
 import {
   sendOrderConfirmation,
@@ -75,14 +75,20 @@ export async function orderRoutes(app: FastifyInstance) {
         }
       }
 
-      if (body.paymentMethod === "cod" && !isCodAvailable(totalWeight)) {
+      if (
+        body.paymentMethod === "cod" &&
+        !(await isCodAvailableAsync(totalWeight))
+      ) {
         return reply.send({
           success: true,
           data: { cost: null, reason: "COD niedostępny dla tej wagi" },
         });
       }
 
-      const cost = calculateShippingCost(totalWeight, body.paymentMethod);
+      const cost = await calculateShippingCostAsync(
+        totalWeight,
+        body.paymentMethod,
+      );
 
       return reply.send({
         success: true,
@@ -90,7 +96,7 @@ export async function orderRoutes(app: FastifyInstance) {
           cost: cost ?? 0,
           totalWeight,
           paymentMethod: body.paymentMethod,
-          codAvailable: isCodAvailable(totalWeight),
+          codAvailable: await isCodAvailableAsync(totalWeight),
         },
       });
     } catch (err: any) {
@@ -184,10 +190,11 @@ export async function orderRoutes(app: FastifyInstance) {
         verifiedSubtotal += actualPrice * item.quantity;
       }
 
-      const verifiedShipping = calculateShippingCost(
+      const verifiedShipping = await calculateShippingCostAsync(
         body.totalWeight,
         body.paymentMethod,
       );
+
       if (verifiedShipping === null) {
         return reply.status(400).send({
           success: false,
