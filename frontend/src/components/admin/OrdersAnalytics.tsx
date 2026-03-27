@@ -222,6 +222,9 @@ export default function OrdersAnalytics() {
   const [topCustomers, setTopCustomers] = useState<any>(null);
   const [customersVisible, setCustomersVisible] = useState(5);
   const [productsVisible, setProductsVisible] = useState(10);
+  const [productSort, setProductSort] = useState<"revenue" | "quantity">(
+    "quantity",
+  );
   const [citiesVisible, setCitiesVisible] = useState(10);
   const [showMap, setShowMap] = useState(true);
 
@@ -680,77 +683,102 @@ export default function OrdersAnalytics() {
             {/* Top products */}
             <Card title="🏆 Top produkty">
               <div>
-                {data.topProducts.slice(0, productsVisible).map((p, i) => (
-                  <div
-                    key={p.name}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "8px 0",
-                      borderBottom: "1px solid var(--border)",
-                    }}
+                {/* Sort toggle */}
+                <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
+                  <button
+                    onClick={() => setProductSort("quantity")}
+                    className={`btn btn-sm ${productSort === "quantity" ? "btn-primary" : "btn-outline"}`}
                   >
+                    Wg ilości
+                  </button>
+                  <button
+                    onClick={() => setProductSort("revenue")}
+                    className={`btn btn-sm ${productSort === "revenue" ? "btn-primary" : "btn-outline"}`}
+                  >
+                    Wg przychodu
+                  </button>
+                </div>
+
+                {[...data.topProducts]
+                  .sort((a, b) =>
+                    productSort === "quantity"
+                      ? b.quantity - a.quantity
+                      : b.revenue - a.revenue,
+                  )
+                  .slice(0, productsVisible)
+                  .map((p, i) => (
                     <div
+                      key={p.name}
                       style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: "50%",
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: "#fff",
-                        flexShrink: 0,
-                        background:
-                          i === 0
-                            ? "#f59e0b"
-                            : i === 1
-                              ? "#9ca3af"
-                              : i === 2
-                                ? "#cd7f32"
-                                : "var(--border)",
+                        gap: 10,
+                        padding: "8px 0",
+                        borderBottom: "1px solid var(--border)",
                       }}
                     >
-                      {i + 1}
-                    </div>
-                    {p.image && (
-                      <img
-                        src={p.image}
-                        alt=""
-                        style={{
-                          width: 36,
-                          height: 36,
-                          objectFit: "cover",
-                          borderRadius: 4,
-                          border: "1px solid var(--border)",
-                        }}
-                      />
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{
-                          fontSize: 13,
-                          fontWeight: 500,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
+                          width: 28,
+                          height: 28,
+                          borderRadius: "50%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: "#fff",
+                          flexShrink: 0,
+                          background:
+                            i === 0
+                              ? "#f59e0b"
+                              : i === 1
+                                ? "#9ca3af"
+                                : i === 2
+                                  ? "#cd7f32"
+                                  : "var(--border)",
                         }}
                       >
-                        {p.name}
+                        {i + 1}
                       </div>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                        {p.quantity} szt.
+                      {p.image && (
+                        <img
+                          src={p.image}
+                          alt=""
+                          style={{
+                            width: 36,
+                            height: 36,
+                            objectFit: "cover",
+                            borderRadius: 4,
+                            border: "1px solid var(--border)",
+                          }}
+                        />
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 500,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {p.name}
+                        </div>
+                        <div
+                          style={{ fontSize: 11, color: "var(--text-muted)" }}
+                        >
+                          {p.quantity} szt.
+                        </div>
+                      </div>
+                      <div
+                        style={{ fontSize: 13, fontWeight: 700, flexShrink: 0 }}
+                      >
+                        {fmt(p.revenue)}
                       </div>
                     </div>
-                    <div
-                      style={{ fontSize: 13, fontWeight: 700, flexShrink: 0 }}
-                    >
-                      {fmt(p.revenue)}
-                    </div>
-                  </div>
-                ))}
+                  ))}
                 {data.topProducts.length > productsVisible && (
                   <button
                     onClick={() => setProductsVisible((prev) => prev + 10)}
