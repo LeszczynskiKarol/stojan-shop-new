@@ -1,8 +1,12 @@
 // frontend/src/components/admin/OrdersAnalytics.tsx
 // Comprehensive order analytics dashboard
 // Stack: React + recharts + lucide-react, styled with admin CSS variables
-
-import { useState, useEffect, useCallback } from "react";
+declare global {
+  interface Window {
+    google: typeof google;
+  }
+}
+import { useRef, useState, useEffect, useCallback } from "react";
 import {
   AreaChart,
   Area,
@@ -217,6 +221,9 @@ export default function OrdersAnalytics() {
   const [error, setError] = useState<string | null>(null);
   const [topCustomers, setTopCustomers] = useState<any>(null);
   const [customersVisible, setCustomersVisible] = useState(5);
+  const [productsVisible, setProductsVisible] = useState(10);
+  const [citiesVisible, setCitiesVisible] = useState(10);
+  const [showMap, setShowMap] = useState(true);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
@@ -264,6 +271,8 @@ export default function OrdersAnalytics() {
 
   useEffect(() => {
     setCustomersVisible(5);
+    setProductsVisible(10);
+    setCitiesVisible(10);
   }, [topCustomers]);
 
   const applyPreset = (preset: (typeof PRESETS)[0]) => {
@@ -671,7 +680,7 @@ export default function OrdersAnalytics() {
             {/* Top products */}
             <Card title="🏆 Top produkty">
               <div>
-                {data.topProducts.map((p, i) => (
+                {data.topProducts.slice(0, productsVisible).map((p, i) => (
                   <div
                     key={p.name}
                     style={{
@@ -742,6 +751,32 @@ export default function OrdersAnalytics() {
                     </div>
                   </div>
                 ))}
+                {data.topProducts.length > productsVisible && (
+                  <button
+                    onClick={() => setProductsVisible((prev) => prev + 10)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 0",
+                      marginTop: 8,
+                      background: "transparent",
+                      border: "1px solid var(--border)",
+                      borderRadius: 6,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: "var(--text-muted)",
+                      cursor: "pointer",
+                    }}
+                    onMouseOver={(e) =>
+                      (e.currentTarget.style.background = "var(--bg)")
+                    }
+                    onMouseOut={(e) =>
+                      (e.currentTarget.style.background = "transparent")
+                    }
+                  >
+                    Pokaż więcej ({data.topProducts.length - productsVisible}{" "}
+                    pozostało)
+                  </button>
+                )}
                 {data.topProducts.length === 0 && (
                   <div
                     style={{
@@ -760,7 +795,7 @@ export default function OrdersAnalytics() {
             {/* Top cities */}
             <Card title="📍 Top miasta">
               <div>
-                {data.topCities.map((c, i) => {
+                {data.topCities.slice(0, citiesVisible).map((c, i) => {
                   const maxCount = data.topCities[0]?.count || 1;
                   return (
                     <div
@@ -806,6 +841,32 @@ export default function OrdersAnalytics() {
                     </div>
                   );
                 })}
+                {data.topCities.length > citiesVisible && (
+                  <button
+                    onClick={() => setCitiesVisible((prev) => prev + 10)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 0",
+                      marginTop: 8,
+                      background: "transparent",
+                      border: "1px solid var(--border)",
+                      borderRadius: 6,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: "var(--text-muted)",
+                      cursor: "pointer",
+                    }}
+                    onMouseOver={(e) =>
+                      (e.currentTarget.style.background = "var(--bg)")
+                    }
+                    onMouseOut={(e) =>
+                      (e.currentTarget.style.background = "transparent")
+                    }
+                  >
+                    Pokaż więcej ({data.topCities.length - citiesVisible}{" "}
+                    pozostało)
+                  </button>
+                )}
                 {data.topCities.length === 0 && (
                   <div
                     style={{
@@ -821,7 +882,14 @@ export default function OrdersAnalytics() {
               </div>
             </Card>
           </div>
+          <button
+            className="btn btn-outline"
+            onClick={() => setShowMap((prev) => !prev)}
+          >
+            {showMap ? "🗺️ Ukryj mapę" : "🗺️ Nanieś zamówienia na mapę"}
+          </button>
 
+          {showMap && <OrdersMap startDate={startDate} endDate={endDate} />}
           {/* ═══════════ CHARTS ROW 2 ═══════════ */}
           <div
             style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
@@ -1737,5 +1805,187 @@ function Card({
       </div>
       <div style={{ padding: 16 }}>{children}</div>
     </div>
+  );
+}
+
+function OrdersMap({
+  startDate,
+  endDate,
+}: {
+  startDate: string;
+  endDate: string;
+}) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(true);
+  const [points, setPoints] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [gmapsReady, setGmapsReady] = useState(!!window.google?.maps);
+  const mapInstance = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+
+  // 1. Load Google Maps script once, with onload callback
+  useEffect(() => {
+    if (window.google?.maps) {
+      setGmapsReady(true);
+      return;
+    }
+    if (document.getElementById("gmaps-script")) return;
+
+    const script = document.createElement("script");
+    script.id = "gmaps-script";
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${
+      (import.meta as any).env?.PUBLIC_GOOGLE_MAPS_KEY || ""
+    }&libraries=marker&v=weekly`;
+    script.async = true;
+    script.onload = () => setGmapsReady(true);
+    script.onerror = () => setError("Nie udało się załadować Google Maps");
+    document.head.appendChild(script);
+  }, []);
+
+  // 2. Fetch points from backend
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams({ startDate, endDate });
+        const res = await fetch(`${API}/api/orders/stats/map-points?${params}`);
+        const json = await res.json();
+        if (json.success) setPoints(json.data.points);
+        else setError(json.error);
+      } catch (e: any) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [startDate, endDate]);
+
+  // 3. Render map ONLY when both gmaps loaded AND data ready
+  useEffect(() => {
+    if (!gmapsReady || loading || !mapRef.current || points.length === 0)
+      return;
+
+    const map = new google.maps.Map(mapRef.current, {
+      center: { lat: 52.0, lng: 19.5 },
+      zoom: 6,
+      mapId: "orders-map",
+    });
+    mapInstance.current = map;
+
+    // Clear old markers
+    markersRef.current.forEach((m) => (m.map = null));
+    markersRef.current = [];
+
+    // Aggregate by postal prefix
+    const groups: Record<
+      string,
+      { lat: number; lng: number; orders: any[]; total: number }
+    > = {};
+
+    for (const p of points) {
+      const key = `${p.lat.toFixed(2)},${p.lng.toFixed(2)}`;
+      if (!groups[key])
+        groups[key] = { lat: p.lat, lng: p.lng, orders: [], total: 0 };
+      groups[key].orders.push(p);
+      groups[key].total += Number(p.total);
+    }
+
+    const infoWindow = new google.maps.InfoWindow();
+
+    Object.values(groups).forEach((g) => {
+      const size = Math.min(44, 18 + g.orders.length * 3);
+      const el = document.createElement("div");
+      el.style.cssText = `
+        width:${size}px; height:${size}px; border-radius:50%;
+        background:rgba(99,102,241,0.85); border:2px solid #fff;
+        display:flex; align-items:center; justify-content:center;
+        font-size:11px; font-weight:700; color:#fff; cursor:pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        transition: transform 0.15s;
+      `;
+      el.textContent = String(g.orders.length);
+      el.onmouseenter = () => (el.style.transform = "scale(1.2)");
+      el.onmouseleave = () => (el.style.transform = "scale(1)");
+
+      const marker = new google.maps.marker.AdvancedMarkerElement({
+        map,
+        position: { lat: g.lat, lng: g.lng },
+        content: el,
+      });
+
+      marker.addListener("click", () => {
+        const list = g.orders
+          .slice(0, 8)
+          .map(
+            (o: any) =>
+              `<div style="display:flex;justify-content:space-between;gap:16px;padding:2px 0;font-size:12px;">
+                <span>${o.orderNumber} • ${o.customer}</span>
+                <strong>${fmt(Number(o.total))}</strong>
+              </div>`,
+          )
+          .join("");
+        const more =
+          g.orders.length > 8
+            ? `<div style="font-size:11px;color:#888;margin-top:4px">+ ${g.orders.length - 8} więcej</div>`
+            : "";
+        infoWindow.setContent(`
+          <div style="max-width:320px;font-family:system-ui;color:#111;">
+            <div style="font-weight:700;margin-bottom:6px;">${g.orders[0]?.city || "Region"} — ${g.orders.length} zam.</div>
+            <div style="font-weight:600;color:#6366f1;margin-bottom:8px;">${fmt(g.total)}</div>
+            ${list}${more}
+          </div>
+        `);
+        infoWindow.open(map, marker);
+      });
+
+      markersRef.current.push(marker);
+    });
+
+    // Auto-fit bounds
+    if (Object.keys(groups).length > 1) {
+      const bounds = new google.maps.LatLngBounds();
+      Object.values(groups).forEach((g) =>
+        bounds.extend({ lat: g.lat, lng: g.lng }),
+      );
+      map.fitBounds(bounds, 40);
+    }
+  }, [points, loading, gmapsReady]);
+
+  if (error)
+    return (
+      <div style={{ padding: 16, color: "var(--danger)" }}>⚠️ {error}</div>
+    );
+
+  return (
+    <Card title={`🗺️ Mapa zamówień (${points.length} punktów)`}>
+      {loading || !gmapsReady ? (
+        <div
+          style={{
+            padding: 40,
+            textAlign: "center",
+            color: "var(--text-muted)",
+          }}
+        >
+          ⏳{" "}
+          {!gmapsReady ? "Ładowanie Google Maps..." : "Pobieranie zamówień..."}
+        </div>
+      ) : points.length === 0 ? (
+        <div
+          style={{
+            padding: 40,
+            textAlign: "center",
+            color: "var(--text-muted)",
+          }}
+        >
+          Brak zamówień w wybranym zakresie dat
+        </div>
+      ) : (
+        <div
+          ref={mapRef}
+          style={{ width: "100%", height: 500, borderRadius: 8 }}
+        />
+      )}
+    </Card>
   );
 }

@@ -226,7 +226,7 @@ export async function orderStatsRoutes(app: FastifyInstance) {
         image: d.image || null,
       }))
       .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 10);
+      .slice(0, 50);
 
     // ═══════════════════════════════════════════
     // 6. HOURLY DISTRIBUTION
@@ -271,7 +271,7 @@ export async function orderStatsRoutes(app: FastifyInstance) {
         };
       })
       .sort((a, b) => b.count - a.count)
-      .slice(0, 20);
+      .slice(0, 120);
 
     // ═══════════════════════════════════════════
     // 8. DAY OF WEEK DISTRIBUTION
@@ -513,5 +513,65 @@ export async function orderStatsRoutes(app: FastifyInstance) {
         },
       },
     };
+  });
+  // GET /api/orders/stats/map-points?startDate=...&endDate=...
+  app.get("/map-points", async (request, reply) => {
+    const { startDate, endDate } = request.query as {
+      startDate?: string;
+      endDate?: string;
+    };
+
+    const where: any = {
+      status: { notIn: ["pending", "cancelled"] },
+    };
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    const orders = await prisma.order.findMany({
+      where,
+      select: {
+        id: true,
+        orderNumber: true,
+        total: true,
+        status: true,
+        totalWeight: true,
+        createdAt: true,
+        shipping: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const points = orders
+      .map((o) => {
+        const s = o.shipping as any;
+        const coords = geocodePostalCode(s?.postalCode);
+        if (!coords) return null;
+        return {
+          id: o.id,
+          orderNumber: o.orderNumber,
+          total: o.total,
+          status: o.status,
+          weight: o.totalWeight,
+          date: o.createdAt,
+          city: s?.city || "—",
+          postalCode: s?.postalCode || "",
+          customer:
+            s?.companyName ||
+            `${s?.firstName || ""} ${s?.lastName || ""}`.trim(),
+          lat: coords[0],
+          lng: coords[1],
+        };
+      })
+      .filter(Boolean);
+
+    return { success: true, data: { points, total: points.length } };
   });
 }
