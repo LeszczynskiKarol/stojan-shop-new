@@ -79,18 +79,18 @@ jobs:
             pm2 list
             pm2 logs stojan-backend --lines 5 --nostream
       - name: Notify Google Indexing
-              if: success()
-              run: |
-                aws lambda invoke --function-name google-indexing-notifier \
-                  --payload '{"siteUrl":"https://www.silniki-elektryczne.com.pl","sitemapPath":"/sitemap_index.xml"}' \
-                  --cli-binary-format raw-in-base64-out \
-                  --invocation-type Event \
-                  --region eu-central-1 /tmp/indexing.json
-                cat /tmp/indexing.json
-              env:
-                AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-                AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                AWS_DEFAULT_REGION: eu-central-1
+        if: success()
+        run: |
+          aws lambda invoke --function-name google-indexing-notifier \
+            --payload '{"siteUrl":"https://www.silniki-elektryczne.com.pl","sitemapPath":"/sitemap_index.xml"}' \
+            --cli-binary-format raw-in-base64-out \
+            --invocation-type Event \
+            --region eu-central-1 /tmp/indexing.json
+          cat /tmp/indexing.json
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: eu-central-1
       - name: Close SSH
         if: always()
         run: |
