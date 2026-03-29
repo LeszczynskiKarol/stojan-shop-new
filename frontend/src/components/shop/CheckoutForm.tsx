@@ -1,8 +1,10 @@
 // frontend/src/components/shop/CheckoutForm.tsx
 // Formularz zamówienia - React island for Astro
+// v2 — FIX: tracker.saveCheckoutContext() before Stripe redirect, use tracker.getVisitorId()
 // Czyta produkty z cart (stojan_cart), wysyła do /api/orders
 import { useState, useEffect, useCallback } from "react";
 import { cart, type CartItem } from "@/lib/cart";
+import { tracker } from "@/lib/tracker";
 import { PostalCodeCityField } from "./PostalCodeCityField";
 import { NipLookupField } from "./NipLookupField";
 
@@ -286,6 +288,13 @@ export function CheckoutForm() {
       paymentMethod === "cod" ? shippingCosts.cod : shippingCosts.prepaid;
     const total = subtotal + shippingCost;
 
+    // ── FIX v2: Use tracker.getVisitorId() instead of raw localStorage ──
+    // This ensures we get the same visitorId that's backed up in sessionStorage
+    const visitorId = tracker.getVisitorId();
+    console.log(
+      `[CHECKOUT] Submitting order. paymentMethod=${paymentMethod}, visitorId=${visitorId.substring(0, 8)}..., total=${total}`,
+    );
+
     try {
       const res = await fetch(`${API_URL}/api/orders`, {
         method: "POST",
@@ -323,7 +332,7 @@ export function CheckoutForm() {
           totalWeight,
           paymentMethod,
           returnUrl: window.location.href,
-          visitorId: localStorage.getItem("stojan_vid") || undefined,
+          visitorId, // ← teraz z tracker.getVisitorId()
         }),
       });
 
@@ -332,11 +341,22 @@ export function CheckoutForm() {
         throw new Error(result.error || "Błąd tworzenia zamówienia");
 
       if (paymentMethod === "prepaid" && result.data.checkoutUrl) {
+        // ── FIX v2: Save checkout context BEFORE Stripe redirect ──
+        // This ensures visitorId survives the redirect and backend can
+        // match the post-payment session to the original session.
+        tracker.saveCheckoutContext();
+        console.log(
+          `[CHECKOUT] Stripe redirect. Order: ${result.data.order.orderNumber}, checkoutUrl ready. Context saved.`,
+        );
+
         // ✅ NIE czyścimy koszyka — zostanie wyczyszczony na stronie sukcesu
         // Dane formularza też zostawiamy w sessionStorage na wypadek cancel
         window.location.href = result.data.checkoutUrl;
       } else {
         // COD — czyścimy koszyk i dane formularza od razu
+        console.log(
+          `[CHECKOUT] COD order complete. Order: ${result.data.order.orderNumber}, redirecting to success.`,
+        );
         cart.clear();
         clearFormData();
         window.location.href = `/checkout/sukces?order_id=${result.data.order.id}`;

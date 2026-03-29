@@ -112,6 +112,8 @@ interface AnalyticsData {
   hourlyDistribution: HourlyPoint[];
   browsers: BrowserItem[];
   operatingSystems: BrowserItem[];
+  firstTouchAttribution: FirstTouchPair[];
+  firstTouchSummary: FirstTouchSource[];
 }
 
 interface SessionItem {
@@ -250,6 +252,7 @@ const SOURCE_COLORS: Record<string, string> = {
   google_organic: "#34A853",
   google_ads: "#FBBC05",
   direct: "#6366f1",
+  stripe_return: "#9ca3af",
   referral: "#ec4899",
   facebook: "#1877F2",
   instagram: "#E4405F",
@@ -1066,6 +1069,197 @@ function OverviewTab({ data }: { data: AnalyticsData }) {
   );
 }
 
+// ══════════════════════════════════════════════════════════════
+// FRONTEND PATCH — AnalyticsDashboard.tsx
+// ══════════════════════════════════════════════════════════════
+
+// ──── ZMIANA 1: Dodaj do SOURCE_COLORS (szukaj "const SOURCE_COLORS") ────
+//   stripe_return: "#9ca3af",
+
+// ──── ZMIANA 2: Dodaj typy (szukaj "interface AnalyticsData", dodaj pola) ────
+// Dodaj te interfejsy PRZED interface AnalyticsData:
+
+interface FirstTouchPair {
+  firstSource: string;
+  lastSource: string;
+  orders: number;
+  revenue: number;
+  match: boolean;
+}
+
+interface FirstTouchSource {
+  source: string;
+  label: string;
+  orders: number;
+  revenue: number;
+  lastTouchOrders: number;
+  lastTouchRevenue: number;
+  uplift: number;
+}
+
+// Dodaj te pola wewnątrz interface AnalyticsData (po operatingSystems):
+//   firstTouchAttribution: FirstTouchPair[];
+//   firstTouchSummary: FirstTouchSource[];
+
+// ──── ZMIANA 3: Zaktualizuj SourcesTab ────
+// Zmień sygnaturę SourcesTab na:
+//   function SourcesTab({ data }: { data: AnalyticsData })
+// (to jest już takie — OK)
+//
+// Na KOŃCU SourcesTab, PRZED zamykającym </div>,
+// dodaj:
+//   {data.firstTouchSummary?.length > 0 && (
+//     <FirstTouchSection data={data} />
+//   )}
+
+// ──── ZMIANA 4: Dodaj komponent FirstTouchSection ────
+// Wklej PRZED lub PO SourcesTab:
+
+function FirstTouchSection({ data }: { data: AnalyticsData }) {
+  const ft = data.firstTouchSummary || [];
+  const pairs = data.firstTouchAttribution || [];
+
+  if (ft.length === 0) return null;
+
+  return (
+    <>
+      {/* First-touch vs Last-touch comparison */}
+      <div className="border border-[hsl(var(--border))] rounded-lg overflow-hidden bg-[hsl(var(--card))]">
+        <div className="px-4 py-3 border-b border-[hsl(var(--border))] bg-[hsl(var(--accent))]/30">
+          <h3 className="font-semibold text-sm text-[hsl(var(--foreground))]">
+            🎯 First-touch vs Last-touch — atrybucja zamówień
+          </h3>
+          <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+            First-touch = skąd klient NAPRAWDĘ przyszedł (pierwsza wizyta).
+            Last-touch = sesja w której kupił.
+          </p>
+        </div>
+        <table className="w-full text-sm">
+          <thead className="bg-[hsl(var(--accent))]">
+            <tr>
+              <th className="px-4 py-2 text-left">Źródło</th>
+              <th className="px-4 py-2 text-right">First-touch zam.</th>
+              <th className="px-4 py-2 text-right">First-touch przychód</th>
+              <th className="px-4 py-2 text-right">Last-touch zam.</th>
+              <th className="px-4 py-2 text-right">Last-touch przychód</th>
+              <th className="px-4 py-2 text-right">Zmiana</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ft.map((s) => (
+              <tr
+                key={s.source}
+                className="border-t border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]/20"
+              >
+                <td className="px-4 py-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ background: SOURCE_COLORS[s.source] || "#888" }}
+                    />
+                    <span className="font-medium">{s.label}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-2 text-right font-bold">{s.orders}</td>
+                <td className="px-4 py-2 text-right">{fmtPln(s.revenue)}</td>
+                <td className="px-4 py-2 text-right text-[hsl(var(--muted-foreground))]">
+                  {s.lastTouchOrders}
+                </td>
+                <td className="px-4 py-2 text-right text-[hsl(var(--muted-foreground))]">
+                  {fmtPln(s.lastTouchRevenue)}
+                </td>
+                <td className="px-4 py-2 text-right">
+                  {s.uplift !== 0 ? (
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                        s.uplift > 0
+                          ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                          : "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                      }`}
+                    >
+                      {s.uplift > 0 ? "+" : ""}
+                      {s.uplift.toFixed(0)}%
+                    </span>
+                  ) : (
+                    <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                      —
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Attribution paths */}
+      {pairs.filter((p) => !p.match).length > 0 && (
+        <div className="border border-[hsl(var(--border))] rounded-lg p-4 bg-[hsl(var(--card))]">
+          <h3 className="font-semibold text-sm mb-3 text-[hsl(var(--foreground))]">
+            🔀 Ścieżki konwersji (first → last różne)
+          </h3>
+          <div className="space-y-2">
+            {pairs
+              .filter((p) => !p.match)
+              .map((p, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between py-2 border-b border-[hsl(var(--border))]/50 last:border-0"
+                >
+                  <div className="flex items-center gap-2 text-sm">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={{
+                        background: SOURCE_COLORS[p.firstSource] || "#888",
+                      }}
+                    />
+                    <span className="font-medium">
+                      {SOURCE_LABELS[p.firstSource] || p.firstSource}
+                    </span>
+                    <span className="text-[hsl(var(--muted-foreground))]">
+                      →
+                    </span>
+                    <span
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={{
+                        background: SOURCE_COLORS[p.lastSource] || "#888",
+                      }}
+                    />
+                    <span>{SOURCE_LABELS[p.lastSource] || p.lastSource}</span>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="font-bold">{p.orders} zam.</span>
+                    <span className="text-[hsl(var(--muted-foreground))]">
+                      {fmtPln(p.revenue)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ──── DODAJ do SOURCE_LABELS (użyty w FirstTouchSection) ────
+// Upewnij się że SOURCE_LABELS jest dostępny w scope komponentu.
+// Jeśli nie — wyciągnij go wyżej lub zdefiniuj jako const:
+
+const SOURCE_LABELS: Record<string, string> = {
+  google_shopping: "Google Shopping",
+  google_organic: "Google Organic",
+  google_ads: "Google Ads",
+  direct: "Bezpośredni",
+  stripe_return: "⚠️ Stripe (nieznane)",
+  referral: "Referral",
+  facebook: "Facebook",
+  instagram: "Instagram",
+  allegro: "Allegro",
+  olx: "OLX",
+  bing: "Bing",
+};
+
 // ============================================
 // SOURCES TAB
 // ============================================
@@ -1240,6 +1434,7 @@ function SourcesTab({ data }: { data: AnalyticsData }) {
             ))}
         </div>
       </div>
+      {data.firstTouchSummary?.length > 0 && <FirstTouchSection data={data} />}
     </div>
   );
 }

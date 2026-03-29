@@ -117,8 +117,12 @@ export async function webhookRoutes(app: FastifyInstance) {
           app.log.info(`✅ Order ${order.orderNumber} opłacony (Stripe)`);
 
           // ▶ Server-side analytics tracking
+          const webhookVisitorId = session.metadata?.visitorId;
+          app.log.info(
+            `🔍 [WEBHOOK] Analytics tracking: orderId=${order.id}, visitorId=${webhookVisitorId ? webhookVisitorId.substring(0, 8) + "..." : "MISSING"}, orderNumber=${order.orderNumber}`,
+          );
           trackOrderServerSide({
-            visitorId: session.metadata?.visitorId,
+            visitorId: webhookVisitorId,
             orderId: order.id,
             orderValue: Number(updatedOrder.total),
           });

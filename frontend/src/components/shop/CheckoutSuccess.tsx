@@ -1,4 +1,5 @@
 // frontend/src/components/shop/CheckoutSuccess.tsx
+// v2 — FIX: dedup order tracking, diagnostic logs
 import { useEffect, useState } from "react";
 import { tracker } from "@/lib/tracker";
 import { cart } from "@/lib/cart";
@@ -39,7 +40,7 @@ export function CheckoutSuccess() {
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Wyczyść koszyk i dane formularza na stronie sukcesu
+  // ✅ Clear cart and form data on success page
   useEffect(() => {
     cart.clear();
     try {
@@ -47,39 +48,68 @@ export function CheckoutSuccess() {
     } catch {}
   }, []);
 
+  // ── TRACK ORDER when loaded ──
   useEffect(() => {
     if (!order) return;
 
-    // Internal analytics
+    console.log(
+      "[CHECKOUT-SUCCESS] Order loaded:",
+      order.id,
+      order.orderNumber,
+      "total:",
+      order.total,
+    );
+
+    // ── Internal analytics (with dedup) ──
     tracker.orderComplete({
       orderId: order.id,
       orderValue: Number(order.total),
       itemCount: order.items.length,
     });
 
-    // GA4 purchase event
-    if (window.gtag) {
-      window.gtag("event", "purchase", {
-        transaction_id: order.id,
-        value: Number(order.total),
-        currency: "PLN",
-        items: order.items.map((item, i) => ({
-          item_id: String(i),
-          item_name: item.name,
-          price: Number(item.price),
-          quantity: item.quantity,
-          index: i,
-        })),
-      });
+    // ── GA4 purchase event (with dedup via sessionStorage) ──
+    const ga4Key = `stojan_ga4_purchase_${order.id}`;
+    try {
+      if (sessionStorage.getItem(ga4Key)) {
+        console.log(
+          "[CHECKOUT-SUCCESS] GA4 purchase already sent for:",
+          order.id,
+        );
+      } else if (window.gtag) {
+        window.gtag("event", "purchase", {
+          transaction_id: order.id,
+          value: Number(order.total),
+          currency: "PLN",
+          items: order.items.map((item, i) => ({
+            item_id: String(i),
+            item_name: item.name,
+            price: Number(item.price),
+            quantity: item.quantity,
+            index: i,
+          })),
+        });
+        sessionStorage.setItem(ga4Key, "1");
+        console.log("[CHECKOUT-SUCCESS] GA4 purchase event sent:", order.id);
+      }
+    } catch (e) {
+      console.warn("[CHECKOUT-SUCCESS] GA4 tracking error:", e);
     }
   }, [order]);
 
+  // ── FETCH ORDER ──
   useEffect(() => {
     const fetchOrder = async () => {
       try {
         const params = new URLSearchParams(window.location.search);
         const orderId = params.get("order_id");
         const sessionId = params.get("session_id");
+
+        console.log(
+          "[CHECKOUT-SUCCESS] Fetching order. order_id:",
+          orderId,
+          "session_id:",
+          sessionId,
+        );
 
         let resolvedId = orderId;
 
@@ -90,6 +120,11 @@ export function CheckoutSuccess() {
           );
           const data = await res.json();
           if (data.success && data.data) {
+            console.log(
+              "[CHECKOUT-SUCCESS] Resolved from Stripe session:",
+              data.data.id,
+              data.data.orderNumber,
+            );
             setOrder(data.data);
             setLoading(false);
             return;
@@ -97,6 +132,9 @@ export function CheckoutSuccess() {
         }
 
         if (!resolvedId) {
+          console.log(
+            "[CHECKOUT-SUCCESS] No order_id or session_id — cannot fetch order",
+          );
           setLoading(false);
           return;
         }
@@ -105,10 +143,14 @@ export function CheckoutSuccess() {
         const data = await res.json();
 
         if (data.success || data.data) {
+          console.log(
+            "[CHECKOUT-SUCCESS] Order fetched:",
+            (data.data || data).id,
+          );
           setOrder(data.data || data);
         }
       } catch (err) {
-        console.error("Błąd pobierania zamówienia:", err);
+        console.error("[CHECKOUT-SUCCESS] Error fetching order:", err);
       } finally {
         setLoading(false);
       }

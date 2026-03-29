@@ -32,6 +32,7 @@ const SOURCE_LABELS: Record<string, string> = {
   google_organic: "Google Organic",
   google_ads: "Google Ads",
   direct: "Bezpośredni",
+  stripe_return: "⚠️ Stripe (nieznane źródło)",
   referral: "Referral",
   facebook: "Facebook",
   instagram: "Instagram",
@@ -542,6 +543,123 @@ export async function adminAnalyticsRoutes(app: FastifyInstance) {
       where: { lastSeenAt: { gte: realTimeCutoff } },
     });
 
+    // ═══════════════════════════════════════════════════
+    // 11. FIRST-TOUCH ATTRIBUTION
+    // ═══════════════════════════════════════════════════
+    const orderingVisitorIds = [
+      ...new Set(sessions.filter((s) => s.hasOrdered).map((s) => s.visitorId)),
+    ];
+
+    let firstTouchAttribution: Array<{
+      firstSource: string;
+      lastSource: string;
+      orders: number;
+      revenue: number;
+      match: boolean;
+    }> = [];
+
+    let firstTouchSummary: Array<{
+      source: string;
+      label: string;
+      orders: number;
+      revenue: number;
+      lastTouchOrders: number;
+      lastTouchRevenue: number;
+      uplift: number;
+    }> = [];
+
+    if (orderingVisitorIds.length > 0) {
+      const firstSessions = await prisma.$queryRaw<
+        Array<{ visitor_id: string; source: string; medium: string }>
+      >`
+        SELECT DISTINCT ON (visitor_id) visitor_id, source, medium
+        FROM analytics_sessions
+        WHERE visitor_id = ANY(${orderingVisitorIds})
+        ORDER BY visitor_id, started_at ASC
+      `;
+
+      const firstTouchMap = new Map<
+        string,
+        { source: string; medium: string }
+      >();
+      for (const fs of firstSessions) {
+        firstTouchMap.set(fs.visitor_id, {
+          source: fs.source,
+          medium: fs.medium,
+        });
+      }
+
+      const pairMap = new Map<string, { orders: number; revenue: number }>();
+      const ftSourceMap = new Map<
+        string,
+        { orders: number; revenue: number }
+      >();
+      const ltSourceMap = new Map<
+        string,
+        { orders: number; revenue: number }
+      >();
+
+      for (const s of sessions.filter((s) => s.hasOrdered)) {
+        const ft = firstTouchMap.get(s.visitorId);
+        const firstSource = ft?.source || s.source;
+        const rev = Number(s.orderValue || 0);
+
+        const pairKey = `${firstSource}|${s.source}`;
+        const pair = pairMap.get(pairKey) || { orders: 0, revenue: 0 };
+        pair.orders++;
+        pair.revenue += rev;
+        pairMap.set(pairKey, pair);
+
+        const ftCur = ftSourceMap.get(firstSource) || { orders: 0, revenue: 0 };
+        ftCur.orders++;
+        ftCur.revenue += rev;
+        ftSourceMap.set(firstSource, ftCur);
+
+        const ltCur = ltSourceMap.get(s.source) || { orders: 0, revenue: 0 };
+        ltCur.orders++;
+        ltCur.revenue += rev;
+        ltSourceMap.set(s.source, ltCur);
+      }
+
+      firstTouchAttribution = Array.from(pairMap.entries())
+        .map(([key, d]) => {
+          const [firstSource, lastSource] = key.split("|");
+          return {
+            firstSource,
+            lastSource,
+            orders: d.orders,
+            revenue: round2(d.revenue),
+            match: firstSource === lastSource,
+          };
+        })
+        .sort((a, b) => b.orders - a.orders);
+
+      const allSources = new Set([
+        ...ftSourceMap.keys(),
+        ...ltSourceMap.keys(),
+      ]);
+      firstTouchSummary = Array.from(allSources)
+        .map((source) => {
+          const ft = ftSourceMap.get(source) || { orders: 0, revenue: 0 };
+          const lt = ltSourceMap.get(source) || { orders: 0, revenue: 0 };
+          return {
+            source,
+            label: SOURCE_LABELS[source] || source,
+            orders: ft.orders,
+            revenue: round2(ft.revenue),
+            lastTouchOrders: lt.orders,
+            lastTouchRevenue: round2(lt.revenue),
+            uplift:
+              lt.orders > 0
+                ? round2(((ft.orders - lt.orders) / lt.orders) * 100)
+                : ft.orders > 0
+                  ? 100
+                  : 0,
+          };
+        })
+        .sort((a, b) => b.orders - a.orders);
+    }
+
     // ═══════════════════════════════════════════
     // RESPONSE
     // ═══════════════════════════════════════════
@@ -578,6 +696,8 @@ export async function adminAnalyticsRoutes(app: FastifyInstance) {
         hourlyDistribution,
         browsers,
         operatingSystems,
+        firstTouchAttribution,
+        firstTouchSummary,
       },
     };
   });

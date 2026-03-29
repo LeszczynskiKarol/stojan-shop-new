@@ -49,8 +49,8 @@ jobs:
             git reset --hard origin/main
 
             echo "=== Install all dependencies ==="
-            rm -rf node_modules backend/node_modules frontend/node_modules
-            npm ci
+            rm -rf node_modules backend/node_modules frontend/node_modules package-lock.json
+            npm install
 
             echo "=== Backend build ==="
             cd /home/ec2-user/stojan-shop-new/backend

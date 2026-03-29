@@ -1,5 +1,6 @@
 // backend/src/routes/analytics.ts
 // Public analytics tracking endpoints
+// v2 — FIX: srsltid blog misclassification, global order_complete dedup, diagnostic logs
 // Register: app.register(analyticsRoutes, { prefix: '/api/analytics' })
 
 import { FastifyInstance, FastifyRequest } from "fastify";
@@ -39,17 +40,35 @@ function detectSource(params: {
   // 3. srsltid — Google Surface Results tracking
   //    Product pages = Google Shopping / Merchant Center
   //    Other pages = Google Organic with rich results
+  //    FIX v2: exclude /blog/, /admin/, /checkout/, /kontakt, /skup-silnikow etc.
   if (params.srsltid) {
-    const isProductPage = /^\/[^/]+\/[^/]+$/.test(
-      new URL(params.landingPage, "https://x.com").pathname,
-    );
+    let pathname = "/";
+    try {
+      pathname = new URL(params.landingPage, "https://x.com").pathname;
+    } catch {}
+
+    const isProductPage =
+      /^\/[^/]+\/[^/]+$/.test(pathname) &&
+      !pathname.startsWith("/blog/") &&
+      !pathname.startsWith("/admin/") &&
+      !pathname.startsWith("/checkout/") &&
+      !pathname.startsWith("/zamowienie/") &&
+      !pathname.startsWith("/kontakt") &&
+      !pathname.startsWith("/skup-silnikow");
+
     if (isProductPage) {
+      console.log(
+        `[ANALYTICS] srsltid detected → Shopping (product page: ${pathname})`,
+      );
       return {
         source: "google_shopping",
         medium: "shopping",
         campaign: "merchant_pmax",
       };
     }
+    console.log(
+      `[ANALYTICS] srsltid detected → Organic (non-product page: ${pathname})`,
+    );
     return { source: "google_organic", medium: "organic", campaign: null };
   }
 
@@ -136,7 +155,6 @@ async function isAdmin(request: FastifyRequest): Promise<boolean> {
 
 /** Detect bots by user-agent */
 function isBotUA(ua: string): boolean {
-  // Layer 1: Known bot patterns (UA strings)
   if (
     /bot|crawl|spider|slurp|bingbot|googlebot|yandex|baidu|duckduck|facebookexternalhit|semrush|ahrefs|mj12bot|dotbot|petalbot|bytespider|gptbot|claudebot|anthropic|applebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|pingdom|uptimerobot|headlesschrome|phantomjs|puppeteer|selenium|webdriver|wget|curl|httpie|python-requests|go-http|java\/|libwww|scrapy|httpclient|okhttp|axios\/|node-fetch/i.test(
       ua,
@@ -145,23 +163,20 @@ function isBotUA(ua: string): boolean {
     return true;
   }
 
-  // Layer 2: Stale Chrome version (pre-2024) — real users auto-update
   const chromeMatch = ua.match(/Chrome\/(\d+)/);
   if (chromeMatch) {
     const ver = parseInt(chromeMatch[1], 10);
     if (ver > 0 && ver < 120) return true;
   }
 
-  // Layer 3: Empty or minimal UA
   if (!ua || ua.length < 20) return true;
 
-  // Layer 4: "compatible;" pattern without MSIE = old bot convention
   if (/compatible;/i.test(ua) && !/msie|trident/i.test(ua)) return true;
 
   return false;
 }
 
-/** Score bot likelihood 0-100 — usable for soft filtering / flagging */
+/** Score bot likelihood 0-100 */
 function botScore(
   ua: string,
   meta?: { botSignals?: string[]; screenWidth?: number; screenHeight?: number },
@@ -180,7 +195,6 @@ function botScore(
 export async function analyticsRoutes(app: FastifyInstance) {
   // ------------------------------------------
   // POST /api/analytics/event — track any event
-  // Body: { visitorId, type, page, data?, sessionMeta? }
   // ------------------------------------------
   app.post<{
     Body: {
@@ -210,7 +224,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
       const ua = request.headers["user-agent"] || "";
       const { visitorId, type, page, data, sessionMeta } = request.body;
 
-      // Exclude bots (multi-layer detection)
+      // Exclude bots
       const bScore = botScore(ua, sessionMeta);
       if (bScore >= 50) {
         return { success: true, tracked: false, reason: "bot", score: bScore };
@@ -223,9 +237,28 @@ export async function analyticsRoutes(app: FastifyInstance) {
       }
 
       const { deviceType, browser, os } = parseDevice(ua);
-
-      // Clean HTML-encoded ampersands from page URL
       const cleanPage = page.replace(/&amp;/g, "&");
+
+      // ── GLOBAL DEDUP: order_complete by orderId ──
+      if (type === "order_complete" && data?.orderId) {
+        const existingOrderEvent = await prisma.analyticsEvent.findFirst({
+          where: {
+            type: "order_complete",
+            data: { path: ["orderId"], equals: data.orderId },
+          },
+        });
+        if (existingOrderEvent) {
+          console.log(
+            `[ANALYTICS] ⚡ DEDUP: order_complete for orderId=${data.orderId} already exists (eventId=${existingOrderEvent.id}), skipping`,
+          );
+          return {
+            success: true,
+            tracked: false,
+            reason: "dedup_order",
+            existingEventId: existingOrderEvent.id,
+          };
+        }
+      }
 
       // Find or create session
       const now = new Date();
@@ -240,7 +273,11 @@ export async function analyticsRoutes(app: FastifyInstance) {
       });
 
       if (!session) {
-        // New session — extract params from URL as fallback
+        // ── NEW SESSION ──
+        // If no sessionMeta provided (e.g. payment return page), this will be "direct"
+        // That's expected — but we log it for diagnostics
+        const hasSessionMeta = !!sessionMeta;
+
         let gclid = sessionMeta?.gclid;
         let srsltid = sessionMeta?.srsltid;
         let utm_source = sessionMeta?.utm_source;
@@ -275,6 +312,20 @@ export async function analyticsRoutes(app: FastifyInstance) {
           landingPage: cleanPage,
         });
 
+        console.log(
+          `[ANALYTICS] 🆕 NEW SESSION: vid=${visitorId.substring(0, 8)}..., source=${sourceInfo.source}, medium=${sourceInfo.medium}, landing=${cleanPage.substring(0, 80)}, hasSessionMeta=${hasSessionMeta}, type=${type}`,
+        );
+
+        // ── DIAGNOSTIC WARNING: new session on success page ──
+        if (
+          cleanPage.includes("/checkout/sukces") ||
+          cleanPage.includes("/zamowienie/sukces")
+        ) {
+          console.warn(
+            `[ANALYTICS] ⚠️ NEW SESSION on success page! vid=${visitorId.substring(0, 8)}..., source=${sourceInfo.source} — this should have matched existing session. Possible visitorId mismatch (Safari ITP?) or session timeout.`,
+          );
+        }
+
         session = await prisma.analyticsSession.create({
           data: {
             visitorId,
@@ -299,11 +350,15 @@ export async function analyticsRoutes(app: FastifyInstance) {
           },
         });
       } else {
-        // Update existing session
+        // ── EXISTING SESSION FOUND ──
         const duration = Math.floor(
           (now.getTime() - session.startedAt.getTime()) / 1000,
         );
         const pageIncrement = type === "page_view" ? 1 : 0;
+
+        console.log(
+          `[ANALYTICS] ♻️ EXISTING SESSION: vid=${visitorId.substring(0, 8)}..., sessionId=${session.id.substring(0, 8)}..., source=${session.source}, duration=${duration}s, pages=${session.pageCount}+${pageIncrement}, type=${type}`,
+        );
 
         await prisma.analyticsSession.update({
           where: { id: session.id },
@@ -335,6 +390,9 @@ export async function analyticsRoutes(app: FastifyInstance) {
         conversionUpdate.hasOrdered = true;
         conversionUpdate.orderId = data?.orderId || null;
         conversionUpdate.orderValue = data?.orderValue || null;
+        console.log(
+          `[ANALYTICS] 🎯 ORDER COMPLETE tracked: orderId=${data?.orderId}, value=${data?.orderValue}, sessionId=${session.id.substring(0, 8)}..., source=${session.source}`,
+        );
       }
 
       if (Object.keys(conversionUpdate).length > 0) {
@@ -347,7 +405,6 @@ export async function analyticsRoutes(app: FastifyInstance) {
       return { success: true, tracked: true, sessionId: session.id };
     } catch (err: any) {
       app.log.error(`Analytics tracking error: ${err.message}`);
-      // Analytics should never break the UX — always return 200
       return { success: true, tracked: false, error: "internal" };
     }
   });
