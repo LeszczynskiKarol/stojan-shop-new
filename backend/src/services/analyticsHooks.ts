@@ -1,5 +1,6 @@
 // backend/src/services/analyticsHooks.ts
-// v2 — FIX: global dedup by orderId across ALL sessions, better logging
+// v3 — FIX: create fallback session when visitor has NO sessions at all
+// This handles adblockers, JS-disabled browsers, and bot-scored visitors
 import { prisma } from "../lib/prisma.js";
 
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
@@ -29,7 +30,10 @@ export async function trackOrderServerSide(params: {
     }
 
     if (!params.visitorId) {
-      console.log("🔍 [ANALYTICS-HOOK] No visitorId — skipping");
+      console.log(
+        `🔍 [ANALYTICS-HOOK] No visitorId — creating orphan session for orderId=${params.orderId}`,
+      );
+      await createFallbackSession(params);
       return;
     }
 
@@ -38,7 +42,8 @@ export async function trackOrderServerSide(params: {
       `🔍 [ANALYTICS-HOOK] Looking for session, vid=${params.visitorId.substring(0, 8)}..., cutoff=${cutoff.toISOString()}`,
     );
 
-    const session = await prisma.analyticsSession.findFirst({
+    // ── TRY 1: Recent session (last 30min) ──
+    let session = await prisma.analyticsSession.findFirst({
       where: {
         visitorId: params.visitorId,
         lastSeenAt: { gte: cutoff },
@@ -46,76 +51,127 @@ export async function trackOrderServerSide(params: {
       orderBy: { lastSeenAt: "desc" },
     });
 
-    if (!session) {
+    if (session) {
       console.log(
-        `🔍 [ANALYTICS-HOOK] ⚠️ No session found for vid=${params.visitorId.substring(0, 8)}... in last 30min. Looking for ANY recent session...`,
+        `🔍 [ANALYTICS-HOOK] Found session: ${session.id.substring(0, 8)}..., source=${session.source}, hasOrdered=${session.hasOrdered}`,
       );
-
-      // Fallback: find ANY session for this visitor (not just last 30min)
-      // This handles cases where user took longer than 30min on Stripe
-      const fallbackSession = await prisma.analyticsSession.findFirst({
-        where: {
-          visitorId: params.visitorId,
-          hasOrdered: false,
-        },
-        orderBy: { lastSeenAt: "desc" },
-      });
-
-      if (fallbackSession) {
-        console.log(
-          `🔍 [ANALYTICS-HOOK] Found fallback session: ${fallbackSession.id.substring(0, 8)}..., source=${fallbackSession.source}, started=${fallbackSession.startedAt.toISOString()}`,
-        );
-        await prisma.analyticsSession.update({
-          where: { id: fallbackSession.id },
-          data: {
-            hasOrdered: true,
-            orderId: params.orderId,
-            orderValue: params.orderValue,
-            lastSeenAt: new Date(),
-            isBounce: false,
-          },
-        });
-        console.log("🔍 [ANALYTICS-HOOK] Fallback session updated ✅");
-
-        // Create event on fallback session
-        await createOrderEventIfMissing(
-          fallbackSession.id,
-          params.orderId,
-          params.orderValue,
-        );
-        return;
-      }
-
-      console.log(
-        "🔍 [ANALYTICS-HOOK] ❌ No session found at all for this visitor. Order will only be tracked if frontend fires.",
-      );
+      await assignOrderToSession(session.id, params);
       return;
     }
 
+    // ── TRY 2: ANY session for this visitor (no time limit) ──
     console.log(
-      `🔍 [ANALYTICS-HOOK] Found session: ${session.id.substring(0, 8)}..., source=${session.source}, hasOrdered=${session.hasOrdered}`,
+      `🔍 [ANALYTICS-HOOK] ⚠️ No session in last 30min for vid=${params.visitorId.substring(0, 8)}... Looking for ANY session...`,
     );
 
-    await prisma.analyticsSession.update({
-      where: { id: session.id },
-      data: {
-        hasOrdered: true,
-        orderId: params.orderId,
-        orderValue: params.orderValue,
-        lastSeenAt: new Date(),
-        isBounce: false,
+    session = await prisma.analyticsSession.findFirst({
+      where: {
+        visitorId: params.visitorId,
+        hasOrdered: false,
       },
+      orderBy: { lastSeenAt: "desc" },
     });
-    console.log("🔍 [ANALYTICS-HOOK] Session updated ✅");
 
-    await createOrderEventIfMissing(
-      session.id,
-      params.orderId,
-      params.orderValue,
+    if (session) {
+      console.log(
+        `🔍 [ANALYTICS-HOOK] Found fallback session: ${session.id.substring(0, 8)}..., source=${session.source}, started=${session.startedAt.toISOString()}`,
+      );
+      await assignOrderToSession(session.id, params);
+      return;
+    }
+
+    // ── TRY 3: No session at all — CREATE one ──
+    console.log(
+      `🔍 [ANALYTICS-HOOK] ❌ No session found at all for vid=${params.visitorId.substring(0, 8)}... Creating fallback session.`,
     );
+    await createFallbackSession(params);
   } catch (err) {
     console.warn("⚠️ Server-side order tracking failed:", err);
   }
+}
+
+/**
+ * Assign order to an existing session.
+ */
+async function assignOrderToSession(
+  sessionId: string,
+  params: { orderId: string; orderValue: number },
+): Promise<void> {
+  await prisma.analyticsSession.update({
+    where: { id: sessionId },
+    data: {
+      hasOrdered: true,
+      orderId: params.orderId,
+      orderValue: params.orderValue,
+      lastSeenAt: new Date(),
+      isBounce: false,
+    },
+  });
+  console.log("🔍 [ANALYTICS-HOOK] Session updated ✅");
+
+  await createOrderEventIfMissing(sessionId, params.orderId, params.orderValue);
+}
+
+/**
+ * Create a fallback session + order event when visitor has NO sessions.
+ * This happens when: adblocker blocks tracker.js, JS disabled,
+ * bot score was too high, or visitor somehow bypassed frontend tracking.
+ *
+ * Source is set to "server_fallback" so dashboard shows these separately
+ * and you can see how many orders your tracker is missing.
+ */
+async function createFallbackSession(params: {
+  visitorId?: string;
+  orderId: string;
+  orderValue: number;
+  userAgent?: string;
+}): Promise<void> {
+  const now = new Date();
+
+  const session = await prisma.analyticsSession.create({
+    data: {
+      visitorId: params.visitorId || `server_${params.orderId.substring(0, 8)}`,
+      source: "server_fallback",
+      medium: "server",
+      campaign: null,
+      referrer: null,
+      landingPage: "/checkout",
+      userAgent: params.userAgent || null,
+      deviceType: "unknown",
+      browser: "unknown",
+      os: "unknown",
+      startedAt: now,
+      lastSeenAt: now,
+      duration: 0,
+      pageCount: 1,
+      isBounce: false,
+      hasViewedProduct: true,
+      hasAddedToCart: true,
+      hasStartedCheckout: true,
+      hasOrdered: true,
+      orderId: params.orderId,
+      orderValue: params.orderValue,
+    },
+  });
+
+  console.log(
+    `🔍 [ANALYTICS-HOOK] 🆕 Fallback session created: ${session.id.substring(0, 8)}..., source=server_fallback, orderId=${params.orderId}, value=${params.orderValue}`,
+  );
+
+  await prisma.analyticsEvent.create({
+    data: {
+      sessionId: session.id,
+      type: "order_complete",
+      page: "/checkout/sukces",
+      data: {
+        orderId: params.orderId,
+        orderValue: params.orderValue,
+        source: "server_fallback",
+      },
+    },
+  });
+
+  console.log(`🔍 [ANALYTICS-HOOK] Fallback event order_complete created ✅`);
 }
 
 /**
@@ -126,7 +182,6 @@ async function createOrderEventIfMissing(
   orderId: string,
   orderValue: number,
 ): Promise<void> {
-  // Check GLOBALLY — not just this session
   const existing = await prisma.analyticsEvent.findFirst({
     where: {
       type: "order_complete",

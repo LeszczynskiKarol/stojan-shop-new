@@ -36,6 +36,7 @@ const SOURCE_LABELS: Record<string, string> = {
   referral: "Referral",
   facebook: "Facebook",
   instagram: "Instagram",
+  server_fallback: "🔧 Server (brak trackera)",
   allegro: "Allegro",
   olx: "OLX",
   bing: "Bing",

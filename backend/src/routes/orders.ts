@@ -299,6 +299,7 @@ export async function orderRoutes(app: FastifyInstance) {
           visitorId: (body as any).visitorId,
           orderId: order.id,
           orderValue: verifiedTotal,
+          userAgent: request.headers["user-agent"] || undefined,
         });
 
         try {

@@ -254,6 +254,7 @@ const SOURCE_COLORS: Record<string, string> = {
   direct: "#6366f1",
   stripe_return: "#9ca3af",
   referral: "#ec4899",
+  server_fallback: "#f59e0b",
   facebook: "#1877F2",
   instagram: "#E4405F",
   allegro: "#FF5A00",
