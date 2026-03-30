@@ -33,13 +33,21 @@ async function generateOrderNumber(): Promise<string> {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-  const count = await prisma.order.count({
+  const lastOrder = await prisma.order.findFirst({
     where: {
-      createdAt: { gte: startOfMonth, lt: endOfMonth },
+      orderNumber: { endsWith: `/${month}/${year}` },
     },
+    orderBy: { orderNumber: "desc" },
+    select: { orderNumber: true },
   });
 
-  const seq = String(count + 1).padStart(3, "0");
+  let seq: string;
+  if (lastOrder?.orderNumber) {
+    const lastSeq = parseInt(lastOrder.orderNumber.split("/")[0], 10);
+    seq = String(lastSeq + 1).padStart(3, "0");
+  } else {
+    seq = "001";
+  }
   return `${seq}/${month}/${year}`;
 }
 
