@@ -1,6 +1,7 @@
 // frontend/src/components/admin/AdminOrders.tsx
 // Port 1:1 ze starego Next.js admin/orders/page.tsx
 // Bez: zustand, shadcn/ui, framer-motion → czysty React + fetch
+import { CourierSelectModal } from "./CourierSelectModal";
 import { useEffect, useState, useCallback } from "react";
 import { OrderDetailsDialog } from "./OrderDetailsDialog";
 import { CancelOrderModal } from "./CancelOrderModal";
@@ -91,6 +92,11 @@ const fmt = (v: number) =>
 // Component
 // ============================================
 export function AdminOrders() {
+  const [wnModal, setWnModal] = useState<{
+    order: Order;
+    offers: any[];
+  } | null>(null);
+  const [wnLoading, setWnLoading] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
@@ -470,7 +476,9 @@ export function AdminOrders() {
         >
           {hideCancelled ? "Pokaż anulowane" : "Ukryj anulowane"}
         </button>
-
+        {/* FedEx Pickup */}
+        <FedExPickupButton />
+        <DHLPickupButton />
         {/* Bulk actions */}
         {markedOrders.length > 0 && (
           <>
@@ -810,17 +818,62 @@ export function AdminOrders() {
 
                   {/* Status */}
                   <td className="px-3 py-2">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        order.paymentMethod === "cod" && order.status === "paid"
-                          ? "bg-red-100 text-red-700"
-                          : statusColors[order.status]
-                      }`}
-                    >
-                      {order.paymentMethod === "cod" && order.status === "paid"
-                        ? "Pobranie"
-                        : statusLabels[order.status]}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          order.paymentMethod === "cod" &&
+                          order.status === "paid"
+                            ? "bg-red-100 text-red-700"
+                            : statusColors[order.status]
+                        }`}
+                      >
+                        {order.paymentMethod === "cod" &&
+                        order.status === "paid"
+                          ? "Pobranie"
+                          : statusLabels[order.status]}
+                      </span>
+                      {(order.paymentDetails as any)?.fedex?.trackingNumber && (
+                        <a
+                          href={`https://www.fedex.com/fedextrack/?trknbr=${(order.paymentDetails as any).fedex.trackingNumber}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-blue-400 hover:text-blue-300 hover:underline"
+                          title="Śledź przesyłkę FedEx"
+                        >
+                          📦{" "}
+                          {(order.paymentDetails as any).fedex.trackingNumber}
+                        </a>
+                      )}
+                      {(order.paymentDetails as any)?.dhl?.trackingNumber && (
+                        <a
+                          href={`https://www.dhl.com/pl-pl/home/sledzenie.html?tracking-id=${(order.paymentDetails as any).dhl.trackingNumber}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-yellow-400 hover:text-yellow-300 hover:underline"
+                        >
+                          📦 DHL{" "}
+                          {(order.paymentDetails as any).dhl.trackingNumber}
+                        </a>
+                      )}
+                      {(order.paymentDetails as any)?.wysylajnami
+                        ?.waybillNumber && (
+                        <a
+                          href={
+                            (order.paymentDetails as any).wysylajnami
+                              .trackingUrl || "#"
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-green-400 hover:text-green-300 hover:underline"
+                        >
+                          🚛 WN{" "}
+                          {
+                            (order.paymentDetails as any).wysylajnami
+                              .waybillNumber
+                          }
+                        </a>
+                      )}
+                    </div>
                   </td>
 
                   {/* Total */}
@@ -829,6 +882,132 @@ export function AdminOrders() {
                   {/* ═══ INVOICES COLUMN (NEW) ═══ */}
                   <td className="px-3 py-2">
                     <div className="flex flex-col gap-1 min-w-[140px]">
+                      {/* FedEx label */}
+                      {/* FedEx label + cancel */}
+                      {(order.paymentDetails as any)?.fedex?.trackingNumber && (
+                        <div className="flex items-center gap-1.5">
+                          {(order.paymentDetails as any)?.fedex?.labelUrl && (
+                            <a
+                              href={
+                                (order.paymentDetails as any).fedex.labelUrl
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-500 hover:text-blue-700 hover:underline"
+                            >
+                              🏷️ Etykieta
+                            </a>
+                          )}
+                          <button
+                            onClick={async () => {
+                              if (
+                                !confirm(
+                                  `Anulować przesyłkę FedEx ${(order.paymentDetails as any).fedex.trackingNumber}?`,
+                                )
+                              )
+                                return;
+                              try {
+                                const res = await fetch(
+                                  `${API}/api/admin/fedex/ship/${order.id}`,
+                                  { method: "DELETE", credentials: "include" },
+                                );
+                                const json = await res.json();
+                                if (json.success) {
+                                  showToast("Przesyłka FedEx anulowana");
+                                  fetchOrders();
+                                } else {
+                                  showToast(
+                                    json.error || "Błąd anulowania",
+                                    "err",
+                                  );
+                                }
+                              } catch {
+                                showToast("Błąd anulowania FedEx", "err");
+                              }
+                            }}
+                            className="text-[10px] text-red-400 hover:text-red-600 hover:underline"
+                          >
+                            ✕ Anuluj FedEx
+                          </button>
+                        </div>
+                      )}
+                      {(order.paymentDetails as any)?.dhl?.trackingNumber && (
+                        <div className="flex items-center gap-1.5">
+                          {(order.paymentDetails as any)?.dhl?.labelUrl && (
+                            <a
+                              href={(order.paymentDetails as any).dhl.labelUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-yellow-500 hover:text-yellow-700 hover:underline"
+                            >
+                              🏷️ Etykieta DHL
+                            </a>
+                          )}
+                          <button
+                            onClick={async () => {
+                              if (!confirm("Anulować przesyłkę DHL?")) return;
+                              try {
+                                const res = await fetch(
+                                  `${API}/api/admin/dhl/ship/${order.id}`,
+                                  { method: "DELETE", credentials: "include" },
+                                );
+                                const json = await res.json();
+                                if (json.success) {
+                                  showToast("Przesyłka DHL anulowana");
+                                  fetchOrders();
+                                } else {
+                                  showToast(json.error || "Błąd", "err");
+                                }
+                              } catch {
+                                showToast("Błąd anulowania DHL", "err");
+                              }
+                            }}
+                            className="text-[10px] text-red-400 hover:text-red-600 hover:underline"
+                          >
+                            ✕ Anuluj DHL
+                          </button>
+                        </div>
+                      )}
+                      {(order.paymentDetails as any)?.wysylajnami?.orderId && (
+                        <div className="flex items-center gap-1.5">
+                          {(order.paymentDetails as any)?.wysylajnami
+                            ?.labelUrl && (
+                            <a
+                              href={
+                                (order.paymentDetails as any).wysylajnami
+                                  .labelUrl
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-green-500 hover:text-green-700 hover:underline"
+                            >
+                              🏷️ Etykieta WN
+                            </a>
+                          )}
+                          <button
+                            onClick={async () => {
+                              if (!confirm("Anulować przesyłkę Wysylajnami?"))
+                                return;
+                              try {
+                                const res = await fetch(
+                                  `${API}/api/admin/wysylajnami/ship/${order.id}`,
+                                  { method: "DELETE", credentials: "include" },
+                                );
+                                const json = await res.json();
+                                if (json.success) {
+                                  showToast("Wysylajnami anulowane");
+                                  fetchOrders();
+                                } else showToast(json.error || "Błąd", "err");
+                              } catch {
+                                showToast("Błąd anulowania WN", "err");
+                              }
+                            }}
+                            className="text-[10px] text-red-400 hover:text-red-600 hover:underline"
+                          >
+                            ✕ Anuluj WN
+                          </button>
+                        </div>
+                      )}
                       {/* Existing invoices */}
                       {(order.invoiceUrls || []).map((url, i) => (
                         <div key={i} className="flex items-center gap-1.5">
@@ -891,14 +1070,193 @@ export function AdminOrders() {
                         Szczegóły
                       </button>
                       {order.status === "paid" && (
-                        <button
-                          onClick={() =>
-                            handleStatusChange(order.id, "shipped")
-                          }
-                          className="px-2 py-1 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] text-xs"
-                        >
-                          Zakończ
-                        </button>
+                        <>
+                          <button
+                            onClick={async () => {
+                              const totalWeight =
+                                Number(order.totalWeight) || 0;
+                              let msg = "Oznaczyć jako wysłane?";
+
+                              if (totalWeight <= 36.5 && totalWeight > 0) {
+                                try {
+                                  const shipping = order.shipping as any;
+                                  const pc = shipping.differentShippingAddress
+                                    ? shipping.shippingPostalCode ||
+                                      shipping.postalCode
+                                    : shipping.postalCode;
+                                  const city = shipping.differentShippingAddress
+                                    ? shipping.shippingCity || shipping.city
+                                    : shipping.city;
+                                  const priceRes = await fetch(
+                                    `${API}/api/admin/fedex/price`,
+                                    {
+                                      method: "POST",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                      },
+                                      credentials: "include",
+                                      body: JSON.stringify({
+                                        weightKg: totalWeight,
+                                        postalCode: pc,
+                                        city,
+                                      }),
+                                    },
+                                  );
+                                  const priceJson = await priceRes.json();
+                                  if (
+                                    priceJson.success &&
+                                    priceJson.data.rates?.length
+                                  ) {
+                                    const rate = priceJson.data.rates[0];
+                                    msg = `Wysłać przez FedEx?\n\nCena: ${rate.totalCharge} ${rate.currency}\nSerwis: ${rate.serviceType}\nWaga: ${totalWeight} kg`;
+                                  }
+                                } catch {}
+                              }
+
+                              if (!confirm(msg)) return;
+                              try {
+                                await fetch(
+                                  `${API}/api/orders/${order.id}/status`,
+                                  {
+                                    method: "PATCH",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({ status: "shipped" }),
+                                  },
+                                );
+                                fetchOrders();
+                                showToast("Status zaktualizowany");
+                              } catch {
+                                showToast("Błąd aktualizacji statusu", "err");
+                              }
+                            }}
+                            className={`px-2 py-1 rounded text-xs ${
+                              Number(order.totalWeight) <= 36.5 &&
+                              Number(order.totalWeight) > 0
+                                ? "bg-blue-600 text-white"
+                                : "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
+                            }`}
+                          >
+                            {Number(order.totalWeight) <= 36.5 &&
+                            Number(order.totalWeight) > 0
+                              ? "📦 FedEx"
+                              : "Zakończ"}
+                          </button>
+                          {Number(order.totalWeight) > 36.5 && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const shipping = order.shipping as any;
+                                  const pc = shipping.differentShippingAddress
+                                    ? shipping.shippingPostalCode ||
+                                      shipping.postalCode
+                                    : shipping.postalCode;
+                                  const city = shipping.differentShippingAddress
+                                    ? shipping.shippingCity || shipping.city
+                                    : shipping.city;
+
+                                  const priceRes = await fetch(
+                                    `${API}/api/admin/dhl/price`,
+                                    {
+                                      method: "POST",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                      },
+                                      credentials: "include",
+                                      body: JSON.stringify({
+                                        weightKg: order.totalWeight,
+                                        postalCode: pc,
+                                        city,
+                                        insuranceValue: order.total,
+                                      }),
+                                    },
+                                  );
+                                  const priceJson = await priceRes.json();
+
+                                  let msg = "Nadać przesyłkę DHL?\n\n";
+                                  if (priceJson.success) {
+                                    msg += `Cena: ${priceJson.data.price} PLN`;
+                                    if (priceJson.data.fuelSurcharge > 0)
+                                      msg += ` (+ dopłata paliwowa: ${priceJson.data.fuelSurcharge} PLN)`;
+                                    msg += `\nWaga: ${order.totalWeight} kg`;
+                                    msg += `\nUbezpieczenie: ${order.total} PLN`;
+                                  } else {
+                                    msg += `(Nie udało się pobrać ceny: ${priceJson.error})\nWaga: ${order.totalWeight} kg`;
+                                  }
+
+                                  if (!confirm(msg)) return;
+
+                                  const res = await fetch(
+                                    `${API}/api/admin/dhl/ship/${order.id}`,
+                                    { method: "POST", credentials: "include" },
+                                  );
+                                  const json = await res.json();
+                                  if (json.success) {
+                                    await fetch(
+                                      `${API}/api/orders/${order.id}/status`,
+                                      {
+                                        method: "PATCH",
+                                        headers: {
+                                          "Content-Type": "application/json",
+                                        },
+                                        body: JSON.stringify({
+                                          status: "shipped",
+                                        }),
+                                      },
+                                    );
+                                    showToast(
+                                      `DHL: ${json.data.trackingNumber}`,
+                                    );
+                                    fetchOrders();
+                                  } else {
+                                    showToast(json.error || "Błąd DHL", "err");
+                                  }
+                                } catch (err: any) {
+                                  showToast(err.message || "Błąd DHL", "err");
+                                }
+                              }}
+                              className="px-2 py-1 rounded bg-yellow-600 text-white text-xs"
+                              title="Nadaj przez DHL (> 36.5 kg)"
+                            >
+                              📦 DHL
+                            </button>
+                          )}
+                          {Number(order.totalWeight) > 36.5 && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const offRes = await fetch(
+                                    `${API}/api/admin/wysylajnami/offers`,
+                                    {
+                                      method: "POST",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                      },
+                                      credentials: "include",
+                                      body: JSON.stringify({
+                                        weightKg: order.totalWeight,
+                                      }),
+                                    },
+                                  );
+                                  const offJson = await offRes.json();
+                                  const offers = offJson.data?.offers || [];
+                                  if (!offers.length) {
+                                    showToast("Brak ofert Wysylajnami", "err");
+                                    return;
+                                  }
+                                  setWnModal({ order, offers });
+                                } catch (err: any) {
+                                  showToast(err.message || "Błąd", "err");
+                                }
+                              }}
+                              className="px-2 py-1 rounded bg-green-600 text-white text-xs"
+                              title="Nadaj przez Wysylajnami.pl (porównanie cen)"
+                            >
+                              🚛 Wysyłaj
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </td>
@@ -1044,10 +1402,228 @@ export function AdminOrders() {
         }
       />
 
+      {/* Wysylajnami Courier Select */}
+      {wnModal && (
+        <CourierSelectModal
+          offers={wnModal.offers}
+          orderNumber={wnModal.order.orderNumber}
+          weight={Number(wnModal.order.totalWeight)}
+          loading={wnLoading}
+          onClose={() => setWnModal(null)}
+          onSelect={async (offer) => {
+            setWnLoading(true);
+            try {
+              const res = await fetch(
+                `${API}/api/admin/wysylajnami/ship/${wnModal.order.id}`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "include",
+                  body: JSON.stringify({ courierId: offer.courierId }),
+                },
+              );
+              const json = await res.json();
+              if (json.success) {
+                await fetch(`${API}/api/orders/${wnModal.order.id}/status`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ status: "shipped" }),
+                });
+                showToast(
+                  `${offer.courierName}: ${json.data.waybillNumber} (${json.data.price} PLN)`,
+                );
+                setWnModal(null);
+                fetchOrders();
+              } else {
+                showToast(json.error || "Błąd", "err");
+              }
+            } catch (err: any) {
+              showToast(err.message || "Błąd", "err");
+            } finally {
+              setWnLoading(false);
+            }
+          }}
+        />
+      )}
+
       <style>{`
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
       `}</style>
     </div>
+  );
+}
+
+// ============================================
+// FedEx Pickup Button
+// ============================================
+function FedExPickupButton() {
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<any>(null);
+
+  const checkStatus = async () => {
+    try {
+      const res = await fetch(`${API}/api/admin/fedex/pickup/status`, {
+        credentials: "include",
+      });
+      const json = await res.json();
+      if (json.success) setStatus(json.data);
+    } catch {}
+  };
+
+  useEffect(() => {
+    checkStatus();
+  }, []);
+
+  const handlePickup = async () => {
+    if (
+      !confirm(
+        "Zamówić podjazd kuriera FedEx dla wszystkich gotowych przesyłek?",
+      )
+    )
+      return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/admin/fedex/pickup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (json.success) {
+        alert(
+          `✅ Kurier zamówiony!\nKod: ${json.data.confirmationCode}\nPaczek: ${json.data.ordersCount}\nZamówienia: ${json.data.orderNumbers.join(", ")}`,
+        );
+        checkStatus();
+      } else {
+        alert(`❌ ${json.error}`);
+      }
+    } catch (err: any) {
+      alert(`❌ ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!status?.activePickup || !confirm("Anulować podjazd kuriera?")) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/admin/fedex/pickup/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(status.activePickup),
+      });
+      const json = await res.json();
+      if (json.success) {
+        alert("✅ Podjazd anulowany");
+        checkStatus();
+      } else {
+        alert(`❌ ${json.error}`);
+      }
+    } catch (err: any) {
+      alert(`❌ ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!status) return null;
+
+  return (
+    <div className="flex items-center gap-2">
+      {status.pendingPickup > 0 && !status.activePickup && (
+        <button
+          onClick={handlePickup}
+          disabled={loading}
+          className="h-9 px-3 rounded-lg bg-blue-600 text-white text-sm font-medium flex items-center gap-1"
+        >
+          {loading
+            ? "⏳..."
+            : `🚛 Przywołaj FEDEX (${status.pendingPickup} paczek)`}
+        </button>
+      )}
+      {status.activePickup && (
+        <>
+          <span className="text-xs text-green-500 font-medium">
+            ✅ Kurier zamówiony ({status.activePickup.confirmationCode})
+          </span>
+          <button
+            onClick={handleCancel}
+            disabled={loading}
+            className="h-7 px-2 rounded border border-red-500 text-red-500 text-xs"
+          >
+            Anuluj
+          </button>
+        </>
+      )}
+      {status.pendingPickup === 0 && !status.activePickup && (
+        <span className="text-xs text-[hsl(var(--muted-foreground))]">
+          🚛 Brak paczek do odbioru
+        </span>
+      )}
+    </div>
+  );
+}
+
+function DHLPickupButton() {
+  const [loading, setLoading] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const checkStatus = async () => {
+    try {
+      const res = await fetch(`${API}/api/admin/dhl/pickup/status`, {
+        credentials: "include",
+      });
+      const json = await res.json();
+      if (json.success) setPendingCount(json.data.pendingPickup || 0);
+    } catch {}
+  };
+
+  useEffect(() => {
+    checkStatus();
+  }, []);
+
+  const handlePickup = async () => {
+    if (
+      !confirm("Zamówić podjazd kuriera DHL dla wszystkich gotowych przesyłek?")
+    )
+      return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/admin/dhl/pickup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (json.success) {
+        alert(
+          `✅ Kurier DHL zamówiony!\nZlecenia: ${json.data.orderIds.join(", ")}\nPaczek: ${json.data.ordersCount}`,
+        );
+        checkStatus();
+      } else {
+        alert(`❌ ${json.error}`);
+      }
+    } catch (err: any) {
+      alert(`❌ ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (pendingCount === 0) return null;
+
+  return (
+    <button
+      onClick={handlePickup}
+      disabled={loading}
+      className="h-9 px-3 rounded-lg bg-yellow-600 text-white text-sm font-medium flex items-center gap-1"
+    >
+      {loading ? "⏳..." : `🚛 Kurier DHL (${pendingCount} paczek)`}
+    </button>
   );
 }
 

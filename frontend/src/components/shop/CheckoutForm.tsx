@@ -104,6 +104,24 @@ export function CheckoutForm() {
     }
     setItems(cartItems);
 
+    // GA4 begin_checkout event
+    try {
+      if (window.gtag) {
+        window.gtag("event", "begin_checkout", {
+          currency: "PLN",
+          value: cartItems.reduce((s, i) => s + i.price * i.quantity, 0),
+          items: cartItems.map((item, idx) => ({
+            item_id: item.productId,
+            item_name: item.name,
+            item_category: item.categorySlug,
+            price: item.price,
+            quantity: item.quantity,
+            index: idx,
+          })),
+        });
+      }
+    } catch {}
+
     // Detect stripe cancel
     const params = new URLSearchParams(window.location.search);
     if (params.get("stripe_cancel") === "true") {

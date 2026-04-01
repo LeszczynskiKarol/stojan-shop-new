@@ -1,6 +1,7 @@
 // frontend/src/components/shop/OrderButton.tsx
 // "Zamów teraz" — adds to cart + redirects to /checkout
-import { useState } from "react";
+// v2 — GA4 view_item event on mount
+import { useState, useEffect } from "react";
 import { cart, type CartItem } from "@/lib/cart";
 
 interface Props {
@@ -32,6 +33,28 @@ export function OrderButton({ product, categorySlug, productSlug }: Props) {
     typeof product.power === "object" ? product.power?.value : product.power;
   const rpm =
     typeof product.rpm === "object" ? product.rpm?.value : product.rpm;
+
+  // GA4 view_item — fires once when product page renders
+  useEffect(() => {
+    try {
+      if (window.gtag) {
+        window.gtag("event", "view_item", {
+          currency: "PLN",
+          value: Number(price),
+          items: [
+            {
+              item_id: product.id,
+              item_name: product.name,
+              item_category: categorySlug,
+              item_brand: product.manufacturer || undefined,
+              price: Number(price),
+              quantity: 1,
+            },
+          ],
+        });
+      }
+    } catch {}
+  }, [product.id]);
 
   const handleOrder = () => {
     const item: CartItem = {

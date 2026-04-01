@@ -13,6 +13,25 @@ import { SHIPPING_RATES } from "../config/shipping.config.js";
 
 const SITE_URL = "https://www.silniki-elektryczne.com.pl";
 
+const BLACKLIST_PATTERNS = [
+  /^ramię reakcyjne\b/i,
+  /^kołnierz boczny\b/i,
+  /^wał zdawczy\b/i,
+  /^wał stalowy\b/i,
+  /^reduktor \/ przekładnia ślimakowa/i,
+  /^reduktor wstępny/i,
+  /^sprzęgło kłowe surowe/i,
+];
+
+const SHOPPING_ADS_BLACKLIST = new Set([
+  "motoreduktor / przekładnia 0,55kW 97obr. 3fazowy NORD", // CPC 39.78 zł — 1 klik za 40 zł, anomalia
+]);
+
+function isBlacklisted(productName: string): boolean {
+  if (SHOPPING_ADS_BLACKLIST.has(productName)) return true;
+  return BLACKLIST_PATTERNS.some((p) => p.test(productName));
+}
+
 function escapeXml(str: string): string {
   if (!str) return "";
   return str
@@ -225,6 +244,10 @@ export async function googleMerchantFeedRoute(app: FastifyInstance) {
       }
       if (product.shaftDiameter && Number(product.shaftDiameter) > 0) {
         itemXml += `\n      <g:custom_label_4>Wał ${product.shaftDiameter}mm</g:custom_label_4>`;
+      }
+
+      if (isBlacklisted(product.name)) {
+        itemXml += `\n      <g:excluded_destination>Shopping_ads</g:excluded_destination>`;
       }
 
       itemXml += `\n    </item>`;

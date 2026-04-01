@@ -1,5 +1,6 @@
 // frontend/src/lib/cart.ts
 // Cart store — localStorage + CustomEvent for cross-component sync
+// v3 — GA4 add_to_cart event
 
 import { tracker } from "./tracker";
 
@@ -56,12 +57,34 @@ export const cart = {
       items.push({ ...item });
     }
     write(items);
+
+    // Internal tracker
     tracker.addToCart({
       productId: item.productId,
       productName: item.name,
       price: item.price,
       quantity: item.quantity,
     });
+
+    // GA4 add_to_cart event
+    try {
+      if (window.gtag) {
+        window.gtag("event", "add_to_cart", {
+          currency: "PLN",
+          value: item.price * item.quantity,
+          items: [
+            {
+              item_id: item.productId,
+              item_name: item.name,
+              item_category: item.categorySlug,
+              item_brand: item.manufacturer || undefined,
+              price: item.price,
+              quantity: item.quantity,
+            },
+          ],
+        });
+      }
+    } catch {}
   },
   updateQuantity(productId: string, quantity: number): void {
     const items = read();
@@ -74,6 +97,25 @@ export const cart = {
   },
 
   remove(productId: string): void {
+    // GA4 remove_from_cart
+    try {
+      const items = read();
+      const item = items.find((i) => i.productId === productId);
+      if (item && window.gtag) {
+        window.gtag("event", "remove_from_cart", {
+          currency: "PLN",
+          value: item.price * item.quantity,
+          items: [
+            {
+              item_id: item.productId,
+              item_name: item.name,
+              price: item.price,
+              quantity: item.quantity,
+            },
+          ],
+        });
+      }
+    } catch {}
     write(read().filter((i) => i.productId !== productId));
   },
   clear(): void {

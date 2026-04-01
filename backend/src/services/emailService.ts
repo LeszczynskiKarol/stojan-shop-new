@@ -552,6 +552,7 @@ export async function sendShipmentNotification(
   data: OrderEmailData,
   trackingNumber?: string,
   courierName?: string,
+  trackingUrl?: string,
 ): Promise<boolean> {
   const deliveryDateStr = formatDeliveryDate(data.totalWeight);
 
@@ -559,12 +560,21 @@ export async function sendShipmentNotification(
     ? `
     <tr>
       <td style="padding:0 32px 24px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,#eff6ff 0%,#f0f9ff 100%);border-radius:10px;border:1px solid #bfdbfe;">
           <tr>
-            <td style="padding:14px 16px;">
-              <p style="margin:0 0 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;">Numer przesyłki</p>
-              <p style="margin:0;font-size:15px;font-weight:700;color:#1e293b;font-family:monospace;letter-spacing:1px;">${escapeHtml(trackingNumber)}</p>
-              ${courierName ? `<p style="margin:4px 0 0;font-size:12px;color:#64748b;">Kurier: ${escapeHtml(courierName)}</p>` : ""}
+            <td style="padding:16px 20px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td width="40" style="vertical-align:top;">
+                    <span style="font-size:24px;">📦</span>
+                  </td>
+                  <td style="vertical-align:top;">
+                    <p style="margin:0 0 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#3b82f6;">Śledzenie przesyłki${courierName ? ` — ${escapeHtml(courierName)}` : ""}</p>
+                    <p style="margin:0 0 8px;font-size:16px;font-weight:700;color:#1e293b;font-family:monospace;letter-spacing:1px;">${escapeHtml(trackingNumber)}</p>
+                    ${trackingUrl ? `<a href="${trackingUrl}" target="_blank" style="display:inline-block;padding:10px 24px;background-color:#2563eb;color:#ffffff;text-decoration:none;font-weight:600;font-size:13px;border-radius:6px;">Śledź przesyłkę →</a>` : ""}
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
         </table>
