@@ -28,7 +28,7 @@ import { userRoutes } from "./routes/users.js";
 import { manufacturerRoutes } from "./routes/manufacturers.js";
 import { blogRoutes } from "./routes/blog.js";
 import { legalRoutes } from "./routes/legal.js";
-// import { adminFedExRoutes } from "./routes/admin-fedex.js";
+import { adminFedExRoutes } from "./routes/admin-fedex.js";
 import { sitemapRoutes } from "./routes/sitemap.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { allegroRoutes } from "./routes/allegro.js";
@@ -151,9 +151,9 @@ app.register(async function protectedRoutes(protectedApp) {
   });
 
   // ▶ FedEx admin routes (ship, cancel, rates, status)
-  //await protectedApp.register(adminFedExRoutes, {
-  //    prefix: "/api/admin/fedex",
-  //  });
+  await protectedApp.register(adminFedExRoutes, {
+    prefix: "/api/admin/fedex",
+  });
 
   //  await protectedApp.register(adminDHLRoutes, { prefix: "/api/admin/dhl" });
 
@@ -193,11 +193,11 @@ app.get("/api/health", async () => {
     allegroOk = await isAllegroConnected();
   } catch {}
 
-  // let fedexOk = false;
-  // try {
-  // const { isFedExConnected } = await import("./lib/fedex-client.js");
-  // fedexOk = await isFedExConnected();
-  // } catch {}
+  let fedexOk = false;
+  try {
+    const { isFedExConnected } = await import("./lib/fedex-client.js");
+    fedexOk = await isFedExConnected();
+  } catch {}
 
   return {
     status: "ok",

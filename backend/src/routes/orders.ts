@@ -1,4 +1,5 @@
 // backend/src/routes/orders.ts
+
 import { FastifyInstance } from "fastify";
 import Stripe from "stripe";
 import { prisma } from "../lib/prisma.js";
@@ -23,6 +24,49 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:4821";
 
+// Na górze pliku:
+async function notifySeoPanelWebhook(orderDate: Date) {
+  const SEO_PANEL_URL = process.env.SEO_PANEL_WEBHOOK_URL;
+  const SEO_PANEL_KEY = process.env.SEO_PANEL_WEBHOOK_KEY;
+  if (!SEO_PANEL_URL || !SEO_PANEL_KEY) return;
+
+  try {
+    const dateStr = orderDate.toISOString().split("T")[0];
+
+    // Aggregate day totals
+    const dayStart = new Date(dateStr);
+    const dayEnd = new Date(dateStr + "T23:59:59.999Z");
+
+    const dayOrders = await prisma.order.findMany({
+      where: {
+        status: { in: ["paid", "shipped", "delivered"] },
+        createdAt: { gte: dayStart, lte: dayEnd },
+      },
+      select: { total: true },
+    });
+
+    const totalRevenue = dayOrders.reduce((s, o) => s + Number(o.total), 0);
+    const totalOrders = dayOrders.length;
+
+    await fetch(SEO_PANEL_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        apiKey: SEO_PANEL_KEY,
+        date: dateStr,
+        revenue: totalRevenue,
+        orders: totalOrders,
+      }),
+    });
+
+    console.log(
+      `✅ SEO Panel webhook: ${dateStr} → ${totalOrders} orders, ${totalRevenue} zł`,
+    );
+  } catch (e: any) {
+    console.error("❌ SEO Panel webhook failed:", e.message);
+  }
+}
+
 // ============================================
 // Helper: generuj numer zamówienia (001/02/2026)
 // ============================================
@@ -30,9 +74,6 @@ async function generateOrderNumber(): Promise<string> {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const year = String(now.getFullYear());
-
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
   const lastOrder = await prisma.order.findFirst({
     where: {
@@ -310,7 +351,7 @@ export async function orderRoutes(app: FastifyInstance) {
           orderValue: verifiedTotal,
           userAgent: request.headers["user-agent"] || undefined,
         });
-
+        await notifySeoPanelWebhook(order.createdAt);
         try {
           const emailData = buildEmailDataFromOrder(updatedOrder);
           await sendOrderConfirmation(emailData);
@@ -503,6 +544,13 @@ export async function orderRoutes(app: FastifyInstance) {
           where: { id: request.params.id },
           data: { status: status as any },
         });
+
+        // ▶ Notify SEO Panel
+        if (["paid", "shipped", "delivered"].includes(status)) {
+          await notifySeoPanelWebhook(order.createdAt);
+        }
+
+        // ═══ SHIPPED: FedEx first, then email with tracking ═══
 
         // ═══ SHIPPED: FedEx first, then email with tracking ═══
         if (status === "shipped") {
