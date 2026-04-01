@@ -659,47 +659,10 @@ export function OrderDetailsDialog({
 
               {/* ═══ ZAKOŃCZ / NADAJ ═══ */}
               {order.status === "paid" && (
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                  {/* FedEx (≤ 36.5 kg) lub Zakończ (> 36.5 kg) */}
+                <div>
                   <button
                     onClick={async () => {
-                      const totalWeight = Number(order.totalWeight) || 0;
-                      let msg = "Oznaczyć jako wysłane?";
-
-                      if (totalWeight <= 36.5 && totalWeight > 0) {
-                        try {
-                          const shipping = order.shipping as any;
-                          const pc = shipping.differentShippingAddress
-                            ? shipping.shippingPostalCode || shipping.postalCode
-                            : shipping.postalCode;
-                          const city = shipping.differentShippingAddress
-                            ? shipping.shippingCity || shipping.city
-                            : shipping.city;
-                          const priceRes = await fetch(
-                            `${API}/api/admin/fedex/price`,
-                            {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              credentials: "include",
-                              body: JSON.stringify({
-                                weightKg: totalWeight,
-                                postalCode: pc,
-                                city,
-                              }),
-                            },
-                          );
-                          const priceJson = await priceRes.json();
-                          if (
-                            priceJson.success &&
-                            priceJson.data.rates?.length
-                          ) {
-                            const rate = priceJson.data.rates[0];
-                            msg = `Wysłać przez FedEx?\n\nCena: ${rate.totalCharge} ${rate.currency}\nSerwis: ${rate.serviceType}\nWaga: ${totalWeight} kg`;
-                          }
-                        } catch {}
-                      }
-
-                      if (!confirm(msg)) return;
+                      if (!confirm("Oznaczyć jako wysłane?")) return;
                       setShipping(true);
                       try {
                         await fetch(`${API}/api/orders/${order.id}/status`, {
@@ -720,11 +683,7 @@ export function OrderDetailsDialog({
                       alignItems: "center",
                       gap: "6px",
                       padding: "8px 16px",
-                      background:
-                        Number(order.totalWeight) <= 36.5 &&
-                        Number(order.totalWeight) > 0
-                          ? "#2563eb"
-                          : "var(--primary, #6366f1)",
+                      background: "var(--primary, #6366f1)",
                       color: "#fff",
                       border: "none",
                       borderRadius: "6px",
@@ -734,150 +693,8 @@ export function OrderDetailsDialog({
                       opacity: shipping ? 0.6 : 1,
                     }}
                   >
-                    {shipping
-                      ? "⏳ Wysyłanie..."
-                      : Number(order.totalWeight) <= 36.5 &&
-                          Number(order.totalWeight) > 0
-                        ? "📦 FedEx"
-                        : "🚚 Zakończ zamówienie"}
+                    {shipping ? "⏳ Wysyłanie..." : "🚚 Zakończ zamówienie"}
                   </button>
-
-                  {/* DHL (> 36.5 kg) */}
-                  {Number(order.totalWeight) > 36.5 && (
-                    <button
-                      onClick={async () => {
-                        try {
-                          const shipping = order.shipping as any;
-                          const pc = shipping.differentShippingAddress
-                            ? shipping.shippingPostalCode || shipping.postalCode
-                            : shipping.postalCode;
-                          const city = shipping.differentShippingAddress
-                            ? shipping.shippingCity || shipping.city
-                            : shipping.city;
-                          const priceRes = await fetch(
-                            `${API}/api/admin/dhl/price`,
-                            {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              credentials: "include",
-                              body: JSON.stringify({
-                                weightKg: order.totalWeight,
-                                postalCode: pc,
-                                city,
-                                insuranceValue: order.total,
-                              }),
-                            },
-                          );
-                          const priceJson = await priceRes.json();
-                          let msg = "Nadać przesyłkę DHL?\n\n";
-                          if (priceJson.success) {
-                            msg += `Cena: ${priceJson.data.price} PLN`;
-                            if (priceJson.data.fuelSurcharge > 0)
-                              msg += ` (+ dopłata paliwowa: ${priceJson.data.fuelSurcharge} PLN)`;
-                            msg += `\nWaga: ${order.totalWeight} kg\nUbezpieczenie: ${order.total} PLN`;
-                          } else {
-                            msg += `(Nie udało się pobrać ceny)\nWaga: ${order.totalWeight} kg`;
-                          }
-                          if (!confirm(msg)) return;
-                        } catch {}
-
-                        setShipping(true);
-                        try {
-                          const res = await fetch(
-                            `${API}/api/admin/dhl/ship/${order.id}`,
-                            {
-                              method: "POST",
-                              credentials: "include",
-                            },
-                          );
-                          const json = await res.json();
-                          if (json.success) {
-                            await fetch(
-                              `${API}/api/orders/${order.id}/status`,
-                              {
-                                method: "PATCH",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ status: "shipped" }),
-                              },
-                            );
-                            alert(`✅ DHL: ${json.data.trackingNumber}`);
-                            onStatusChange?.("shipped");
-                            onClose();
-                          } else {
-                            alert(`❌ ${json.error || "Błąd DHL"}`);
-                            setShipping(false);
-                          }
-                        } catch (err: any) {
-                          alert(`❌ ${err.message || "Błąd DHL"}`);
-                          setShipping(false);
-                        }
-                      }}
-                      disabled={shipping}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        padding: "8px 16px",
-                        background: "#ca8a04",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: "6px",
-                        fontWeight: 600,
-                        fontSize: "13px",
-                        cursor: shipping ? "wait" : "pointer",
-                        opacity: shipping ? 0.6 : 1,
-                      }}
-                    >
-                      {shipping ? "⏳..." : "📦 Nadaj DHL"}
-                    </button>
-                  )}
-
-                  {/* Wysylajnami (> 36.5 kg) */}
-                  {Number(order.totalWeight) > 36.5 && (
-                    <button
-                      onClick={async () => {
-                        try {
-                          const offRes = await fetch(
-                            `${API}/api/admin/wysylajnami/offers`,
-                            {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              credentials: "include",
-                              body: JSON.stringify({
-                                weightKg: order.totalWeight,
-                              }),
-                            },
-                          );
-                          const offJson = await offRes.json();
-                          const offers = offJson.data?.offers || [];
-                          if (!offers.length) {
-                            showToast("Brak ofert Wysylajnami", "err");
-                            return;
-                          }
-                          setWnModal({ order, offers });
-                        } catch (err: any) {
-                          showToast(err.message || "Błąd", "err");
-                        }
-                      }}
-                      disabled={shipping}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        padding: "8px 16px",
-                        background: "#16a34a",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: "6px",
-                        fontWeight: 600,
-                        fontSize: "13px",
-                        cursor: shipping ? "wait" : "pointer",
-                        opacity: shipping ? 0.6 : 1,
-                      }}
-                    >
-                      {shipping ? "⏳..." : "🚛 Wysyłaj"}
-                    </button>
-                  )}
                 </div>
               )}
             </div>

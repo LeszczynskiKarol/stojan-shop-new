@@ -151,9 +151,9 @@ app.register(async function protectedRoutes(protectedApp) {
   });
 
   // ▶ FedEx admin routes (ship, cancel, rates, status)
-  await protectedApp.register(adminFedExRoutes, {
-    prefix: "/api/admin/fedex",
-  });
+  //await protectedApp.register(adminFedExRoutes, {
+  //    prefix: "/api/admin/fedex",
+  //  });
 
   //  await protectedApp.register(adminDHLRoutes, { prefix: "/api/admin/dhl" });
 

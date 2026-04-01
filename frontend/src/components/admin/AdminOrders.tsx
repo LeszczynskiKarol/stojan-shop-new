@@ -476,9 +476,9 @@ export function AdminOrders() {
         >
           {hideCancelled ? "Pokaż anulowane" : "Ukryj anulowane"}
         </button>
-        {/* FedEx Pickup */}
+        {/* FedEx Pickup 
         <FedExPickupButton />
-        <DHLPickupButton />
+        <DHLPickupButton />*/}
         {/* Bulk actions */}
         {markedOrders.length > 0 && (
           <>
@@ -1070,193 +1070,14 @@ export function AdminOrders() {
                         Szczegóły
                       </button>
                       {order.status === "paid" && (
-                        <>
-                          <button
-                            onClick={async () => {
-                              const totalWeight =
-                                Number(order.totalWeight) || 0;
-                              let msg = "Oznaczyć jako wysłane?";
-
-                              if (totalWeight <= 36.5 && totalWeight > 0) {
-                                try {
-                                  const shipping = order.shipping as any;
-                                  const pc = shipping.differentShippingAddress
-                                    ? shipping.shippingPostalCode ||
-                                      shipping.postalCode
-                                    : shipping.postalCode;
-                                  const city = shipping.differentShippingAddress
-                                    ? shipping.shippingCity || shipping.city
-                                    : shipping.city;
-                                  const priceRes = await fetch(
-                                    `${API}/api/admin/fedex/price`,
-                                    {
-                                      method: "POST",
-                                      headers: {
-                                        "Content-Type": "application/json",
-                                      },
-                                      credentials: "include",
-                                      body: JSON.stringify({
-                                        weightKg: totalWeight,
-                                        postalCode: pc,
-                                        city,
-                                      }),
-                                    },
-                                  );
-                                  const priceJson = await priceRes.json();
-                                  if (
-                                    priceJson.success &&
-                                    priceJson.data.rates?.length
-                                  ) {
-                                    const rate = priceJson.data.rates[0];
-                                    msg = `Wysłać przez FedEx?\n\nCena: ${rate.totalCharge} ${rate.currency}\nSerwis: ${rate.serviceType}\nWaga: ${totalWeight} kg`;
-                                  }
-                                } catch {}
-                              }
-
-                              if (!confirm(msg)) return;
-                              try {
-                                await fetch(
-                                  `${API}/api/orders/${order.id}/status`,
-                                  {
-                                    method: "PATCH",
-                                    headers: {
-                                      "Content-Type": "application/json",
-                                    },
-                                    body: JSON.stringify({ status: "shipped" }),
-                                  },
-                                );
-                                fetchOrders();
-                                showToast("Status zaktualizowany");
-                              } catch {
-                                showToast("Błąd aktualizacji statusu", "err");
-                              }
-                            }}
-                            className={`px-2 py-1 rounded text-xs ${
-                              Number(order.totalWeight) <= 36.5 &&
-                              Number(order.totalWeight) > 0
-                                ? "bg-blue-600 text-white"
-                                : "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
-                            }`}
-                          >
-                            {Number(order.totalWeight) <= 36.5 &&
-                            Number(order.totalWeight) > 0
-                              ? "📦 FedEx"
-                              : "Zakończ"}
-                          </button>
-                          {Number(order.totalWeight) > 36.5 && (
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const shipping = order.shipping as any;
-                                  const pc = shipping.differentShippingAddress
-                                    ? shipping.shippingPostalCode ||
-                                      shipping.postalCode
-                                    : shipping.postalCode;
-                                  const city = shipping.differentShippingAddress
-                                    ? shipping.shippingCity || shipping.city
-                                    : shipping.city;
-
-                                  const priceRes = await fetch(
-                                    `${API}/api/admin/dhl/price`,
-                                    {
-                                      method: "POST",
-                                      headers: {
-                                        "Content-Type": "application/json",
-                                      },
-                                      credentials: "include",
-                                      body: JSON.stringify({
-                                        weightKg: order.totalWeight,
-                                        postalCode: pc,
-                                        city,
-                                        insuranceValue: order.total,
-                                      }),
-                                    },
-                                  );
-                                  const priceJson = await priceRes.json();
-
-                                  let msg = "Nadać przesyłkę DHL?\n\n";
-                                  if (priceJson.success) {
-                                    msg += `Cena: ${priceJson.data.price} PLN`;
-                                    if (priceJson.data.fuelSurcharge > 0)
-                                      msg += ` (+ dopłata paliwowa: ${priceJson.data.fuelSurcharge} PLN)`;
-                                    msg += `\nWaga: ${order.totalWeight} kg`;
-                                    msg += `\nUbezpieczenie: ${order.total} PLN`;
-                                  } else {
-                                    msg += `(Nie udało się pobrać ceny: ${priceJson.error})\nWaga: ${order.totalWeight} kg`;
-                                  }
-
-                                  if (!confirm(msg)) return;
-
-                                  const res = await fetch(
-                                    `${API}/api/admin/dhl/ship/${order.id}`,
-                                    { method: "POST", credentials: "include" },
-                                  );
-                                  const json = await res.json();
-                                  if (json.success) {
-                                    await fetch(
-                                      `${API}/api/orders/${order.id}/status`,
-                                      {
-                                        method: "PATCH",
-                                        headers: {
-                                          "Content-Type": "application/json",
-                                        },
-                                        body: JSON.stringify({
-                                          status: "shipped",
-                                        }),
-                                      },
-                                    );
-                                    showToast(
-                                      `DHL: ${json.data.trackingNumber}`,
-                                    );
-                                    fetchOrders();
-                                  } else {
-                                    showToast(json.error || "Błąd DHL", "err");
-                                  }
-                                } catch (err: any) {
-                                  showToast(err.message || "Błąd DHL", "err");
-                                }
-                              }}
-                              className="px-2 py-1 rounded bg-yellow-600 text-white text-xs"
-                              title="Nadaj przez DHL (> 36.5 kg)"
-                            >
-                              📦 DHL
-                            </button>
-                          )}
-                          {Number(order.totalWeight) > 36.5 && (
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const offRes = await fetch(
-                                    `${API}/api/admin/wysylajnami/offers`,
-                                    {
-                                      method: "POST",
-                                      headers: {
-                                        "Content-Type": "application/json",
-                                      },
-                                      credentials: "include",
-                                      body: JSON.stringify({
-                                        weightKg: order.totalWeight,
-                                      }),
-                                    },
-                                  );
-                                  const offJson = await offRes.json();
-                                  const offers = offJson.data?.offers || [];
-                                  if (!offers.length) {
-                                    showToast("Brak ofert Wysylajnami", "err");
-                                    return;
-                                  }
-                                  setWnModal({ order, offers });
-                                } catch (err: any) {
-                                  showToast(err.message || "Błąd", "err");
-                                }
-                              }}
-                              className="px-2 py-1 rounded bg-green-600 text-white text-xs"
-                              title="Nadaj przez Wysylajnami.pl (porównanie cen)"
-                            >
-                              🚛 Wysyłaj
-                            </button>
-                          )}
-                        </>
+                        <button
+                          onClick={() =>
+                            handleStatusChange(order.id, "shipped")
+                          }
+                          className="px-2 py-1 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] text-xs"
+                        >
+                          🚚 Zakończ
+                        </button>
                       )}
                     </div>
                   </td>
