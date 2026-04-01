@@ -1,7 +1,7 @@
 // backend/src/routes/integration.routes.ts
 
 import { FastifyInstance } from "fastify";
-import { prisma } from "../lib/prisma";
+import { prisma } from "../lib/prisma.js";
 
 const API_KEY = process.env.INTEGRATION_API_KEY || "zmien-mnie-na-cos-losowego";
 
