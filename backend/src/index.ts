@@ -3,7 +3,7 @@
 import "dotenv/config";
 import Fastify from "fastify";
 import { FastifyError } from "fastify";
-import { adminWNRoutes } from "./routes/admin-wysylajnami.js";
+// import { adminWNRoutes } from "./routes/admin-wysylajnami.js";
 import multipart from "@fastify/multipart";
 import helmet from "@fastify/helmet";
 import formbody from "@fastify/formbody";
@@ -13,7 +13,7 @@ import { prisma } from "./lib/prisma.js";
 // Routes
 import { orderStatsRoutes } from "./routes/order-stats.js";
 import { analyticsRoutes } from "./routes/analytics.js";
-import { adminDHLRoutes } from "./routes/admin-dhl.js";
+// import { adminDHLRoutes } from "./routes/admin-dhl.js";
 import { adminAnalyticsRoutes } from "./routes/admin-analytics.js";
 import { productRoutes } from "./routes/products.js";
 import { shopProductRoutes } from "./routes/shop-products.js";
@@ -28,7 +28,7 @@ import { userRoutes } from "./routes/users.js";
 import { manufacturerRoutes } from "./routes/manufacturers.js";
 import { blogRoutes } from "./routes/blog.js";
 import { legalRoutes } from "./routes/legal.js";
-import { adminFedExRoutes } from "./routes/admin-fedex.js";
+// import { adminFedExRoutes } from "./routes/admin-fedex.js";
 import { sitemapRoutes } from "./routes/sitemap.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { allegroRoutes } from "./routes/allegro.js";
@@ -151,15 +151,15 @@ app.register(async function protectedRoutes(protectedApp) {
   });
 
   // ▶ FedEx admin routes (ship, cancel, rates, status)
-  await protectedApp.register(adminFedExRoutes, {
-    prefix: "/api/admin/fedex",
-  });
+  //await protectedApp.register(adminFedExRoutes, {
+  //    prefix: "/api/admin/fedex",
+  //  });
 
-  await protectedApp.register(adminDHLRoutes, { prefix: "/api/admin/dhl" });
+  //  await protectedApp.register(adminDHLRoutes, { prefix: "/api/admin/dhl" });
 
-  await protectedApp.register(adminWNRoutes, {
-    prefix: "/api/admin/wysylajnami",
-  });
+  //await protectedApp.register(adminWNRoutes, {
+  //prefix: "/api/admin/wysylajnami",
+  //});
 });
 
 // ============================================
@@ -193,17 +193,17 @@ app.get("/api/health", async () => {
     allegroOk = await isAllegroConnected();
   } catch {}
 
-  let fedexOk = false;
-  try {
-    const { isFedExConnected } = await import("./lib/fedex-client.js");
-    fedexOk = await isFedExConnected();
-  } catch {}
+  // let fedexOk = false;
+  // try {
+  // const { isFedExConnected } = await import("./lib/fedex-client.js");
+  // fedexOk = await isFedExConnected();
+  // } catch {}
 
   return {
     status: "ok",
     timestamp: new Date().toISOString(),
     database: dbOk ? "connected" : "disconnected",
-    fedex: fedexOk ? "connected" : "disconnected",
+    // fedex: fedexOk ? "connected" : "disconnected",
     allegro: allegroOk ? "connected" : "disconnected",
   };
 });
