@@ -56,19 +56,6 @@ function detectSource(params: {
       !pathname.startsWith("/kontakt") &&
       !pathname.startsWith("/skup-silnikow");
 
-    if (isProductPage) {
-      console.log(
-        `[ANALYTICS] srsltid detected → Shopping (product page: ${pathname})`,
-      );
-      return {
-        source: "google_shopping",
-        medium: "shopping",
-        campaign: "merchant_pmax",
-      };
-    }
-    console.log(
-      `[ANALYTICS] srsltid detected → Organic (non-product page: ${pathname})`,
-    );
     return { source: "google_organic", medium: "organic", campaign: null };
   }
 
@@ -247,17 +234,6 @@ export async function analyticsRoutes(app: FastifyInstance) {
             data: { path: ["orderId"], equals: data.orderId },
           },
         });
-        if (existingOrderEvent) {
-          console.log(
-            `[ANALYTICS] ⚡ DEDUP: order_complete for orderId=${data.orderId} already exists (eventId=${existingOrderEvent.id}), skipping`,
-          );
-          return {
-            success: true,
-            tracked: false,
-            reason: "dedup_order",
-            existingEventId: existingOrderEvent.id,
-          };
-        }
       }
 
       // Find or create session
@@ -312,10 +288,6 @@ export async function analyticsRoutes(app: FastifyInstance) {
           landingPage: cleanPage,
         });
 
-        console.log(
-          `[ANALYTICS] 🆕 NEW SESSION: vid=${visitorId.substring(0, 8)}..., source=${sourceInfo.source}, medium=${sourceInfo.medium}, landing=${cleanPage.substring(0, 80)}, hasSessionMeta=${hasSessionMeta}, type=${type}`,
-        );
-
         // ── DIAGNOSTIC WARNING: new session on success page ──
         if (
           cleanPage.includes("/checkout/sukces") ||
@@ -356,10 +328,6 @@ export async function analyticsRoutes(app: FastifyInstance) {
         );
         const pageIncrement = type === "page_view" ? 1 : 0;
 
-        console.log(
-          `[ANALYTICS] ♻️ EXISTING SESSION: vid=${visitorId.substring(0, 8)}..., sessionId=${session.id.substring(0, 8)}..., source=${session.source}, duration=${duration}s, pages=${session.pageCount}+${pageIncrement}, type=${type}`,
-        );
-
         await prisma.analyticsSession.update({
           where: { id: session.id },
           data: {
@@ -390,9 +358,6 @@ export async function analyticsRoutes(app: FastifyInstance) {
         conversionUpdate.hasOrdered = true;
         conversionUpdate.orderId = data?.orderId || null;
         conversionUpdate.orderValue = data?.orderValue || null;
-        console.log(
-          `[ANALYTICS] 🎯 ORDER COMPLETE tracked: orderId=${data?.orderId}, value=${data?.orderValue}, sessionId=${session.id.substring(0, 8)}..., source=${session.source}`,
-        );
       }
 
       if (Object.keys(conversionUpdate).length > 0) {
