@@ -552,10 +552,65 @@ export async function orderRoutes(app: FastifyInstance) {
 
         // ═══ SHIPPED: FedEx first, then email with tracking ═══
         if (status === "shipped") {
-          // FedEx DISABLED — just send email
+          let fedexTracking: string | undefined;
+          let fedexCourier: string | undefined;
+          let fedexTrackingUrl: string | undefined;
+
+          const totalWeight = Number(order.totalWeight) || 0;
+          if (isFedExEligible(totalWeight)) {
+            try {
+              const { createFedExShipmentFromOrder } =
+                await import("../services/fedex-service.js");
+              const result = await createFedExShipmentFromOrder(order.id);
+              if (result.success && result.trackingNumber) {
+                fedexTracking = result.trackingNumber;
+                fedexCourier = "FedEx";
+                fedexTrackingUrl = `https://www.fedex.com/fedextrack/?trknbr=${result.trackingNumber}`;
+                app.log.info(
+                  `📦 FedEx OK: ${result.trackingNumber} for #${order.orderNumber}`,
+                );
+              } else {
+                app.log.warn(
+                  `⚠️ FedEx failed for #${order.orderNumber}: ${result.error}`,
+                );
+              }
+            } catch (fedexErr: any) {
+              app.log.error(
+                `❌ FedEx error for #${order.orderNumber}: ${fedexErr.message}`,
+              );
+            }
+          }
+
           try {
-            const emailData = buildEmailDataFromOrder(order);
-            const sent = await sendShipmentNotification(emailData);
+            const updatedOrder = await prisma.order.findUnique({
+              where: { id: order.id },
+            });
+            const pd = (updatedOrder?.paymentDetails as any) || {};
+            const dhl = pd.dhl;
+            const wn = pd.wysylajnami;
+
+            const trackingNumber =
+              fedexTracking || dhl?.trackingNumber || wn?.waybillNumber;
+            const courierName = fedexTracking
+              ? "FedEx"
+              : dhl?.trackingNumber
+                ? "DHL"
+                : wn?.waybillNumber
+                  ? "Wysylajnami"
+                  : undefined;
+            const trackingUrl = fedexTracking
+              ? fedexTrackingUrl
+              : dhl?.trackingNumber
+                ? `https://www.dhl.com/pl-pl/home/sledzenie.html?tracking-id=${dhl.trackingNumber}`
+                : wn?.trackingUrl || undefined;
+
+            const emailData = buildEmailDataFromOrder(updatedOrder || order);
+            const sent = await sendShipmentNotification(
+              emailData,
+              trackingNumber,
+              courierName,
+              trackingUrl,
+            );
             app.log.info(
               `📧 Shipment email ${sent ? "sent" : "FAILED"} for #${order.orderNumber}`,
             );

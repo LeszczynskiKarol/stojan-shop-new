@@ -88,6 +88,42 @@ const fmt = (v: number) =>
     maximumFractionDigits: 2,
   });
 
+function FedExShipButton({
+  order,
+  onShipped,
+}: {
+  order: Order;
+  onShipped: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const weight = Number(order.totalWeight) || 0;
+
+  return (
+    <button
+      onClick={async () => {
+        if (!confirm(`Nadać FedEx #${order.orderNumber}?\nWaga: ${weight} kg`))
+          return;
+        setLoading(true);
+        try {
+          await fetch(`${API}/api/orders/${order.id}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "shipped" }),
+          });
+          onShipped();
+        } catch {
+          alert("Błąd");
+          setLoading(false);
+        }
+      }}
+      disabled={loading}
+      className="px-2 py-1 rounded bg-blue-600 text-white text-xs whitespace-nowrap"
+    >
+      {loading ? "⏳..." : `📦 FedEx (${weight} kg)`}
+    </button>
+  );
+}
+
 // ============================================
 // Component
 // ============================================
@@ -476,9 +512,10 @@ export function AdminOrders() {
         >
           {hideCancelled ? "Pokaż anulowane" : "Ukryj anulowane"}
         </button>
-        {/* FedEx Pickup 
+        {/* FedEx Pickup */}
         <FedExPickupButton />
-        <DHLPickupButton />*/}
+        {/* DHL Pickup */}
+        <DHLPickupButton />
         {/* Bulk actions */}
         {markedOrders.length > 0 && (
           <>
@@ -1069,16 +1106,68 @@ export function AdminOrders() {
                       >
                         Szczegóły
                       </button>
-                      {order.status === "paid" && (
-                        <button
-                          onClick={() =>
-                            handleStatusChange(order.id, "shipped")
-                          }
-                          className="px-2 py-1 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] text-xs"
-                        >
-                          🚚 Zakończ
-                        </button>
-                      )}
+                      {order.status === "paid" &&
+                        Number(order.totalWeight) <= 36.5 && (
+                          <FedExShipButton
+                            order={order}
+                            onShipped={() => fetchOrders()}
+                          />
+                        )}
+                      {order.status === "paid" &&
+                        Number(order.totalWeight) > 36.5 && (
+                          <>
+                            {/*<button
+                              onClick={async () => {
+                                if (
+                                  !confirm(
+                                    `Nadać DHL? Waga: ${order.totalWeight} kg`,
+                                  )
+                                )
+                                  return;
+                                try {
+                                  const res = await fetch(
+                                    `${API}/api/admin/dhl/ship/${order.id}`,
+                                    { method: "POST", credentials: "include" },
+                                  );
+                                  const json = await res.json();
+                                  if (json.success) {
+                                    await fetch(
+                                      `${API}/api/orders/${order.id}/status`,
+                                      {
+                                        method: "PATCH",
+                                        headers: {
+                                          "Content-Type": "application/json",
+                                        },
+                                        body: JSON.stringify({
+                                          status: "shipped",
+                                        }),
+                                      },
+                                    );
+                                    showToast(
+                                      `✅ DHL: ${json.data.trackingNumber}`,
+                                    );
+                                    fetchOrders();
+                                  } else {
+                                    showToast(json.error || "Błąd DHL", "err");
+                                  }
+                                } catch (err: any) {
+                                  showToast(err.message || "Błąd DHL", "err");
+                                }
+                              }}
+                              className="px-2 py-1 rounded bg-yellow-600 text-white text-xs"
+                            >
+                              📦 DHL
+                            </button>*/}
+                            <button
+                              onClick={() =>
+                                handleStatusChange(order.id, "shipped")
+                              }
+                              className="px-2 py-1 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] text-xs"
+                            >
+                              🚚 Zakończ
+                            </button>
+                          </>
+                        )}
                     </div>
                   </td>
 

@@ -13,7 +13,7 @@ import { prisma } from "./lib/prisma.js";
 // Routes
 import { orderStatsRoutes } from "./routes/order-stats.js";
 import { analyticsRoutes } from "./routes/analytics.js";
-// import { adminDHLRoutes } from "./routes/admin-dhl.js";
+import { adminDHLRoutes } from "./routes/admin-dhl.js";
 import { adminAnalyticsRoutes } from "./routes/admin-analytics.js";
 import { productRoutes } from "./routes/products.js";
 import { shopProductRoutes } from "./routes/shop-products.js";
@@ -151,11 +151,11 @@ app.register(async function protectedRoutes(protectedApp) {
   });
 
   // ▶ FedEx admin routes (ship, cancel, rates, status)
-  //await protectedApp.register(adminFedExRoutes, {
-  //    prefix: "/api/admin/fedex",
-  //  });
+  await protectedApp.register(adminFedExRoutes, {
+    prefix: "/api/admin/fedex",
+  });
 
-  //  await protectedApp.register(adminDHLRoutes, { prefix: "/api/admin/dhl" });
+  await protectedApp.register(adminDHLRoutes, { prefix: "/api/admin/dhl" });
 
   //await protectedApp.register(adminWNRoutes, {
   //prefix: "/api/admin/wysylajnami",
@@ -203,7 +203,7 @@ app.get("/api/health", async () => {
     status: "ok",
     timestamp: new Date().toISOString(),
     database: dbOk ? "connected" : "disconnected",
-    // fedex: fedexOk ? "connected" : "disconnected",
+    fedex: fedexOk ? "connected" : "disconnected",
     allegro: allegroOk ? "connected" : "disconnected",
   };
 });
