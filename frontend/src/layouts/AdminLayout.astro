@@ -265,6 +265,7 @@ const { title = 'Admin Panel' } = Astro.props;
       padding: 20px;
       max-width: 100%;
       overflow-x: auto;
+      overflow-y: visible;
     }
     @media (max-width: 768px) {
       .admin-main { padding: 12px; }
@@ -276,10 +277,12 @@ const { title = 'Admin Panel' } = Astro.props;
     .admin-table-wrap {
       border: 1px solid var(--border);
       border-radius: 8px;
-      overflow-x: auto;
+      overflow-x: visible;
+      overflow-y: visible;
       background: var(--bg-card);
       box-shadow: var(--shadow-sm);
     }
+
     .admin-table-wrap table {
       width: 100%;
       border-collapse: collapse;
@@ -287,7 +290,7 @@ const { title = 'Admin Panel' } = Astro.props;
     }
     .admin-table-wrap thead {
       position: sticky;
-      top: 0;
+      top: 56px;
       z-index: 20;
     }
     .admin-table-wrap th {
