@@ -203,7 +203,7 @@ const breadcrumbLd = {
             </table>
             <!-- TECHNICAL DETAILS -->
     {product.technicalDetails && String(product.technicalDetails).replace(/<[^>]*>/g, '').trim().length >= 3 && (
-      <section class="mb-0">
+      <section class="mt-6">
         <div class="bg-card border border-border rounded-xl overflow-hidden">
           <div class="px-6 py-4 border-b border-border bg-accent/30"><h2 class="font-semibold text-foreground">Szczegóły techniczne</h2></div>
           <div class="px-6 py-5 prose dark:prose-invert max-w-none text-sm leading-relaxed"><Fragment set:html={product.technicalDetails} /></div>
