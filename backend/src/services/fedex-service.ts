@@ -14,6 +14,30 @@ import {
 } from "../lib/fedex-client.js";
 import { FEDEX_MAX_WEIGHT_KG } from "../config/fedex.config.js";
 
+function stripPolish(s: string): string {
+  const map: Record<string, string> = {
+    ą: "a",
+    ć: "c",
+    ę: "e",
+    ł: "l",
+    ń: "n",
+    ó: "o",
+    ś: "s",
+    ź: "z",
+    ż: "z",
+    Ą: "A",
+    Ć: "C",
+    Ę: "E",
+    Ł: "L",
+    Ń: "N",
+    Ó: "O",
+    Ś: "S",
+    Ź: "Z",
+    Ż: "Z",
+  };
+  return s.replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, (c) => map[c] || c);
+}
+
 // ============================================
 // TYPES
 // ============================================
@@ -84,18 +108,20 @@ export async function createFedExShipmentFromOrder(
     .filter(Boolean)
     .join(" ");
   const recipient: FedExRecipient = {
-    personName: fullName.substring(0, 35),
+    personName: stripPolish(fullName).substring(0, 35),
     companyName: shipping.companyName
-      ? shipping.companyName.substring(0, 35)
+      ? stripPolish(shipping.companyName).substring(0, 35)
       : undefined,
     phoneNumber: shipping.phone || "",
     email: shipping.email || undefined,
-    street: useAltAddress
-      ? shipping.shippingStreet || shipping.street
-      : shipping.street,
-    city: useAltAddress
-      ? shipping.shippingCity || shipping.city
-      : shipping.city,
+    street: stripPolish(
+      useAltAddress
+        ? shipping.shippingStreet || shipping.street
+        : shipping.street,
+    ),
+    city: stripPolish(
+      useAltAddress ? shipping.shippingCity || shipping.city : shipping.city,
+    ),
     postalCode: useAltAddress
       ? shipping.shippingPostalCode || shipping.postalCode
       : shipping.postalCode,
