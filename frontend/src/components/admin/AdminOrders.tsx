@@ -96,12 +96,39 @@ function FedExShipButton({
   onShipped: () => void;
 }) {
   const [loading, setLoading] = useState(false);
+  const [price, setPrice] = useState<string | null>(null);
   const weight = Number(order.totalWeight) || 0;
+
+  useEffect(() => {
+    const s = order.shipping as any;
+    const pc = s.differentShippingAddress
+      ? s.shippingPostalCode || s.postalCode
+      : s.postalCode;
+    const city = s.differentShippingAddress ? s.shippingCity || s.city : s.city;
+    fetch(`${API}/api/admin/fedex/price`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ weightKg: weight, postalCode: pc, city }),
+    })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success && json.data.rates?.length) {
+          const r = json.data.rates[0];
+          setPrice(`${Number(r.totalCharge).toFixed(0)} ${r.currency}`);
+        }
+      })
+      .catch(() => {});
+  }, [order.id]);
 
   return (
     <button
       onClick={async () => {
-        if (!confirm(`Nadać FedEx #${order.orderNumber}?\nWaga: ${weight} kg`))
+        if (
+          !confirm(
+            `Nadać FedEx #${order.orderNumber}?\nWaga: ${weight} kg${price ? `\nCena: ~${price}` : ""}`,
+          )
+        )
           return;
         setLoading(true);
         try {
@@ -119,7 +146,7 @@ function FedExShipButton({
       disabled={loading}
       className="px-2 py-1 rounded bg-blue-600 text-white text-xs whitespace-nowrap"
     >
-      {loading ? "⏳..." : `📦 FedEx (${weight} kg)`}
+      {loading ? "⏳..." : `📦 FedEx ${weight}kg${price ? ` ~${price}` : ""}`}
     </button>
   );
 }
