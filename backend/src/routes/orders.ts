@@ -481,6 +481,24 @@ export async function orderRoutes(app: FastifyInstance) {
             { shipping: { path: ["companyName"], string_contains: s } },
             { shipping: { path: ["city"], string_contains: s } },
             { shipping: { path: ["nip"], string_contains: s } },
+            {
+              paymentDetails: {
+                path: ["fedex", "trackingNumber"],
+                string_contains: s,
+              },
+            },
+            {
+              paymentDetails: {
+                path: ["dhl", "trackingNumber"],
+                string_contains: s,
+              },
+            },
+            {
+              paymentDetails: {
+                path: ["wysylajnami", "waybillNumber"],
+                string_contains: s,
+              },
+            },
           ],
         });
       }
