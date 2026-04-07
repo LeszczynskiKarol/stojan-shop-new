@@ -40,6 +40,7 @@ async function getToken(): Promise<string> {
   // Token valid 120 min, refresh at 100 min
   tokenExpiry = Date.now() + 100 * 60 * 1000;
   console.log("✅ Wysylajnami token obtained");
+  console.log("TOKEN:", cachedToken);
   return cachedToken;
 }
 
@@ -75,6 +76,11 @@ async function wnFetch(
   }
 
   if (!res.ok) {
+    console.error(
+      "❌ WN API FULL RESPONSE:",
+      res.status,
+      JSON.stringify(json, null, 2),
+    );
     const errMsg =
       json.message || json.error || JSON.stringify(json.errors || json);
     throw new Error(`WN API ${res.status}: ${errMsg}`);
@@ -123,31 +129,46 @@ export async function getWNOffers(
   widthCm?: number,
   heightCm?: number,
 ): Promise<WNOffer[]> {
-  const data = await wnFetch("/user/orders/offers", "POST", {
+  console.log("📦 WN getOffers request, weight:", weightKg);
+
+  const w = Number(weightKg);
+  const isPallet = w > 31.5;
+  const payload = {
     packages: [
       {
-        product_id: weightKg > 50 ? 3 : 2, // 3=pallet, 2=parcel
-        weight: weightKg,
-        length: lengthCm || 80,
-        width: widthCm || 60,
-        height: heightCm || 60,
-        non_standard: weightKg > 31.5,
-        insurance_value: 0,
+        product_id: 2,
+        weight: w,
+        length: Number(lengthCm) || 80,
+        width: Number(widthCm) || 60,
+        height: Number(heightCm) || 60,
+        non_standard: true,
         description: "Silnik elektryczny",
+        sender: {
+          post_code: "87-152",
+          country_id: 1,
+        },
+        receiver: {
+          post_code: "00-001",
+          country_id: 1,
+        },
       },
     ],
-  });
+  };
+  console.log("📦 WN offers payload:", JSON.stringify(payload, null, 2));
+  const data = await wnFetch("/user/orders/offers", "POST", payload);
 
-  const offers: WNOffer[] = (data.data?.offers || []).map((o: any) => ({
-    courierId: o.courier_id,
-    courierName: getCourierName(o.courier_id),
-    price: Number(o.price),
-    currency: o.currency || "PLN",
-    options: (o.options || []).map((opt: any) => ({
-      name: opt.name,
-      price: Number(opt.price),
-    })),
-  }));
+  const offers: WNOffer[] = (data.data?.offers || data.offers || []).map(
+    (o: any) => ({
+      courierId: o.courier_id,
+      courierName: getCourierName(o.courier_id),
+      price: Number(o.price),
+      currency: o.currency || "PLN",
+      options: (o.options || []).map((opt: any) => ({
+        name: opt.name,
+        price: Number(opt.price),
+      })),
+    }),
+  );
 
   return offers;
 }
@@ -163,10 +184,15 @@ function getCourierName(id: number): string {
     12: "FedEx",
     13: "GEODIS",
     14: "UPS",
-    16: "Poczta Polska palety",
+    16: "Poczta Polska",
+    17: "Pocztex",
     18: "Rohlig SUUS",
+    20: "Ambro Express",
     22: "Rhenus Logistics",
     26: "Hellmann",
+    27: "FedEx Punkt",
+    28: "DHL Punkt",
+    29: "DPD Punkt",
   };
   return map[id] || `Kurier #${id}`;
 }

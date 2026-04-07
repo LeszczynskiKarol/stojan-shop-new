@@ -822,6 +822,52 @@ export function OrderDetailsDialog({
                       {shipping ? "⏳..." : "📦 Nadaj DHL"}
                     </button>
                   )}
+                  {Number(order.totalWeight) > 36.5 && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const offRes = await fetch(
+                            `${API}/api/admin/wysylajnami/offers`,
+                            {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              credentials: "include",
+                              body: JSON.stringify({
+                                weightKg: order.totalWeight,
+                              }),
+                            },
+                          );
+                          const offJson = await offRes.json();
+                          const offers =
+                            offJson.data?.offers || offJson.offers || [];
+                          if (!offers.length) {
+                            alert("Brak ofert Wysylajnami");
+                            return;
+                          }
+                          setWnModal({ order, offers });
+                        } catch (err: any) {
+                          alert(err.message || "Błąd");
+                        }
+                      }}
+                      disabled={shipping}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "8px 16px",
+                        background: "#16a34a",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "6px",
+                        fontWeight: 600,
+                        fontSize: "13px",
+                        cursor: shipping ? "wait" : "pointer",
+                        opacity: shipping ? 0.6 : 1,
+                      }}
+                    >
+                      🚛 Wysyłaj z nami
+                    </button>
+                  )}
                 </div>
               )}
             </div>

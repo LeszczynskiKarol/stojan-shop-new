@@ -1,6 +1,28 @@
 // frontend/src/components/admin/CourierSelectModal.tsx
 import { useState } from "react";
 
+const optionNames: Record<string, string> = {
+  direct_delivery_only: "Do rąk własnych",
+  delivery_phone_advice_note: "Awizo telefoniczne",
+  delivery_sms_advice_note: "Awizo SMS",
+  delivery_email_advice_note: "Awizo e-mail",
+  email_confirmation_of_delivery: "Potwierdzenie e-mail",
+  sms_confirmation_of_delivery: "Potwierdzenie SMS",
+  pre_delivery_information: "Info przed doręczeniem",
+  check_contents_before_accepting: "Sprawdzenie zawartości",
+  without_waybill: "Bez listu przewozowego",
+  no_pickup: "Nadanie w oddziale",
+  with_pickup: "Odbiór kurierem",
+  delivery_until_9_00: "Dostawa do 9:00",
+  delivery_until_12_00: "Dostawa do 12:00",
+  delivery_between_18_00_and_22_00: "Dostawa 18-22",
+  delivery_on_saturday: "Dostawa w sobotę",
+  express_delivery: "Express",
+  handle_with_care: "Ostrożnie",
+  sms_confirmation_of_pickup_receiver: "SMS potwierdzenie odbioru",
+  return_documents: "Zwrot dokumentów",
+};
+
 interface CourierOffer {
   courierId: number;
   courierName: string;
@@ -34,6 +56,7 @@ const courierBrands: Record<
   16: { color: "#dc2626", bg: "rgba(220,38,38,.12)", icon: "📮" }, // Poczta Polska
   17: { color: "#dc2626", bg: "rgba(220,38,38,.12)", icon: "📮" }, // Pocztex
   18: { color: "#0ea5e9", bg: "rgba(14,165,233,.12)", icon: "🔵" }, // Rohlig SUUS
+  20: { color: "#059669", bg: "rgba(5,150,105,.12)", icon: "🟢" }, // Ambro Express
   22: { color: "#1d4ed8", bg: "rgba(29,78,216,.12)", icon: "🔵" }, // Rhenus
   26: { color: "#0369a1", bg: "rgba(3,105,161,.12)", icon: "🔵" }, // Hellmann
 };
@@ -230,7 +253,12 @@ export function CourierSelectModal({
                         >
                           Opcje:{" "}
                           {offer.options
-                            .map((o) => o.name.replace(/_/g, " "))
+                            .filter((o) => o.name)
+                            .map(
+                              (o) =>
+                                optionNames[o.name] ||
+                                o.name.replace(/_/g, " "),
+                            )
                             .join(", ")}
                         </div>
                       )}
