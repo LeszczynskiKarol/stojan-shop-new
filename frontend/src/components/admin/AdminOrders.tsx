@@ -1116,15 +1116,51 @@ export function AdminOrders() {
                       {order.status === "paid" &&
                         Number(order.totalWeight) > 36.5 && (
                           <>
-                            {/*<button
+                            <button
+                              onClick={() =>
+                                handleStatusChange(order.id, "shipped")
+                              }
+                              className="px-2 py-1 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] text-xs"
+                            >
+                              Zakończ
+                            </button>
+                            <button
                               onClick={async () => {
-                                if (
-                                  !confirm(
-                                    `Nadać DHL? Waga: ${order.totalWeight} kg`,
-                                  )
-                                )
-                                  return;
                                 try {
+                                  const s = order.shipping as any;
+                                  const pc = s.differentShippingAddress
+                                    ? s.shippingPostalCode || s.postalCode
+                                    : s.postalCode;
+                                  const city = s.differentShippingAddress
+                                    ? s.shippingCity || s.city
+                                    : s.city;
+                                  const priceRes = await fetch(
+                                    `${API}/api/admin/dhl/price`,
+                                    {
+                                      method: "POST",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                      },
+                                      credentials: "include",
+                                      body: JSON.stringify({
+                                        weightKg: order.totalWeight,
+                                        postalCode: pc,
+                                        city,
+                                        insuranceValue: order.total,
+                                      }),
+                                    },
+                                  );
+                                  const priceJson = await priceRes.json();
+                                  let msg = "Nadać przesyłkę DHL?\n\n";
+                                  if (priceJson.success) {
+                                    msg += `Cena: ${priceJson.data.price} PLN`;
+                                    if (priceJson.data.fuelSurcharge > 0)
+                                      msg += ` (+ dopłata: ${priceJson.data.fuelSurcharge} PLN)`;
+                                    msg += `\nWaga: ${order.totalWeight} kg`;
+                                  } else {
+                                    msg += `(Brak ceny)\nWaga: ${order.totalWeight} kg`;
+                                  }
+                                  if (!confirm(msg)) return;
                                   const res = await fetch(
                                     `${API}/api/admin/dhl/ship/${order.id}`,
                                     { method: "POST", credentials: "include" },
@@ -1144,7 +1180,7 @@ export function AdminOrders() {
                                       },
                                     );
                                     showToast(
-                                      `✅ DHL: ${json.data.trackingNumber}`,
+                                      `DHL: ${json.data.trackingNumber}`,
                                     );
                                     fetchOrders();
                                   } else {
@@ -1157,14 +1193,37 @@ export function AdminOrders() {
                               className="px-2 py-1 rounded bg-yellow-600 text-white text-xs"
                             >
                               📦 DHL
-                            </button>*/}
+                            </button>
                             <button
-                              onClick={() =>
-                                handleStatusChange(order.id, "shipped")
-                              }
-                              className="px-2 py-1 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] text-xs"
+                              onClick={async () => {
+                                try {
+                                  const offRes = await fetch(
+                                    `${API}/api/admin/wysylajnami/offers`,
+                                    {
+                                      method: "POST",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                      },
+                                      credentials: "include",
+                                      body: JSON.stringify({
+                                        weightKg: order.totalWeight,
+                                      }),
+                                    },
+                                  );
+                                  const offJson = await offRes.json();
+                                  const offers = offJson.data?.offers || [];
+                                  if (!offers.length) {
+                                    showToast("Brak ofert Wysylajnami", "err");
+                                    return;
+                                  }
+                                  setWnModal({ order, offers });
+                                } catch (err: any) {
+                                  showToast(err.message || "Błąd", "err");
+                                }
+                              }}
+                              className="px-2 py-1 rounded bg-green-600 text-white text-xs"
                             >
-                              🚚 Zakończ
+                              🚛 Wysyłaj z nami
                             </button>
                           </>
                         )}

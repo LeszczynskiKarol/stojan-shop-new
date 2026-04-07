@@ -79,11 +79,15 @@ export async function createFedExShipmentFromOrder(
   // Użyj adresu dostawy (jeśli inny) albo adresu głównego
   const useAltAddress = shipping.differentShippingAddress === true;
 
+  // FedEx limit: 35 chars per field
+  const fullName = [shipping.firstName, shipping.lastName]
+    .filter(Boolean)
+    .join(" ");
   const recipient: FedExRecipient = {
-    personName: [shipping.firstName, shipping.lastName]
-      .filter(Boolean)
-      .join(" "),
-    companyName: shipping.companyName || undefined,
+    personName: fullName.substring(0, 35),
+    companyName: shipping.companyName
+      ? shipping.companyName.substring(0, 35)
+      : undefined,
     phoneNumber: shipping.phone || "",
     email: shipping.email || undefined,
     street: useAltAddress

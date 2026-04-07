@@ -3,7 +3,7 @@
 import "dotenv/config";
 import Fastify from "fastify";
 import { FastifyError } from "fastify";
-// import { adminWNRoutes } from "./routes/admin-wysylajnami.js";
+import { adminWNRoutes } from "./routes/admin-wysylajnami.js";
 import multipart from "@fastify/multipart";
 import helmet from "@fastify/helmet";
 import formbody from "@fastify/formbody";
@@ -157,9 +157,9 @@ app.register(async function protectedRoutes(protectedApp) {
 
   await protectedApp.register(adminDHLRoutes, { prefix: "/api/admin/dhl" });
 
-  //await protectedApp.register(adminWNRoutes, {
-  //prefix: "/api/admin/wysylajnami",
-  //});
+  await protectedApp.register(adminWNRoutes, {
+    prefix: "/api/admin/wysylajnami",
+  });
 });
 
 // ============================================
