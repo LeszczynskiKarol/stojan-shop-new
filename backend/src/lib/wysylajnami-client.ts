@@ -125,14 +125,19 @@ export async function isWNConnected(): Promise<boolean> {
 // ============================================
 export async function getWNOffers(
   weightKg: number,
+  receiverPostCode?: string,
   lengthCm?: number,
   widthCm?: number,
   heightCm?: number,
 ): Promise<WNOffer[]> {
-  console.log("📦 WN getOffers request, weight:", weightKg);
-
   const w = Number(weightKg);
-  const isPallet = w > 31.5;
+  console.log(
+    "📦 WN getOffers request, weight:",
+    w,
+    "receiver:",
+    receiverPostCode,
+  );
+
   const payload = {
     packages: [
       {
@@ -141,14 +146,14 @@ export async function getWNOffers(
         length: Number(lengthCm) || 80,
         width: Number(widthCm) || 60,
         height: Number(heightCm) || 60,
-        non_standard: true,
+        non_standard: w > 31.5,
         description: "Silnik elektryczny",
         sender: {
           post_code: "87-152",
           country_id: 1,
         },
         receiver: {
-          post_code: "00-001",
+          post_code: receiverPostCode || "00-001",
           country_id: 1,
         },
       },

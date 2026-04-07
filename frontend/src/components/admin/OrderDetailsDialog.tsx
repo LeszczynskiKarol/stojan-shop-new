@@ -826,6 +826,10 @@ export function OrderDetailsDialog({
                     <button
                       onClick={async () => {
                         try {
+                          const s = order.shipping as any;
+                          const pc = s.differentShippingAddress
+                            ? s.shippingPostalCode || s.postalCode
+                            : s.postalCode;
                           const offRes = await fetch(
                             `${API}/api/admin/wysylajnami/offers`,
                             {
@@ -834,6 +838,7 @@ export function OrderDetailsDialog({
                               credentials: "include",
                               body: JSON.stringify({
                                 weightKg: order.totalWeight,
+                                postalCode: pc,
                               }),
                             },
                           );

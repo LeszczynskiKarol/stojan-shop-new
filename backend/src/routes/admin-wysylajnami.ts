@@ -14,14 +14,15 @@ export async function adminWNRoutes(app: FastifyInstance) {
   });
 
   // Get price offers for weight
-  app.post<{ Body: { weightKg: number } }>(
+  app.post<{ Body: { weightKg: number; postalCode?: string } }>(
     "/offers",
     async (request, reply) => {
       try {
-        const { weightKg } = request.body as any;
-        const offers = await getWNOffers(weightKg || 50);
+        const { weightKg, postalCode } = request.body as any;
+        const offers = await getWNOffers(weightKg || 50, postalCode);
         return { success: true, data: { offers } };
       } catch (err: any) {
+        console.error("❌ WN offers error:", err.message);
         return reply.status(500).send({ success: false, error: err.message });
       }
     },

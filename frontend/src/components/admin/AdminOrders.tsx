@@ -1122,7 +1122,7 @@ export function AdminOrders() {
                               }
                               className="px-2 py-1 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] text-xs"
                             >
-                              Zakończ
+                              Zakończ bez API
                             </button>
                             <button
                               onClick={async () => {
@@ -1197,6 +1197,10 @@ export function AdminOrders() {
                             <button
                               onClick={async () => {
                                 try {
+                                  const s = order.shipping as any;
+                                  const pc = s.differentShippingAddress
+                                    ? s.shippingPostalCode || s.postalCode
+                                    : s.postalCode;
                                   const offRes = await fetch(
                                     `${API}/api/admin/wysylajnami/offers`,
                                     {
@@ -1207,6 +1211,7 @@ export function AdminOrders() {
                                       credentials: "include",
                                       body: JSON.stringify({
                                         weightKg: order.totalWeight,
+                                        postalCode: pc,
                                       }),
                                     },
                                   );
