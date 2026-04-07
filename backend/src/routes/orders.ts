@@ -25,7 +25,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:4821";
 
 // Na górze pliku:
-async function notifySeoPanelWebhook(orderDate: Date) {
+export async function notifySeoPanelWebhook(orderDate: Date) {
   const SEO_PANEL_URL = process.env.SEO_PANEL_WEBHOOK_URL;
   const SEO_PANEL_KEY = process.env.SEO_PANEL_WEBHOOK_KEY;
   if (!SEO_PANEL_URL || !SEO_PANEL_KEY) return;
@@ -53,6 +53,8 @@ async function notifySeoPanelWebhook(orderDate: Date) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         apiKey: SEO_PANEL_KEY,
+        integrationId:
+          process.env.SEO_PANEL_INTEGRATION_ID || "cmncbs3wn0001qrx8j3e6ktr7",
         date: dateStr,
         revenue: totalRevenue,
         orders: totalOrders,

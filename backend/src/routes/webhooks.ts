@@ -115,7 +115,13 @@ export async function webhookRoutes(app: FastifyInstance) {
           });
 
           app.log.info(`✅ Order ${order.orderNumber} opłacony (Stripe)`);
-
+          // ▶ Notify SEO Panel
+          try {
+            const { notifySeoPanelWebhook } = await import("./orders.js");
+            await notifySeoPanelWebhook(updatedOrder.createdAt);
+          } catch (e: any) {
+            app.log.warn(`SEO Panel webhook failed: ${e.message}`);
+          }
           // ▶ Server-side analytics tracking
           const webhookVisitorId = session.metadata?.visitorId;
           app.log.info(

@@ -414,7 +414,7 @@ export async function getFedExRates(
         },
       },
       pickupType: "USE_SCHEDULED_PICKUP",
-      serviceType: FEDEX_DEFAULT_SERVICE,
+      //serviceType: FEDEX_DEFAULT_SERVICE,
       packagingType: "YOUR_PACKAGING",
       rateRequestType: ["ACCOUNT", "LIST"],
       requestedPackageLineItems: [
@@ -426,16 +426,36 @@ export async function getFedExRates(
   });
 
   const rateDetails = data?.output?.rateReplyDetails || [];
+  console.log(
+    "📊 FedEx Rate response:",
+    JSON.stringify(
+      rateDetails.map((rd: any) => ({
+        service: rd.serviceType,
+        details: rd.ratedShipmentDetails?.map((d: any) => ({
+          rateType: d.rateType,
+          totalNet: d.totalNetCharge,
+          totalNetFedEx: d.totalNetFedExCharge,
+          currency: d.currency,
+        })),
+      })),
+      null,
+      2,
+    ),
+  );
   return rateDetails.map((rd: any) => {
     const rated =
       rd.ratedShipmentDetails?.find(
         (d: any) => d.rateType === "PAYOR_ACCOUNT_SHIPMENT",
-      ) || rd.ratedShipmentDetails?.[0];
+      ) ||
+      rd.ratedShipmentDetails?.find(
+        (d: any) => d.rateType === "PAYOR_ACCOUNT_PACKAGE",
+      ) ||
+      rd.ratedShipmentDetails?.[0];
 
     return {
       serviceType: rd.serviceType || "",
       serviceName: rd.serviceName || rd.serviceType || "",
-      totalCharge: rated?.totalNetCharge ?? 0,
+      totalCharge: rated?.totalNetCharge ?? rated?.totalNetFedExCharge ?? 0,
       currency: rated?.currency || "PLN",
       transitDays: rd.commit?.transitDays?.toString() || undefined,
     };
