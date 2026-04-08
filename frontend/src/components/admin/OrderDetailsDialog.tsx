@@ -738,6 +738,50 @@ export function OrderDetailsDialog({
                         ? "📦 FedEx"
                         : "🚚 Zakończ zamówienie bez API"}
                   </button>
+                  {Number(order.totalWeight) <= 36.5 &&
+                    Number(order.totalWeight) > 0 && (
+                      <button
+                        onClick={async () => {
+                          if (!confirm("Wysłać ręcznie BEZ FedEx API?")) return;
+                          setShipping(true);
+                          try {
+                            await fetch(
+                              `${API}/api/orders/${order.id}/status`,
+                              {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  status: "shipped",
+                                  skipCourier: true,
+                                }),
+                              },
+                            );
+                            onStatusChange?.("shipped");
+                            onClose();
+                          } catch {
+                            alert("Błąd");
+                            setShipping(false);
+                          }
+                        }}
+                        disabled={shipping}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "8px 16px",
+                          background: "#4b5563",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: "6px",
+                          fontWeight: 600,
+                          fontSize: "13px",
+                          cursor: shipping ? "wait" : "pointer",
+                          opacity: shipping ? 0.6 : 1,
+                        }}
+                      >
+                        🚚 Ręcznie
+                      </button>
+                    )}
                   {Number(order.totalWeight) > 36.5 && (
                     <button
                       onClick={async () => {

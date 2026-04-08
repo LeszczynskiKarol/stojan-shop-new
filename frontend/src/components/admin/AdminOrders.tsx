@@ -1135,10 +1135,44 @@ export function AdminOrders() {
                       </button>
                       {order.status === "paid" &&
                         Number(order.totalWeight) <= 36.5 && (
-                          <FedExShipButton
-                            order={order}
-                            onShipped={() => fetchOrders()}
-                          />
+                          <>
+                            <FedExShipButton
+                              order={order}
+                              onShipped={() => fetchOrders()}
+                            />
+                            <button
+                              onClick={async () => {
+                                if (
+                                  !confirm(
+                                    `Wysłać ręcznie #${order.orderNumber} BEZ FedEx API?`,
+                                  )
+                                )
+                                  return;
+                                try {
+                                  await fetch(
+                                    `${API}/api/orders/${order.id}/status`,
+                                    {
+                                      method: "PATCH",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                      },
+                                      body: JSON.stringify({
+                                        status: "shipped",
+                                        skipCourier: true,
+                                      }),
+                                    },
+                                  );
+                                  fetchOrders();
+                                  showToast("Wysłane (ręcznie)");
+                                } catch {
+                                  showToast("Błąd", "err");
+                                }
+                              }}
+                              className="px-2 py-1 rounded bg-gray-600 text-white text-xs"
+                            >
+                              🚚 Ręcznie
+                            </button>
+                          </>
                         )}
                       {order.status === "paid" &&
                         Number(order.totalWeight) > 36.5 && (

@@ -28,7 +28,12 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:4821";
 export async function notifySeoPanelWebhook(orderDate: Date) {
   const SEO_PANEL_URL = process.env.SEO_PANEL_WEBHOOK_URL;
   const SEO_PANEL_KEY = process.env.SEO_PANEL_WEBHOOK_KEY;
-  if (!SEO_PANEL_URL || !SEO_PANEL_KEY) return;
+  if (!SEO_PANEL_URL || !SEO_PANEL_KEY) {
+    console.warn(
+      "⚠️ SEO Panel webhook skipped: missing SEO_PANEL_WEBHOOK_URL or SEO_PANEL_WEBHOOK_KEY env vars",
+    );
+    return;
+  }
 
   try {
     const dateStr = orderDate.toISOString().split("T")[0];
@@ -546,7 +551,10 @@ export async function orderRoutes(app: FastifyInstance) {
     "/:id/status",
     async (request, reply) => {
       try {
-        const { status } = request.body as { status: string };
+        const { status, skipCourier } = request.body as {
+          status: string;
+          skipCourier?: boolean;
+        };
         const validStatuses = [
           "pending",
           "paid",
@@ -577,7 +585,7 @@ export async function orderRoutes(app: FastifyInstance) {
           let fedexTrackingUrl: string | undefined;
 
           const totalWeight = Number(order.totalWeight) || 0;
-          if (isFedExEligible(totalWeight)) {
+          if (isFedExEligible(totalWeight) && !skipCourier) {
             try {
               const { createFedExShipmentFromOrder } =
                 await import("../services/fedex-service.js");
