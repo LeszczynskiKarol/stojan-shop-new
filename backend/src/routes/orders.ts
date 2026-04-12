@@ -820,7 +820,8 @@ export async function orderRoutes(app: FastifyInstance) {
           isStockReserved: false,
         },
       });
-
+      // ▶ Recalculate SEO Panel conversions (cancelled order excluded)
+      await notifySeoPanelWebhook(order.createdAt);
       // ▶ Reset analytics session — usuń anulowane z konwersji
       try {
         await prisma.analyticsSession.updateMany({
@@ -904,7 +905,18 @@ export async function orderRoutes(app: FastifyInstance) {
           console.warn("⚠️ Analytics reset failed:", e);
         }
       }
-
+      // ▶ Recalculate SEO Panel for affected dates
+      const affectedDates = new Set<string>();
+      for (const id of ids) {
+        const o = await prisma.order.findUnique({
+          where: { id },
+          select: { createdAt: true },
+        });
+        if (o) affectedDates.add(o.createdAt.toISOString().split("T")[0]);
+      }
+      for (const dateStr of affectedDates) {
+        await notifySeoPanelWebhook(new Date(dateStr));
+      }
       fireSatelliteRebuild("orders_cancelled_bulk");
 
       return reply.send({
@@ -929,7 +941,11 @@ export async function orderRoutes(app: FastifyInstance) {
       } catch (e) {
         console.warn("⚠️ Analytics reset failed:", e);
       }
-
+      const orderToDelete = await prisma.order.findUnique({
+        where: { id: request.params.id },
+        select: { createdAt: true },
+      });
+      if (orderToDelete) await notifySeoPanelWebhook(orderToDelete.createdAt);
       await prisma.order.delete({ where: { id: request.params.id } });
       return reply.send({ success: true, message: "Zamówienie usunięte" });
     } catch (err: any) {

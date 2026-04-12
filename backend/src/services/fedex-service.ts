@@ -1,42 +1,24 @@
 // backend/src/services/fedex-service.ts
-// Business logic: FedEx shipment creation from order data
-// Handles: label → S3, tracking → DB, email notification
+// Business logic: FedEx FDS WS shipment creation from order data
+// Handles: create shipment → get label → upload to S3 → save tracking to DB
+//
+// FDS WS flow (2 steps, unlike global REST API which was 1):
+// 1. zapiszListV2 → returns waybill (tracking number)
+// 2. wydrukujEtykiete → returns label PDF (base64)
 
 import { prisma } from "../lib/prisma.js";
 import { uploadInvoiceToS3 } from "../lib/s3.js";
 import {
   createFedExShipment,
+  getFedExLabel,
   cancelFedExShipment,
   isFedExEligible,
   type FedExRecipient,
   type FedExPackage,
-  type FedExShipmentResult,
+  type FedExCodOptions,
+  type FedExInsuranceOptions,
 } from "../lib/fedex-client.js";
 import { FEDEX_MAX_WEIGHT_KG } from "../config/fedex.config.js";
-
-function stripPolish(s: string): string {
-  const map: Record<string, string> = {
-    ą: "a",
-    ć: "c",
-    ę: "e",
-    ł: "l",
-    ń: "n",
-    ó: "o",
-    ś: "s",
-    ź: "z",
-    ż: "z",
-    Ą: "A",
-    Ć: "C",
-    Ę: "E",
-    Ł: "L",
-    Ń: "N",
-    Ó: "O",
-    Ś: "S",
-    Ź: "Z",
-    Ż: "Z",
-  };
-  return s.replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, (c) => map[c] || c);
-}
 
 // ============================================
 // TYPES
@@ -50,18 +32,51 @@ export interface FedExShipResult {
 }
 
 // ============================================
+// HELPERS
+// ============================================
+
+/**
+ * Parse street string into street name + house number + apartment number.
+ * Examples:
+ *   "Wojewódzka 2" → { street: "Wojewódzka", homeNo: "2" }
+ *   "ul. Kościuszki 10/2" → { street: "Kościuszki", homeNo: "10", localNo: "2" }
+ *   "Piękna 3A/15" → { street: "Piękna", homeNo: "3A", localNo: "15" }
+ */
+function parseStreet(raw: string): {
+  street: string;
+  homeNo: string;
+  localNo?: string;
+} {
+  // Remove "ul. " prefix
+  let s = raw.replace(/^ul\.?\s*/i, "").trim();
+
+  // Try to match: street name + number (possibly with letter) + optional /apartment
+  const match = s.match(/^(.+?)\s+(\d+\w?)\s*(?:\/\s*(\d+\w?))?\s*$/);
+
+  if (match) {
+    return {
+      street: match[1].trim(),
+      homeNo: match[2],
+      localNo: match[3] || undefined,
+    };
+  }
+
+  // Fallback: use whole string as street, empty house number
+  return { street: s, homeNo: "" };
+}
+
+// ============================================
 // CREATE SHIPMENT FROM ORDER
 // ============================================
 
 /**
- * Tworzy przesyłkę FedEx na podstawie zamówienia:
- * 1. Waliduje wagę (≤ 36.5 kg)
+ * Tworzy przesyłkę FedEx FDS WS na podstawie zamówienia:
+ * 1. Waliduje wagę
  * 2. Buduje recipient z order.shipping JSON
- * 3. Wywołuje FedEx Ship API → tracking + label PDF
- * 4. Uploaduje etykietę na S3
- * 5. Zapisuje tracking + labelUrl w order.paymentDetails
- *
- * Wywoływana z admin panelu lub automatycznie przy zmianie statusu na "shipped".
+ * 3. zapiszListV2 → waybill (tracking number)
+ * 4. wydrukujEtykiete → label PDF base64
+ * 5. Upload etykiety na S3
+ * 6. Zapis tracking + labelUrl w order.paymentDetails
  */
 export async function createFedExShipmentFromOrder(
   orderId: string,
@@ -100,90 +115,115 @@ export async function createFedExShipmentFromOrder(
     return { success: false, error: "Brak danych shipping w zamówieniu" };
   }
 
-  // Użyj adresu dostawy (jeśli inny) albo adresu głównego
+  // Adres dostawy (inny lub główny)
   const useAltAddress = shipping.differentShippingAddress === true;
+  const rawStreet = useAltAddress
+    ? shipping.shippingStreet || shipping.street
+    : shipping.street;
+  const { street, homeNo, localNo } = parseStreet(rawStreet);
 
-  // FedEx limit: 35 chars per field
-  const fullName = [shipping.firstName, shipping.lastName]
-    .filter(Boolean)
-    .join(" ");
   const recipient: FedExRecipient = {
-    personName: stripPolish(fullName).substring(0, 35),
-    companyName: shipping.companyName
-      ? stripPolish(shipping.companyName).substring(0, 35)
-      : undefined,
+    personName: shipping.firstName || "",
+    surname: shipping.lastName || "",
+    companyName: shipping.companyName || undefined,
+    nip: shipping.nip || undefined,
     phoneNumber: shipping.phone || "",
     email: shipping.email || undefined,
-    street: stripPolish(
-      useAltAddress
-        ? shipping.shippingStreet || shipping.street
-        : shipping.street,
-    ),
-    city: stripPolish(
-      useAltAddress ? shipping.shippingCity || shipping.city : shipping.city,
-    ),
+    street,
+    homeNo: homeNo || "1",
+    localNo,
+    city: useAltAddress
+      ? shipping.shippingCity || shipping.city
+      : shipping.city,
     postalCode: useAltAddress
       ? shipping.shippingPostalCode || shipping.postalCode
       : shipping.postalCode,
-    countryCode: "PL", // domestic — adjust if you ship internationally
-    residential: !shipping.companyName, // business = false, individual = true
+    countryCode: "PL",
+    isCompany: !!shipping.companyName || !!shipping.nip,
   };
 
   const pkg: FedExPackage = {
     weightKg: totalWeight,
-    // Dimensions optional — FedEx calculates dim weight if provided
-    // Could be added from product attributes if needed
   };
 
   const orderNumber = order.orderNumber || order.id;
 
-  // 5. Wywołaj FedEx API
-  let result: FedExShipmentResult;
+  // 5. COD — jeśli zamówienie jest za pobraniem
+  let cod: FedExCodOptions | undefined;
+  if (order.paymentMethod === "cod") {
+    cod = {
+      codValue: Number(order.total),
+      bankAccountNumber: process.env.FEDEX_COD_BANK_ACCOUNT || "",
+      codType: "P", // P = przelew na konto
+    };
+  }
+
+  // 6. Ubezpieczenie — opcjonalne, od wartości zamówienia
+  let insurance: FedExInsuranceOptions | undefined;
+  const orderTotal = Number(order.total);
+  if (orderTotal > 500) {
+    // Ubezpieczaj automatycznie zamówienia > 500 zł
+    insurance = {
+      insuranceValue: orderTotal,
+      contentDescription: `Zamówienie ${orderNumber}`,
+    };
+  }
+
+  // 7. KROK 1: Utwórz przesyłkę (zapiszListV2 → waybill)
+  let waybill: string;
   try {
-    result = await createFedExShipment(
+    const result = await createFedExShipment(
       recipient,
       pkg,
       orderNumber,
-      Number(order.total),
+      orderTotal,
+      cod,
+      insurance,
     );
+    waybill = result.waybill;
   } catch (err: any) {
     console.error(
-      `❌ FedEx shipment failed for order ${orderNumber}:`,
+      `❌ FDS WS shipment failed for order ${orderNumber}:`,
       err.message,
     );
     return { success: false, error: err.message };
   }
 
-  // 6. Upload etykiety na S3 (jeśli mamy base64)
-  let labelUrl = result.labelUrl || "";
+  // 8. KROK 2: Pobierz etykietę (wydrukujEtykiete → PDF base64)
+  let labelBase64 = "";
+  try {
+    labelBase64 = await getFedExLabel(waybill);
+  } catch (labelErr: any) {
+    console.warn(`⚠️ FDS WS label failed for ${waybill}: ${labelErr.message}`);
+    // Shipment created, label failed — still save tracking number
+  }
 
-  if (result.labelBase64 && !labelUrl) {
+  // 9. Upload etykiety na S3
+  let labelUrl = "";
+  if (labelBase64) {
     try {
-      const labelBuffer = Buffer.from(result.labelBase64, "base64");
-      const filename = `fedex-label-${result.trackingNumber}.pdf`;
+      const labelBuffer = Buffer.from(labelBase64, "base64");
+      const filename = `fedex-label-${waybill}.pdf`;
       labelUrl = await uploadInvoiceToS3(
         labelBuffer,
         filename,
         "application/pdf",
       );
-      console.log(`✅ FedEx label uploaded to S3: ${labelUrl}`);
+      console.log(`✅ FDS WS label uploaded to S3: ${labelUrl}`);
     } catch (s3Err: any) {
       console.error(`⚠️ S3 upload failed for FedEx label:`, s3Err.message);
-      // Label jest w base64 — admin może pobrać z API
     }
   }
 
-  // 7. Zapisz tracking + label URL w paymentDetails JSON
+  // 10. Zapisz tracking + label URL w paymentDetails JSON
   const currentPaymentDetails = (order.paymentDetails as any) || {};
   const updatedPaymentDetails = {
     ...currentPaymentDetails,
     fedex: {
-      trackingNumber: result.trackingNumber,
-      masterTrackingNumber: result.masterTrackingNumber,
+      trackingNumber: waybill,
       labelUrl,
-      serviceType: result.serviceType,
-      shipDate: result.shipDate,
       createdAt: new Date().toISOString(),
+      system: "FDS_WS", // mark as FDS WS (not FSM)
     },
   };
 
@@ -195,12 +235,12 @@ export async function createFedExShipmentFromOrder(
   });
 
   console.log(
-    `✅ FedEx shipment saved: order=${orderNumber}, tracking=${result.trackingNumber}`,
+    `✅ FDS WS shipment saved: order=${orderNumber}, tracking=${waybill}`,
   );
 
   return {
     success: true,
-    trackingNumber: result.trackingNumber,
+    trackingNumber: waybill,
     labelUrl,
   };
 }
@@ -210,8 +250,8 @@ export async function createFedExShipmentFromOrder(
 // ============================================
 
 /**
- * Anuluje przesyłkę FedEx powiązaną z zamówieniem.
- * Usuwa dane FedEx z paymentDetails.
+ * FDS WS nie obsługuje anulowania przesyłek przez API.
+ * Czyści dane z paymentDetails, ale przesyłka wymaga kontaktu z FedEx.
  */
 export async function cancelFedExShipmentForOrder(
   orderId: string,
@@ -228,20 +268,21 @@ export async function cancelFedExShipmentForOrder(
     return { success: false, error: "Brak przesyłki FedEx do anulowania" };
   }
 
+  // FDS WS can't cancel — just try (will return false) and clean up DB
   const cancelled = await cancelFedExShipment(trackingNumber);
 
-  if (cancelled) {
-    // Usuń dane FedEx z paymentDetails
-    const { fedex, ...rest } = details;
-    await prisma.order.update({
-      where: { id: orderId },
-      data: { paymentDetails: rest },
-    });
-  }
+  // Always clean up DB — user acknowledged they need to call FedEx
+  const { fedex, ...rest } = details;
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { paymentDetails: rest },
+  });
 
   return {
-    success: cancelled,
-    error: cancelled ? undefined : "FedEx nie pozwolił anulować przesyłki",
+    success: true,
+    error: cancelled
+      ? undefined
+      : `Dane usunięte z systemu. Przesyłka ${trackingNumber} wymaga anulowania przez infolinię FedEx: 800 400 800`,
   };
 }
 
@@ -257,8 +298,6 @@ export async function getFedExInfoForOrder(orderId: string): Promise<{
   eligible: boolean;
   trackingNumber?: string;
   labelUrl?: string;
-  serviceType?: string;
-  shipDate?: string;
   trackingUrl?: string;
 }> {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
@@ -281,8 +320,6 @@ export async function getFedExInfoForOrder(orderId: string): Promise<{
     eligible,
     trackingNumber: fedex.trackingNumber,
     labelUrl: fedex.labelUrl,
-    serviceType: fedex.serviceType,
-    shipDate: fedex.shipDate,
     trackingUrl: `https://www.fedex.com/fedextrack/?trknbr=${fedex.trackingNumber}`,
   };
 }

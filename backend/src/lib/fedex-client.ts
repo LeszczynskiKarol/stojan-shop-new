@@ -1,40 +1,55 @@
 // backend/src/lib/fedex-client.ts
-// FedEx REST API client — OAuth2 + Ship API
-// Pattern: analogiczny do allegro-client.ts (in-memory token cache)
+// FedEx FDS WS (Domestic Shipping Web Service) — SOAP client
+// Endpoint: https://poland.fedex.com/fdsWs/IklServicePort
+// WSDL: https://poland.fedex.com/fdsWs/IklServicePort?wsdl
+//
+// Replaces the global REST API (apis.fedex.com) integration.
+// FDS WS uses simple accessCode auth (no OAuth2) and has:
+// - Negotiated/contract rates (not list prices)
+// - Built-in COD (pobranie) support
+// - Built-in insurance (ubezpieczenie) with flat tiers
+// - No >25kg surcharge like FSM
 
 import {
   fedexConfig,
-  FEDEX_DEFAULT_SERVICE,
-  FEDEX_LABEL_CONFIG,
   FEDEX_MAX_WEIGHT_KG,
+  FEDEX_DEFAULT_SHIPMENT_TYPE,
+  FEDEX_DEFAULT_PAYMENT_FORM,
+  FEDEX_DEFAULT_PAYER_TYPE,
+  FEDEX_LABEL_FORMAT,
 } from "../config/fedex.config.js";
 
-const { apiUrl, clientId, clientSecret, accountNumber, shipper } = fedexConfig;
+const { accessCode, soapUrl, senderId, payerId, shipper } = fedexConfig;
+
+// ============================================
+// SOAP NAMESPACE
+// ============================================
+
+const NS = "http://ws.alfaprojekt.com/";
 
 // ============================================
 // TYPES
 // ============================================
 
 export interface FedExShipmentResult {
-  trackingNumber: string;
-  masterTrackingNumber: string;
-  labelBase64: string; // PDF base64
-  labelUrl?: string;
-  serviceType: string;
-  shipDate: string;
+  waybill: string; // numer listu przewozowego (tracking number)
+  nrExt: string; // numer zewnętrzny (order number)
 }
 
 export interface FedExRecipient {
-  personName: string;
+  personName: string; // imię
+  surname: string; // nazwisko
   companyName?: string;
+  nip?: string;
   phoneNumber: string;
   email?: string;
-  street: string;
+  street: string; // ulica (bez numeru domu)
+  homeNo: string; // numer domu
+  localNo?: string; // numer lokalu
   city: string;
   postalCode: string;
   countryCode: string; // ISO2, e.g. "PL"
-  stateOrProvinceCode?: string;
-  residential?: boolean;
+  isCompany?: boolean;
 }
 
 export interface FedExPackage {
@@ -42,123 +57,128 @@ export interface FedExPackage {
   lengthCm?: number;
   widthCm?: number;
   heightCm?: number;
+  type?: string; // typ paczki
+}
+
+export interface FedExCodOptions {
+  codType?: string; // typ pobrania
+  codValue: number; // kwota pobrania
+  bankAccountNumber: string; // nr konta
+}
+
+export interface FedExInsuranceOptions {
+  insuranceValue: number; // kwota ubezpieczenia
+  contentDescription?: string; // opis zawartości
 }
 
 // ============================================
-// TOKEN CACHE (in-memory, ~55 min TTL)
+// SOAP HELPERS
 // ============================================
 
-let _cachedToken: string | null = null;
-let _tokenExpiresAt = 0;
-
 /**
- * OAuth2 Bearer token z FedEx. Cache'owany ~55 min (token żyje 60 min).
+ * Wraps a SOAP body in a full envelope
  */
-export async function getFedExToken(): Promise<string> {
-  const now = Date.now();
-  if (_cachedToken && now < _tokenExpiresAt) {
-    return _cachedToken;
-  }
-
-  if (!clientId || !clientSecret) {
-    throw new Error(
-      "FedEx credentials not configured (FEDEX_CLIENT_ID / FEDEX_CLIENT_SECRET)",
-    );
-  }
-
-  const res = await fetch(`${apiUrl}/oauth/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: clientId,
-      client_secret: clientSecret,
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`FedEx OAuth failed (${res.status}): ${text}`);
-  }
-
-  const data = (await res.json()) as {
-    access_token: string;
-    expires_in: number;
-  };
-
-  _cachedToken = data.access_token;
-  _tokenExpiresAt = now + (data.expires_in - 300) * 1000; // refresh 5 min early
-
-  console.log("✅ FedEx OAuth token obtained");
-  return _cachedToken;
+function soapEnvelope(operationXml: string): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="${NS}">
+  <soapenv:Header/>
+  <soapenv:Body>
+    ${operationXml}
+  </soapenv:Body>
+</soapenv:Envelope>`;
 }
 
 /**
- * Helper: authenticated FedEx API call
+ * Makes a SOAP call to FDS WS and returns parsed response body.
+ * Throws on SOAP faults or HTTP errors.
  */
-export async function fedexFetch(
-  endpoint: string,
-  body: Record<string, unknown>,
-): Promise<any> {
-  const token = await getFedExToken();
+async function soapCall(
+  operationName: string,
+  bodyXml: string,
+): Promise<string> {
+  const envelope = soapEnvelope(bodyXml);
 
-  const res = await fetch(`${apiUrl}${endpoint}`, {
+  const res = await fetch(soapUrl, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      "x-locale": "en_US",
+      "Content-Type": "text/xml; charset=utf-8",
+      SOAPAction: "",
     },
-    body: JSON.stringify(body),
+    body: envelope,
   });
 
-  const data = await res.json();
+  const responseText = await res.text();
 
   if (!res.ok) {
-    console.error(
-      `❌ FedEx API ${endpoint} FULL RESPONSE:`,
-      JSON.stringify(data, null, 2),
+    // Try to extract SOAP fault
+    const faultMatch = responseText.match(
+      /<faultstring[^>]*>([\s\S]*?)<\/faultstring>/,
     );
-    const errMsg =
-      data?.errors?.[0]?.message || data?.message || JSON.stringify(data);
-    throw new Error(`FedEx API ${endpoint} (${res.status}): ${errMsg}`);
+    const errorMatch = responseText.match(/<opis[^>]*>([\s\S]*?)<\/opis>/);
+    const msg =
+      faultMatch?.[1] ||
+      errorMatch?.[1] ||
+      `HTTP ${res.status}: ${responseText.substring(0, 500)}`;
+    throw new Error(`FDS WS ${operationName}: ${msg}`);
   }
 
-  return data;
+  // Check for SOAP Fault in 200 response
+  if (
+    responseText.includes("<soap:Fault>") ||
+    responseText.includes("<S:Fault>")
+  ) {
+    const faultMatch = responseText.match(
+      /<faultstring[^>]*>([\s\S]*?)<\/faultstring>/,
+    );
+    const opisMatch = responseText.match(/<opis[^>]*>([\s\S]*?)<\/opis>/g);
+    const errors = opisMatch
+      ? opisMatch.map((m) => m.replace(/<\/?opis[^>]*>/g, "")).join("; ")
+      : "";
+    const msg = faultMatch?.[1] || errors || "Unknown SOAP Fault";
+    throw new Error(`FDS WS ${operationName}: ${msg}`);
+  }
+
+  return responseText;
 }
 
 /**
- * Helper: authenticated FedEx PUT call (cancel etc.)
+ * Extract text content of a given XML tag from response.
+ * Simple regex-based — sufficient for FDS WS flat responses.
  */
-async function fedexPut(
-  endpoint: string,
-  body: Record<string, unknown>,
-): Promise<any> {
-  const token = await getFedExToken();
+function extractTag(xml: string, tagName: string): string | null {
+  // Match both ns2:tagName and tagName (with or without namespace prefix)
+  const regex = new RegExp(
+    `<(?:[\\w]+:)?${tagName}[^>]*>([\\s\\S]*?)<\\/(?:[\\w]+:)?${tagName}>`,
+  );
+  const match = xml.match(regex);
+  return match ? match[1].trim() : null;
+}
 
-  const res = await fetch(`${apiUrl}${endpoint}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      "x-locale": "en_US",
-    },
-    body: JSON.stringify(body),
-  });
+/**
+ * Extract base64 binary content (for labels/documents)
+ */
+function extractBase64Tag(xml: string, tagName: string): string | null {
+  return extractTag(xml, tagName);
+}
 
-  const data = await res.json();
+/**
+ * Escape XML special characters
+ */
+function escXml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
 
-  if (!res.ok) {
-    console.error(
-      `❌ FedEx API ${endpoint} FULL RESPONSE:`,
-      JSON.stringify(data, null, 2),
-    );
-    const errMsg =
-      data?.errors?.[0]?.message || data?.message || JSON.stringify(data);
-    throw new Error(`FedEx API ${endpoint} (${res.status}): ${errMsg}`);
-  }
-
-  return data;
+/**
+ * Optional XML element — only include if value is truthy
+ */
+function optEl(tag: string, value: string | number | undefined | null): string {
+  if (value === undefined || value === null || value === "") return "";
+  return `<${tag}>${escXml(String(value))}</${tag}>`;
 }
 
 // ============================================
@@ -166,216 +186,261 @@ async function fedexPut(
 // ============================================
 
 /**
- * Sprawdza czy zamówienie kwalifikuje się do wysyłki FedEx (waga ≤ 36.5 kg).
+ * Sprawdza czy zamówienie kwalifikuje się do wysyłki FedEx (waga ≤ limit).
  */
 export function isFedExEligible(totalWeightKg: number): boolean {
   return totalWeightKg > 0 && totalWeightKg <= FEDEX_MAX_WEIGHT_KG;
 }
 
 // ============================================
-// CREATE SHIPMENT → label + tracking number
+// CREATE SHIPMENT — zapiszListV2
 // ============================================
 
 /**
- * Tworzy przesyłkę FedEx i zwraca tracking number + etykietę (PDF base64).
+ * Tworzy przesyłkę w FDS WS.
+ * Operacja: zapiszListV2
+ * Zwraca: waybill (numer listu / tracking number)
  *
- * Endpoint: POST /ship/v1/shipments
+ * Etykieta jest pobierana OSOBNO przez getLabel().
  */
 export async function createFedExShipment(
   recipient: FedExRecipient,
   pkg: FedExPackage,
   orderNumber: string,
   orderValue?: number,
-  shipDate?: string,
+  cod?: FedExCodOptions,
+  insurance?: FedExInsuranceOptions,
 ): Promise<FedExShipmentResult> {
-  // Validate weight
   if (!isFedExEligible(pkg.weightKg)) {
     throw new Error(
       `Waga ${pkg.weightKg} kg przekracza limit FedEx (${FEDEX_MAX_WEIGHT_KG} kg)`,
     );
   }
 
-  // Ship date = next business day (skip Sat/Sun — Saturday surcharge)
-  const now = new Date();
-  const day = now.getDay(); // 0=Sun, 6=Sat
-  if (day === 6) now.setDate(now.getDate() + 2); // Sat → Mon
-  if (day === 0) now.setDate(now.getDate() + 1); // Sun → Mon
-  const today = shipDate || now.toISOString().split("T")[0];
+  // Build COD section
+  let codXml = "";
+  if (cod) {
+    codXml = `
+        <cod>
+          ${optEl("codType", cod.codType || "P")}
+          <codValue>${cod.codValue}</codValue>
+          <bankAccountNumber>${escXml(cod.bankAccountNumber)}</bankAccountNumber>
+        </cod>`;
+  }
 
-  const requestBody: Record<string, unknown> = {
-    labelResponseOptions: "LABEL", // base64 encoded label
-    accountNumber: {
-      value: accountNumber,
-    },
-    requestedShipment: {
-      shipDatestamp: today,
-      pickupType: "USE_SCHEDULED_PICKUP",
-      serviceType: FEDEX_DEFAULT_SERVICE,
-      packagingType: "YOUR_PACKAGING",
-      totalWeight: pkg.weightKg,
-      shipper: {
-        address: {
-          streetLines: [shipper.street],
-          city: shipper.city,
-          postalCode: shipper.postalCode,
-          countryCode: shipper.countryCode,
-          stateOrProvinceCode: shipper.stateOrProvinceCode || undefined,
-          residential: false,
-        },
-        contact: {
-          personName: shipper.personName,
-          companyName: shipper.companyName,
-          phoneNumber: shipper.phoneNumber,
-          emailAddress: shipper.email,
-        },
-      },
-      recipients: [
-        {
-          address: {
-            streetLines: [recipient.street],
-            city: recipient.city,
-            postalCode: recipient.postalCode,
-            countryCode: recipient.countryCode,
-            stateOrProvinceCode: recipient.stateOrProvinceCode || undefined,
-            residential: recipient.residential ?? true,
-          },
-          contact: {
-            personName: recipient.personName,
-            companyName: recipient.companyName || undefined,
-            phoneNumber: recipient.phoneNumber,
-            emailAddress: recipient.email || undefined,
-          },
-        },
-      ],
-      shippingChargesPayment: {
-        paymentType: "SENDER",
-      },
-      labelSpecification: {
-        labelFormatType: FEDEX_LABEL_CONFIG.labelFormatType,
-        imageType: FEDEX_LABEL_CONFIG.imageType,
-        labelStockType: FEDEX_LABEL_CONFIG.labelStockType,
-      },
+  // Build insurance section
+  let insuranceXml = "";
+  if (insurance) {
+    insuranceXml = `
+        <insurance>
+          <insuranceValue>${insurance.insuranceValue}</insuranceValue>
+          ${optEl("contentDescription", insurance.contentDescription)}
+        </insurance>`;
+  }
 
-      customerReferences: [
-        {
-          customerReferenceType: "CUSTOMER_REFERENCE",
-          value: orderNumber,
-        },
-      ],
-      requestedPackageLineItems: [
-        {
-          weight: {
-            units: "KG",
-            value: pkg.weightKg,
-          },
-          ...(orderValue
-            ? {
-                declaredValue: {
-                  amount: orderValue,
-                  currency: "PLN",
-                },
-              }
-            : {}),
-          ...(pkg.lengthCm && pkg.widthCm && pkg.heightCm
-            ? {
-                dimensions: {
-                  length: Math.round(pkg.lengthCm),
-                  width: Math.round(pkg.widthCm),
-                  height: Math.round(pkg.heightCm),
-                  units: "CM",
-                },
-              }
-            : {}),
-        },
-      ],
-    },
-  };
+  // Build dimensions if provided
+  let dimsXml = "";
+  if (pkg.lengthCm && pkg.widthCm && pkg.heightCm) {
+    dimsXml = `
+            <dim1>${Math.round(pkg.lengthCm)}</dim1>
+            <dim2>${Math.round(pkg.widthCm)}</dim2>
+            <dim3>${Math.round(pkg.heightCm)}</dim3>`;
+  }
 
-  const data = await fedexFetch("/ship/v1/shipments", requestBody);
+  const body = `
+    <ws:zapiszListV2>
+      <accessCode>${escXml(accessCode)}</accessCode>
+      <shipmentV2>
+        <nrExt>${escXml(orderNumber)}</nrExt>
+        <paymentForm>${escXml(FEDEX_DEFAULT_PAYMENT_FORM)}</paymentForm>
+        <shipmentType>${escXml(FEDEX_DEFAULT_SHIPMENT_TYPE)}</shipmentType>
+        <payerType>${escXml(FEDEX_DEFAULT_PAYER_TYPE)}</payerType>
+        <sender>
+          <senderId>${escXml(senderId)}</senderId>
+          <contactDetails>
+            <name>${escXml(shipper.personName.split(" ")[0] || "Krzysztof")}</name>
+            <surname>${escXml(shipper.personName.split(" ").slice(1).join(" ") || "Leszczyński")}</surname>
+            <phoneNo>${escXml(shipper.phoneNumber)}</phoneNo>
+            ${optEl("email", shipper.email)}
+          </contactDetails>
+        </sender>
+        <receiver>
+          <addressDetails>
+            <isCompany>${recipient.isCompany || !!recipient.companyName ? "T" : "N"}</isCompany>
+            ${optEl("companyName", recipient.companyName)}
+            ${optEl("vatNo", recipient.nip)}
+            <name>${escXml(recipient.personName)}</name>
+            <surname>${escXml(recipient.surname)}</surname>
+            <city>${escXml(recipient.city)}</city>
+            <postalCode>${escXml(recipient.postalCode)}</postalCode>
+            <countryCode>${escXml(recipient.countryCode)}</countryCode>
+            <street>${escXml(recipient.street)}</street>
+            <homeNo>${escXml(recipient.homeNo)}</homeNo>
+            ${optEl("localNo", recipient.localNo)}
+          </addressDetails>
+          <contactDetails>
+            <name>${escXml(recipient.personName)}</name>
+            <surname>${escXml(recipient.surname)}</surname>
+            <phoneNo>${escXml(recipient.phoneNumber)}</phoneNo>
+            ${optEl("email", recipient.email)}
+          </contactDetails>
+        </receiver>
+        <payer>
+          <payerId>${escXml(payerId || senderId)}</payerId>
+          <contactDetails>
+            <name>${escXml(shipper.personName.split(" ")[0] || "Krzysztof")}</name>
+            <surname>${escXml(shipper.personName.split(" ").slice(1).join(" ") || "Leszczyński")}</surname>
+            <phoneNo>${escXml(shipper.phoneNumber)}</phoneNo>
+          </contactDetails>
+        </payer>${codXml}${insuranceXml}
+        <parcels>
+          <parcel>
+            <weight>${pkg.weightKg}</weight>${dimsXml}
+            ${optEl("type", pkg.type)}
+            ${optEl("nrExtPp", orderNumber)}
+          </parcel>
+        </parcels>
+        ${optEl("remarks", `Zamówienie ${orderNumber}`)}
+      </shipmentV2>
+    </ws:zapiszListV2>`;
 
-  // Parse response
-  const shipment = data?.output?.transactionShipments?.[0];
-  if (!shipment) {
-    throw new Error(
-      "FedEx createShipment: brak transactionShipments w odpowiedzi",
+  const responseXml = await soapCall("zapiszListV2", body);
+
+  // Parse response — listZapisanyV2 contains waybill
+  const waybill = extractTag(responseXml, "waybill");
+  if (!waybill) {
+    console.error(
+      "❌ FDS WS zapiszListV2: brak waybill w odpowiedzi:",
+      responseXml.substring(0, 1000),
     );
-  }
-
-  const pieceResponse = shipment.pieceResponses?.[0];
-  const trackingNumber =
-    pieceResponse?.trackingNumber || shipment.masterTrackingNumber || "";
-
-  // Label — encoded base64 PDF
-  let labelBase64 = "";
-  let labelUrl = "";
-
-  // Check package documents first (per-piece label)
-  const pkgDocs = pieceResponse?.packageDocuments;
-  if (pkgDocs?.[0]?.encodedLabel) {
-    labelBase64 = pkgDocs[0].encodedLabel;
-  } else if (pkgDocs?.[0]?.url) {
-    labelUrl = pkgDocs[0].url;
-  }
-
-  // Fallback to shipment-level documents
-  if (!labelBase64 && !labelUrl) {
-    const shipDocs = shipment.shipmentDocuments;
-    if (shipDocs?.[0]?.encodedLabel) {
-      labelBase64 = shipDocs[0].encodedLabel;
-    } else if (shipDocs?.[0]?.url) {
-      labelUrl = shipDocs[0].url;
-    }
+    throw new Error("FDS WS zapiszListV2: brak numeru listu w odpowiedzi");
   }
 
   console.log(
-    `✅ FedEx shipment created: tracking=${trackingNumber}, order=${orderNumber}`,
+    `✅ FDS WS shipment created: waybill=${waybill}, order=${orderNumber}`,
   );
 
   return {
-    trackingNumber,
-    masterTrackingNumber: shipment.masterTrackingNumber || trackingNumber,
-    labelBase64,
-    labelUrl,
-    serviceType: shipment.serviceType || FEDEX_DEFAULT_SERVICE,
-    shipDate: shipment.shipDatestamp || today,
+    waybill,
+    nrExt: orderNumber,
   };
 }
 
 // ============================================
-// CANCEL SHIPMENT
+// GET LABEL — wydrukujEtykiete
 // ============================================
 
 /**
- * Anuluje przesyłkę FedEx (przed przekazaniem do kuriera).
+ * Pobiera etykietę przesyłki (PDF base64).
+ * Operacja: wydrukujEtykiete
  *
- * Endpoint: PUT /ship/v1/shipments/cancel
+ * MUSI być wywołana PO zapiszListV2 — potrzebuje numeru listu (waybill).
  */
-export async function cancelFedExShipment(
-  trackingNumber: string,
-): Promise<boolean> {
-  try {
-    const data = await fedexPut("/ship/v1/shipments/cancel", {
-      accountNumber: {
-        value: accountNumber,
-      },
-      trackingNumber,
-      senderCountryCode: shipper.countryCode,
-      deletionControl: "DELETE_ALL_PACKAGES",
-    });
+export async function getFedExLabel(
+  waybill: string,
+  format?: string,
+): Promise<string> {
+  const body = `
+    <ws:wydrukujEtykiete>
+      <kodDostepu>${escXml(accessCode)}</kodDostepu>
+      <numerPrzesylki>${escXml(waybill)}</numerPrzesylki>
+      <format>${escXml(format || FEDEX_LABEL_FORMAT)}</format>
+    </ws:wydrukujEtykiete>`;
 
-    const cancelled = data?.output?.cancelledShipment === true;
-    console.log(
-      `${cancelled ? "✅" : "⚠️"} FedEx cancel ${trackingNumber}: ${data?.output?.message || "unknown"}`,
-    );
-    return cancelled;
-  } catch (err: any) {
-    console.error(`❌ FedEx cancel failed for ${trackingNumber}:`, err.message);
-    return false;
+  const responseXml = await soapCall("wydrukujEtykiete", body);
+
+  const labelBase64 = extractBase64Tag(responseXml, "etykietaBajty");
+  if (!labelBase64) {
+    throw new Error(`FDS WS wydrukujEtykiete: brak etykiety dla ${waybill}`);
   }
+
+  console.log(`✅ FDS WS label retrieved: waybill=${waybill}`);
+  return labelBase64;
+}
+
+/**
+ * Pobiera etykietę pojedynczej paczki.
+ * Operacja: wydrukujEtykietePaczki
+ */
+export async function getFedExParcelLabel(
+  parcelNumber: string,
+  format?: string,
+): Promise<string> {
+  const body = `
+    <ws:wydrukujEtykietePaczki>
+      <kodDostepu>${escXml(accessCode)}</kodDostepu>
+      <numerPaczki>${escXml(parcelNumber)}</numerPaczki>
+      <format>${escXml(format || FEDEX_LABEL_FORMAT)}</format>
+    </ws:wydrukujEtykietePaczki>`;
+
+  const responseXml = await soapCall("wydrukujEtykietePaczki", body);
+
+  const labelBase64 = extractBase64Tag(responseXml, "etykietaBajty");
+  if (!labelBase64) {
+    throw new Error(
+      `FDS WS wydrukujEtykietePaczki: brak etykiety dla ${parcelNumber}`,
+    );
+  }
+
+  return labelBase64;
 }
 
 // ============================================
-// GET RATES (optional — for dynamic pricing)
+// CANCEL SHIPMENT — NOT AVAILABLE IN FDS WS
+// ============================================
+
+/**
+ * FDS WS NIE MA operacji anulowania przesyłki.
+ * Jedyna opcja to kontakt z infolinią FedEx.
+ *
+ * Zachowujemy interfejs dla kompatybilności z fedex-service.ts.
+ */
+export async function cancelFedExShipment(
+  _trackingNumber: string,
+): Promise<boolean> {
+  console.warn(
+    `⚠️ FDS WS nie obsługuje anulowania przesyłek przez API. ` +
+      `Przesyłka ${_trackingNumber} — skontaktuj się z FedEx: 800 400 800`,
+  );
+  return false;
+}
+
+// ============================================
+// GET AVAILABLE SERVICES — pobierzDostepneUslugi
+// ============================================
+
+/**
+ * Sprawdza dostępne usługi dla danego kodu pocztowego.
+ * Operacja: pobierzDostepneUslugi
+ *
+ * UWAGA: NIE zwraca cen — tylko listę kodów usług.
+ * Ceny są wg cennika umownego (contract rates).
+ */
+export async function getAvailableServices(
+  postalCode: string,
+): Promise<string[]> {
+  const body = `
+    <ws:pobierzDostepneUslugi>
+      <accessCode>${escXml(accessCode)}</accessCode>
+      <postalCode>${escXml(postalCode)}</postalCode>
+    </ws:pobierzDostepneUslugi>`;
+
+  const responseXml = await soapCall("pobierzDostepneUslugi", body);
+
+  // Extract all availableService entries
+  const services: string[] = [];
+  const regex =
+    /<(?:[\w]+:)?availableService[^>]*>([\s\S]*?)<\/(?:[\w]+:)?availableService>/g;
+  let match;
+  while ((match = regex.exec(responseXml)) !== null) {
+    services.push(match[1].trim());
+  }
+
+  return services;
+}
+
+// ============================================
+// GET RATES — compatibility wrapper
 // ============================================
 
 export interface FedExRate {
@@ -387,9 +452,9 @@ export interface FedExRate {
 }
 
 /**
- * Pobiera stawki FedEx dla danej trasy i wagi.
- *
- * Endpoint: POST /rate/v1/rates/quotes
+ * FDS WS nie ma endpointu rate quotes.
+ * Zwracamy dostępne usługi bez cen (ceny wg cennika umownego).
+ * Zachowujemy interfejs dla kompatybilności z admin-fedex.ts.
  */
 export async function getFedExRates(
   recipient: FedExRecipient,
@@ -397,73 +462,70 @@ export async function getFedExRates(
 ): Promise<FedExRate[]> {
   if (!isFedExEligible(weightKg)) return [];
 
-  const data = await fedexFetch("/rate/v1/rates/quotes", {
-    accountNumber: { value: accountNumber },
-    requestedShipment: {
-      shipper: {
-        address: {
-          postalCode: shipper.postalCode,
-          countryCode: shipper.countryCode,
-        },
-      },
-      recipient: {
-        address: {
-          postalCode: recipient.postalCode,
-          countryCode: recipient.countryCode,
-          residential: recipient.residential ?? true,
-        },
-      },
-      pickupType: "USE_SCHEDULED_PICKUP",
-      //serviceType: FEDEX_DEFAULT_SERVICE,
-      packagingType: "YOUR_PACKAGING",
-      rateRequestType: ["ACCOUNT", "LIST"],
-      requestedPackageLineItems: [
-        {
-          weight: { units: "KG", value: weightKg },
-        },
-      ],
-    },
-  });
-
-  const rateDetails = data?.output?.rateReplyDetails || [];
-  console.log(
-    "📊 FedEx Rate response:",
-    JSON.stringify(
-      rateDetails.map((rd: any) => ({
-        service: rd.serviceType,
-        details: rd.ratedShipmentDetails?.map((d: any) => ({
-          rateType: d.rateType,
-          totalNet: d.totalNetCharge,
-          totalNetFedEx: d.totalNetFedExCharge,
-          currency: d.currency,
-        })),
-      })),
-      null,
-      2,
-    ),
-  );
-  return rateDetails.map((rd: any) => {
-    const rated =
-      rd.ratedShipmentDetails?.find(
-        (d: any) => d.rateType === "PAYOR_ACCOUNT_SHIPMENT",
-      ) ||
-      rd.ratedShipmentDetails?.find(
-        (d: any) => d.rateType === "PAYOR_ACCOUNT_PACKAGE",
-      ) ||
-      rd.ratedShipmentDetails?.[0];
-
-    return {
-      serviceType: rd.serviceType || "",
-      serviceName: rd.serviceName || rd.serviceType || "",
-      totalCharge: rated?.totalNetCharge ?? rated?.totalNetFedExCharge ?? 0,
-      currency: rated?.currency || "PLN",
-      transitDays: rd.commit?.transitDays?.toString() || undefined,
-    };
-  });
+  try {
+    const services = await getAvailableServices(recipient.postalCode);
+    return services.map((svc) => ({
+      serviceType: svc,
+      serviceName: svc,
+      totalCharge: 0, // FDS WS nie zwraca cen — cena wg umowy
+      currency: "PLN",
+      transitDays: undefined,
+    }));
+  } catch (err) {
+    console.warn("⚠️ pobierzDostepneUslugi failed:", err);
+    return [];
+  }
 }
 
 // ============================================
-// PICKUP — zamów podjazd kuriera
+// TRACKING — pobierzStatusyPrzesylki
+// ============================================
+
+export interface FedExTrackingStatus {
+  date: string;
+  shortStatus: string;
+  description: string;
+  department: string;
+  recipientSignature?: string;
+}
+
+/**
+ * Pobiera statusy przesyłki.
+ * Operacja: pobierzStatusyPrzesylki
+ */
+export async function getShipmentStatuses(
+  waybill: string,
+  lastOnly?: boolean,
+): Promise<FedExTrackingStatus[]> {
+  const body = `
+    <ws:pobierzStatusyPrzesylki>
+      <kodDostepu>${escXml(accessCode)}</kodDostepu>
+      <numerPrzesylki>${escXml(waybill)}</numerPrzesylki>
+      <czyOstatni>${lastOnly ? 1 : 0}</czyOstatni>
+    </ws:pobierzStatusyPrzesylki>`;
+
+  const responseXml = await soapCall("pobierzStatusyPrzesylki", body);
+
+  const statuses: FedExTrackingStatus[] = [];
+  const statusRegex =
+    /<(?:[\w]+:)?statusyPrzesylki[^>]*>([\s\S]*?)<\/(?:[\w]+:)?statusyPrzesylki>/g;
+  let match;
+  while ((match = statusRegex.exec(responseXml)) !== null) {
+    const chunk = match[1];
+    statuses.push({
+      date: extractTag(chunk, "dataS") || "",
+      shortStatus: extractTag(chunk, "skrot") || "",
+      description: extractTag(chunk, "opis") || "",
+      department: extractTag(chunk, "oddSymbol") || "",
+      recipientSignature: extractTag(chunk, "podpisOdbiorcy") || undefined,
+    });
+  }
+
+  return statuses;
+}
+
+// ============================================
+// PICKUP — dodajZlecenieV2
 // ============================================
 
 export interface FedExPickupResult {
@@ -474,86 +536,149 @@ export interface FedExPickupResult {
 
 /**
  * Zamawia podjazd kuriera FedEx.
- * Endpoint: POST /pickup/v1/pickups
+ * Operacja: dodajZlecenieV2
  */
 export async function createFedExPickup(
-  readyTime: string, // np. "2026-04-01T14:00:00+02:00"
-  closeTime: string, // np. "2026-04-01T17:00:00+02:00"
+  readyTime: string, // ISO datetime or "YYYY-MM-DD"
+  closeTime: string, // ISO datetime (not used in FDS WS — only hour extracted)
   packageCount: number,
   totalWeightKg: number,
 ): Promise<FedExPickupResult> {
-  const data = await fedexFetch("/pickup/v1/pickups", {
-    associatedAccountNumber: { value: accountNumber },
-    originDetail: {
-      pickupAddressDetail: {
-        address: {
-          streetLines: [shipper.street],
-          city: shipper.city,
-          postalCode: shipper.postalCode,
-          countryCode: shipper.countryCode,
-          residential: false,
-        },
-        contact: {
-          personName: shipper.personName,
-          companyName: shipper.companyName,
-          phoneNumber: shipper.phoneNumber,
-        },
-      },
-      readyDateTimestamp: readyTime,
-      customerCloseTime: closeTime,
-      pickupDateType: "SAME_DAY",
-    },
-    totalWeight: { units: "KG", value: totalWeightKg },
-    packageCount,
-    carrierCode: "FDXE",
-  });
+  // Extract date and hour
+  const pickupDate = readyTime.split("T")[0]; // "2026-04-12"
+  const pickupHour = readyTime.includes("T")
+    ? readyTime.split("T")[1]?.substring(0, 5) || "14:00"
+    : "14:00";
 
-  const output = data?.output;
+  const body = `
+    <ws:dodajZlecenieV2>
+      <accessCode>${escXml(accessCode)}</accessCode>
+      <pickupOrder>
+        <paymentForm>${escXml(FEDEX_DEFAULT_PAYMENT_FORM)}</paymentForm>
+        <shipmentType>${escXml(FEDEX_DEFAULT_SHIPMENT_TYPE)}</shipmentType>
+        <payerType>${escXml(FEDEX_DEFAULT_PAYER_TYPE)}</payerType>
+        <pickupDate>${escXml(pickupDate)}</pickupDate>
+        <pickupHour>${escXml(pickupHour)}</pickupHour>
+        <sender>
+          <senderId>${escXml(senderId)}</senderId>
+          <addressDetails>
+            <isCompany>T</isCompany>
+            <companyName>${escXml(shipper.companyName)}</companyName>
+            <name>${escXml(shipper.personName.split(" ")[0] || "Krzysztof")}</name>
+            <surname>${escXml(shipper.personName.split(" ").slice(1).join(" ") || "Leszczyński")}</surname>
+            <city>${escXml(shipper.city)}</city>
+            <postalCode>${escXml(shipper.postalCode)}</postalCode>
+            <countryCode>${escXml(shipper.countryCode)}</countryCode>
+            <street>${escXml(shipper.street)}</street>
+            <homeNo>${escXml(shipper.homeNo)}</homeNo>
+          </addressDetails>
+          <contactDetails>
+            <name>${escXml(shipper.personName.split(" ")[0] || "Krzysztof")}</name>
+            <surname>${escXml(shipper.personName.split(" ").slice(1).join(" ") || "Leszczyński")}</surname>
+            <phoneNo>${escXml(shipper.phoneNumber)}</phoneNo>
+            <email>${escXml(shipper.email)}</email>
+          </contactDetails>
+        </sender>
+        <payer>
+          <payerId>${escXml(payerId || senderId)}</payerId>
+          <contactDetails>
+            <name>${escXml(shipper.personName.split(" ")[0] || "Krzysztof")}</name>
+            <surname>${escXml(shipper.personName.split(" ").slice(1).join(" ") || "Leszczyński")}</surname>
+            <phoneNo>${escXml(shipper.phoneNumber)}</phoneNo>
+          </contactDetails>
+        </payer>
+        <shipmentWeight>${totalWeightKg}</shipmentWeight>
+        <shipmentAmount>${packageCount}</shipmentAmount>
+      </pickupOrder>
+    </ws:dodajZlecenieV2>`;
+
+  const responseXml = await soapCall("dodajZlecenieV2", body);
+
+  const pickupId = extractTag(responseXml, "pickupId") || "";
+  const pickupNumber = extractTag(responseXml, "pickupNumber") || "";
+  const respDate = extractTag(responseXml, "pickupDate") || pickupDate;
+
+  console.log(
+    `✅ FDS WS pickup created: id=${pickupId}, number=${pickupNumber}, date=${respDate}`,
+  );
+
   return {
-    pickupConfirmationCode: output?.pickupConfirmationCode || "",
-    pickupDate: readyTime.split("T")[0],
-    location: output?.location || "",
+    pickupConfirmationCode: pickupNumber || pickupId,
+    pickupDate: respDate,
+    location: "", // FDS WS doesn't return location code
   };
 }
 
 /**
  * Anuluje podjazd kuriera.
- * Endpoint: PUT /pickup/v1/pickups/cancel
+ * Operacja: anulujZlecenie
  */
 export async function cancelFedExPickup(
   confirmationCode: string,
   pickupDate: string,
-  location: string,
+  _location?: string, // not used in FDS WS
 ): Promise<boolean> {
   try {
-    await fedexPut("/pickup/v1/pickups/cancel", {
-      associatedAccountNumber: { value: accountNumber },
-      pickupConfirmationCode: confirmationCode,
-      scheduledDate: pickupDate,
-      location,
-      carrierCode: "FDXE",
-    });
-    console.log(`✅ FedEx pickup cancelled: ${confirmationCode}`);
+    const body = `
+      <ws:anulujZlecenie>
+        <accessCode>${escXml(accessCode)}</accessCode>
+        <pickupNumber>${escXml(confirmationCode)}</pickupNumber>
+        <pickupDate>${escXml(pickupDate)}</pickupDate>
+      </ws:anulujZlecenie>`;
+
+    const responseXml = await soapCall("anulujZlecenie", body);
+
+    const result = extractTag(responseXml, "anulujZlecenieResponse") || "";
+    console.log(
+      `✅ FDS WS pickup cancelled: ${confirmationCode}, result: ${result}`,
+    );
     return true;
   } catch (err: any) {
-    console.error(`❌ FedEx pickup cancel failed: ${err.message}`);
+    console.error(`❌ FDS WS pickup cancel failed: ${err.message}`);
     return false;
   }
 }
 
 // ============================================
-// HEALTH CHECK
+// HEALTH CHECK — pobierzWersje
 // ============================================
 
 /**
- * Sprawdza czy FedEx API jest dostępne (próbuje pobrać token).
+ * Sprawdza czy FDS WS jest dostępne (pobiera wersję API).
  */
 export async function isFedExConnected(): Promise<boolean> {
   try {
-    if (!clientId || !clientSecret) return false;
-    await getFedExToken();
-    return true;
+    if (!accessCode) return false;
+
+    const services = await getAvailableServices("00-001");
+    return services.length > 0;
   } catch {
     return false;
   }
+}
+
+// ============================================
+// DISPATCH DOCUMENT — zapiszDokumentWydania
+// ============================================
+
+/**
+ * Tworzy i pobiera dokument wydania (manifest) dla grupy przesyłek.
+ * Operacja: zapiszDokumentWydania → PDF base64
+ */
+export async function getDispatchDocument(waybills: string[]): Promise<string> {
+  const body = `
+    <ws:zapiszDokumentWydania>
+      <kodDostepu>${escXml(accessCode)}</kodDostepu>
+      <numeryPrzesylki>${escXml(waybills.join(","))}</numeryPrzesylki>
+      <separator>,</separator>
+    </ws:zapiszDokumentWydania>`;
+
+  const responseXml = await soapCall("zapiszDokumentWydania", body);
+  const pdfBase64 = extractBase64Tag(responseXml, "dokumentWydaniaPdf");
+
+  if (!pdfBase64) {
+    throw new Error("FDS WS: brak dokumentu wydania w odpowiedzi");
+  }
+
+  return pdfBase64;
 }

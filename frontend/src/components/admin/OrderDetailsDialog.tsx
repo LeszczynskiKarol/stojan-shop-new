@@ -1,7 +1,7 @@
 // frontend/src/components/admin/OrderDetailsDialog.tsx
 // Style: inline styles z admin CSS vars (--bg, --bg-card, --text, --text-muted, --border, --primary)
 // ZERO Tailwind, ZERO hsl(), ZERO bg-red-50/bg-yellow-50
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Order } from "./AdminOrders";
 import { CourierSelectModal } from "./CourierSelectModal";
 
@@ -32,6 +32,31 @@ export function OrderDetailsDialog({
     offers: any[];
   } | null>(null);
   const [wnLoading, setWnLoading] = useState(false);
+  const [fedexPrice, setFedexPrice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const w = Number(order.totalWeight) || 0;
+    if (order.status !== "paid" || w <= 0 || w > 36.5) return;
+    const s = order.shipping as any;
+    const pc = s.differentShippingAddress
+      ? s.shippingPostalCode || s.postalCode
+      : s.postalCode;
+    const city = s.differentShippingAddress ? s.shippingCity || s.city : s.city;
+    fetch(`${API}/api/admin/fedex/price`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ weightKg: w, postalCode: pc, city }),
+    })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success && json.data.rates?.length) {
+          const r = json.data.rates[0];
+          setFedexPrice(`~${Number(r.totalCharge).toFixed(0)} ${r.currency}`);
+        }
+      })
+      .catch(() => {});
+  }, [order.id]);
 
   const [toast, setToast] = useState<{
     msg: string;
@@ -735,7 +760,7 @@ export function OrderDetailsDialog({
                       ? "⏳ Wysyłanie..."
                       : Number(order.totalWeight) <= 36.5 &&
                           Number(order.totalWeight) > 0
-                        ? "📦 FedEx"
+                        ? `📦 FedEx${fedexPrice ? ` ${fedexPrice}` : ""}`
                         : "🚚 Zakończ zamówienie bez API"}
                   </button>
                   {Number(order.totalWeight) <= 36.5 &&
@@ -921,111 +946,6 @@ export function OrderDetailsDialog({
               )}
             </div>
 
-            {/* PRZESYŁKA FEDEX */}
-            {(() => {
-              const fedex = (order.paymentDetails as any)?.fedex;
-              if (!fedex?.trackingNumber) return null;
-              return (
-                <div
-                  style={{
-                    border: "2px solid #1d4ed8",
-                    borderRadius: "8px",
-                    padding: "16px",
-                    background: "rgba(29,78,216,.15)",
-                  }}
-                >
-                  <h4 style={{ ...h4Style, color: "#60a5fa" }}>
-                    📦 Przesyłka FedEx
-                  </h4>
-                  <div style={linesStyle}>
-                    <div>
-                      <strong>Tracking:</strong>{" "}
-                      <a
-                        href={`https://www.fedex.com/fedextrack/?trknbr=${fedex.trackingNumber}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          color: "#60a5fa",
-                          textDecoration: "underline",
-                        }}
-                      >
-                        {fedex.trackingNumber}
-                      </a>
-                    </div>
-                    <div>
-                      <strong>Serwis:</strong> {fedex.serviceType}
-                    </div>
-                    <div>
-                      <strong>Data nadania:</strong> {fedex.shipDate}
-                    </div>
-                    {fedex.labelUrl && (
-                      <div style={{ marginTop: 8 }}>
-                        <a
-                          href={fedex.labelUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "6px",
-                            padding: "6px 14px",
-                            background: "#1d4ed8",
-                            color: "#fff",
-                            borderRadius: "6px",
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            textDecoration: "none",
-                          }}
-                        >
-                          🏷️ Pobierz etykietę PDF
-                        </a>
-                        <button
-                          onClick={async () => {
-                            if (
-                              !confirm(
-                                `Anulować przesyłkę FedEx ${fedex.trackingNumber}?`,
-                              )
-                            )
-                              return;
-                            try {
-                              const res = await fetch(
-                                `${API}/api/admin/fedex/ship/${order.id}`,
-                                { method: "DELETE", credentials: "include" },
-                              );
-                              const json = await res.json();
-                              if (json.success) {
-                                alert("✅ Przesyłka FedEx anulowana");
-                                onClose();
-                              } else {
-                                alert(`❌ ${json.error || "Błąd anulowania"}`);
-                              }
-                            } catch {
-                              alert("❌ Błąd anulowania FedEx");
-                            }
-                          }}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "6px",
-                            padding: "6px 14px",
-                            background: "transparent",
-                            color: "#f87171",
-                            border: "1px solid #991b1b",
-                            borderRadius: "6px",
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            marginLeft: "8px",
-                          }}
-                        >
-                          ✕ Anuluj przesyłkę
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
             {/* PRZESYŁKA DHL */}
             {(() => {
               const dhl = (order.paymentDetails as any)?.dhl;

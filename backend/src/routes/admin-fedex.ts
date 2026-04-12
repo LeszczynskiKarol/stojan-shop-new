@@ -147,9 +147,11 @@ export async function adminFedExRoutes(app: FastifyInstance) {
       }
 
       const recipient: FedExRecipient = {
-        personName: "Rate Check",
+        personName: "Rate",
+        surname: "Check",
         phoneNumber: "000000000",
-        street: "ul. Testowa 1",
+        street: "Testowa",
+        homeNo: "1",
         city: "Warszawa",
         postalCode,
         countryCode,
@@ -365,9 +367,11 @@ export async function adminFedExRoutes(app: FastifyInstance) {
     try {
       const { weightKg, postalCode, city } = request.body as any;
       const recipient: FedExRecipient = {
-        personName: "Rate Check",
+        personName: "Rate",
+        surname: "Check",
         phoneNumber: "000000000",
-        street: "ul. Testowa 1",
+        street: "Testowa",
+        homeNo: "1",
         city: city || "Warszawa",
         postalCode: postalCode || "00-001",
         countryCode: "PL",
