@@ -99,39 +99,12 @@ function FedExShipButton({
   onRequestShip: (data: any) => void;
 }) {
   const [loading, setLoading] = useState(false);
-  const [price, setPrice] = useState<string | null>(null);
   const weight = Number(order.totalWeight) || 0;
-
-  useEffect(() => {
-    const s = order.shipping as any;
-    const pc = s.differentShippingAddress
-      ? s.shippingPostalCode || s.postalCode
-      : s.postalCode;
-    const city = s.differentShippingAddress ? s.shippingCity || s.city : s.city;
-    fetch(`${API}/api/admin/fedex/price`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ weightKg: weight, postalCode: pc, city }),
-    })
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.success && json.data.rates?.length) {
-          const r = json.data.rates[0];
-          setPrice(`${Number(r.totalCharge).toFixed(0)} ${r.currency}`);
-        }
-      })
-      .catch(() => {});
-  }, [order.id]);
 
   return (
     <button
       onClick={async () => {
-        if (
-          !confirm(
-            `Nadać FedEx #${order.orderNumber}?\nWaga: ${weight} kg${price ? `\nCena: ~${price}` : ""}`,
-          )
-        )
+        if (!confirm(`Nadać FedEx #${order.orderNumber}?\nWaga: ${weight} kg`))
           return;
         setLoading(true);
         try {
@@ -149,7 +122,7 @@ function FedExShipButton({
       disabled={loading}
       className="px-2 py-1 rounded bg-blue-600 text-white text-xs whitespace-nowrap"
     >
-      {loading ? "⏳..." : `📦 FedEx ${weight}kg${price ? ` ~${price}` : ""}`}
+      {loading ? "⏳..." : `📦 FedEx ${weight}kg`}
     </button>
   );
 }
@@ -1605,15 +1578,52 @@ function FedExPickupButton() {
   return (
     <div className="flex items-center gap-2">
       {status.pendingPickup > 0 && !status.activePickup && (
-        <button
-          onClick={handlePickup}
-          disabled={loading}
-          className="h-9 px-3 rounded-lg bg-blue-600 text-white text-sm font-medium flex items-center gap-1"
-        >
-          {loading
-            ? "⏳..."
-            : `🚛 Przywołaj FEDEX (${status.pendingPickup} paczek)`}
-        </button>
+        <>
+          <button
+            onClick={handlePickup}
+            disabled={loading}
+            className="h-9 px-3 rounded-lg bg-blue-600 text-white text-sm font-medium flex items-center gap-1"
+          >
+            {loading
+              ? "⏳..."
+              : `🚛 Przywołaj FEDEX (${status.pendingPickup} paczek)`}
+          </button>
+          <button
+            onClick={async () => {
+              if (
+                !confirm(
+                  `Wyczyścić dane FedEx z ${status.pendingPickup} zamówień oczekujących na pickup?\n\nUżyj gdy paczki zostały wysłane poza systemem.`,
+                )
+              )
+                return;
+              setLoading(true);
+              try {
+                const res = await fetch(
+                  `${API}/api/admin/fedex/pickup/clear-pending`,
+                  {
+                    method: "POST",
+                    credentials: "include",
+                  },
+                );
+                const json = await res.json();
+                if (json.success) {
+                  alert(`✅ ${json.message}`);
+                  checkStatus();
+                } else {
+                  alert(`❌ ${json.error}`);
+                }
+              } catch (err: any) {
+                alert(`❌ ${err.message}`);
+              } finally {
+                setLoading(false);
+              }
+            }}
+            disabled={loading}
+            className="h-7 px-2 rounded border border-orange-500 text-orange-500 text-xs"
+          >
+            Resetuj
+          </button>
+        </>
       )}
       {status.activePickup && (
         <>
@@ -1626,6 +1636,38 @@ function FedExPickupButton() {
             className="h-7 px-2 rounded border border-red-500 text-red-500 text-xs"
           >
             Anuluj
+          </button>
+          <button
+            onClick={async () => {
+              if (
+                !confirm(
+                  "Wyczyścić dane przywołania z bazy?\n\nTo NIE anuluje kuriera w systemie FedEx — tylko resetuje stan w panelu.",
+                )
+              )
+                return;
+              setLoading(true);
+              try {
+                const res = await fetch(`${API}/api/admin/fedex/pickup/reset`, {
+                  method: "POST",
+                  credentials: "include",
+                });
+                const json = await res.json();
+                if (json.success) {
+                  alert(`✅ ${json.message}`);
+                  checkStatus();
+                } else {
+                  alert(`❌ ${json.error}`);
+                }
+              } catch (err: any) {
+                alert(`❌ ${err.message}`);
+              } finally {
+                setLoading(false);
+              }
+            }}
+            disabled={loading}
+            className="h-7 px-2 rounded border border-orange-500 text-orange-500 text-xs"
+          >
+            Resetuj
           </button>
         </>
       )}

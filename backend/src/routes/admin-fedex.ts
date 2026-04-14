@@ -382,4 +382,73 @@ export async function adminFedExRoutes(app: FastifyInstance) {
       return reply.status(500).send({ success: false, error: err.message });
     }
   });
+
+  // ==========================================
+  // POST /api/admin/fedex/pickup/reset
+  // Wyczyść dane pickup z DB (bez kontaktu z FedEx API)
+  // Użyj gdy pickup się "zawiesi" w systemie
+  // ==========================================
+  app.post("/pickup/reset", async (request, reply) => {
+    const orders = await prisma.order.findMany({
+      where: { status: "shipped" },
+    });
+
+    let cleared = 0;
+    for (const order of orders) {
+      const pd = order.paymentDetails as any;
+      if (pd?.fedex?.pickup?.confirmationCode) {
+        const { pickup, ...fedexRest } = pd.fedex;
+        await prisma.order.update({
+          where: { id: order.id },
+          data: {
+            paymentDetails: { ...pd, fedex: fedexRest },
+          },
+        });
+        cleared++;
+      }
+    }
+
+    return {
+      success: true,
+      data: { cleared },
+      message:
+        cleared > 0
+          ? `Wyczyszczono dane pickup z ${cleared} zamówień`
+          : "Brak zamówień z danymi pickup do wyczyszczenia",
+    };
+  });
+
+  // ==========================================
+  // POST /api/admin/fedex/pickup/clear-pending
+  // Wyczyść dane FedEx z zamówień "oczekujących na pickup"
+  // (wysłanych poza systemem / ręcznie)
+  // ==========================================
+  app.post("/pickup/clear-pending", async (request, reply) => {
+    const orders = await prisma.order.findMany({
+      where: { status: "shipped" },
+    });
+
+    let cleared = 0;
+    for (const order of orders) {
+      const pd = order.paymentDetails as any;
+      // Ma tracking FedEx ale nie ma pickup → "oczekuje na pickup"
+      if (pd?.fedex?.trackingNumber && !pd?.fedex?.pickup?.confirmationCode) {
+        const { fedex, ...rest } = pd;
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { paymentDetails: rest },
+        });
+        cleared++;
+      }
+    }
+
+    return {
+      success: true,
+      data: { cleared },
+      message:
+        cleared > 0
+          ? `Wyczyszczono dane FedEx z ${cleared} zamówień`
+          : "Brak zamówień do wyczyszczenia",
+    };
+  });
 }
