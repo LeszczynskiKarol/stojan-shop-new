@@ -32,31 +32,6 @@ export function OrderDetailsDialog({
     offers: any[];
   } | null>(null);
   const [wnLoading, setWnLoading] = useState(false);
-  const [fedexPrice, setFedexPrice] = useState<string | null>(null);
-
-  useEffect(() => {
-    const w = Number(order.totalWeight) || 0;
-    if (order.status !== "paid" || w <= 0 || w > 36.5) return;
-    const s = order.shipping as any;
-    const pc = s.differentShippingAddress
-      ? s.shippingPostalCode || s.postalCode
-      : s.postalCode;
-    const city = s.differentShippingAddress ? s.shippingCity || s.city : s.city;
-    fetch(`${API}/api/admin/fedex/price`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ weightKg: w, postalCode: pc, city }),
-    })
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.success && json.data.rates?.length) {
-          const r = json.data.rates[0];
-          setFedexPrice(`~${Number(r.totalCharge).toFixed(0)} ${r.currency}`);
-        }
-      })
-      .catch(() => {});
-  }, [order.id]);
 
   const [toast, setToast] = useState<{
     msg: string;
@@ -687,41 +662,6 @@ export function OrderDetailsDialog({
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                   <button
                     onClick={async () => {
-                      const totalWeight = Number(order.totalWeight) || 0;
-                      let msg = "Oznaczyć jako wysłane?";
-                      if (totalWeight <= 36.5 && totalWeight > 0) {
-                        try {
-                          const s = order.shipping as any;
-                          const pc = s.differentShippingAddress
-                            ? s.shippingPostalCode || s.postalCode
-                            : s.postalCode;
-                          const city = s.differentShippingAddress
-                            ? s.shippingCity || s.city
-                            : s.city;
-                          const priceRes = await fetch(
-                            `${API}/api/admin/fedex/price`,
-                            {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              credentials: "include",
-                              body: JSON.stringify({
-                                weightKg: totalWeight,
-                                postalCode: pc,
-                                city,
-                              }),
-                            },
-                          );
-                          const priceJson = await priceRes.json();
-                          if (
-                            priceJson.success &&
-                            priceJson.data.rates?.length
-                          ) {
-                            const rate = priceJson.data.rates[0];
-                            msg = `Wysłać przez FedEx?\n\nCena: ${rate.totalCharge} ${rate.currency}\nSerwis: ${rate.serviceType}\nWaga: ${totalWeight} kg`;
-                          }
-                        } catch {}
-                      }
-                      if (!confirm(msg)) return;
                       setShipping(true);
                       try {
                         await fetch(`${API}/api/orders/${order.id}/status`, {
@@ -760,7 +700,7 @@ export function OrderDetailsDialog({
                       ? "⏳ Wysyłanie..."
                       : Number(order.totalWeight) <= 36.5 &&
                           Number(order.totalWeight) > 0
-                        ? `📦 FedEx${fedexPrice ? ` ${fedexPrice}` : ""}`
+                        ? `📦 FedEx ${Number(order.totalWeight)}kg`
                         : "🚚 Zakończ zamówienie bez API"}
                   </button>
                   {Number(order.totalWeight) <= 36.5 &&
