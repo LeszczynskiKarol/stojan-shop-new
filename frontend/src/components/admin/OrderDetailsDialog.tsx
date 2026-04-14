@@ -661,7 +661,15 @@ export function OrderDetailsDialog({
               {order.status === "paid" && (
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                   <button
+                    // ✅ POPRAWIONY — confirm jak w FedExShipButton z tabeli
                     onClick={async () => {
+                      const weight = Number(order.totalWeight) || 0;
+                      if (
+                        !confirm(
+                          `Nadać FedEx #${order.orderNumber}?\nWaga: ${weight} kg`,
+                        )
+                      )
+                        return;
                       setShipping(true);
                       try {
                         await fetch(`${API}/api/orders/${order.id}/status`, {
