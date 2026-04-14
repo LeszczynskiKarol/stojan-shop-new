@@ -2,6 +2,7 @@
 // Port 1:1 ze starego Next.js admin/orders/page.tsx
 // Bez: zustand, shadcn/ui, framer-motion → czysty React + fetch
 import { CourierSelectModal } from "./CourierSelectModal";
+import { ShipConfirmModal } from "./ShipConfirmModal";
 import { useEffect, useState, useCallback } from "react";
 import { OrderDetailsDialog } from "./OrderDetailsDialog";
 import { CancelOrderModal } from "./CancelOrderModal";
@@ -91,9 +92,11 @@ const fmt = (v: number) =>
 function FedExShipButton({
   order,
   onShipped,
+  onRequestShip,
 }: {
   order: Order;
   onShipped: () => void;
+  onRequestShip: (data: any) => void;
 }) {
   const [loading, setLoading] = useState(false);
   const [price, setPrice] = useState<string | null>(null);
@@ -155,6 +158,15 @@ function FedExShipButton({
 // Component
 // ============================================
 export function AdminOrders() {
+  const [shipModal, setShipModal] = useState<{
+    order: Order;
+    courierName: string;
+    courierIcon: string;
+    courierColor: string;
+    price?: string | null;
+    extra?: string | null;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
   const [wnModal, setWnModal] = useState<{
     order: Order;
     offers: any[];
@@ -1139,34 +1151,36 @@ export function AdminOrders() {
                             <FedExShipButton
                               order={order}
                               onShipped={() => fetchOrders()}
+                              onRequestShip={(data) => setShipModal(data)}
                             />
                             <button
                               onClick={async () => {
-                                if (
-                                  !confirm(
-                                    `Wysłać ręcznie #${order.orderNumber} BEZ FedEx API?`,
-                                  )
-                                )
-                                  return;
-                                try {
-                                  await fetch(
-                                    `${API}/api/orders/${order.id}/status`,
-                                    {
-                                      method: "PATCH",
-                                      headers: {
-                                        "Content-Type": "application/json",
+                                setShipModal({
+                                  order,
+                                  courierName: "Ręcznie (bez API)",
+                                  courierIcon: "🚚",
+                                  courierColor: "gray",
+                                  extra:
+                                    "Przesyłka zostanie oznaczona jako wysłana bez tworzenia listu w systemie kurierskim",
+                                  onConfirm: async () => {
+                                    await fetch(
+                                      `${API}/api/orders/${order.id}/status`,
+                                      {
+                                        method: "PATCH",
+                                        headers: {
+                                          "Content-Type": "application/json",
+                                        },
+                                        body: JSON.stringify({
+                                          status: "shipped",
+                                          skipCourier: true,
+                                        }),
                                       },
-                                      body: JSON.stringify({
-                                        status: "shipped",
-                                        skipCourier: true,
-                                      }),
-                                    },
-                                  );
-                                  fetchOrders();
-                                  showToast("Wysłane (ręcznie)");
-                                } catch {
-                                  showToast("Błąd", "err");
-                                }
+                                    );
+                                    fetchOrders();
+                                    showToast("Wysłane (ręcznie)");
+                                    setShipModal(null);
+                                  },
+                                });
                               }}
                               className="px-2 py-1 rounded bg-gray-600 text-white text-xs"
                             >
@@ -1436,6 +1450,28 @@ export function AdminOrders() {
             : undefined
         }
       />
+
+      {shipModal && (
+        <ShipConfirmModal
+          isOpen={true}
+          onClose={() => setShipModal(null)}
+          onConfirm={async () => {
+            await shipModal.onConfirm();
+          }}
+          courierName={shipModal.courierName}
+          courierIcon={shipModal.courierIcon}
+          courierColor={shipModal.courierColor}
+          orderNumber={shipModal.order.orderNumber}
+          weightKg={Number(shipModal.order.totalWeight) || undefined}
+          price={shipModal.price}
+          codAmount={
+            shipModal.order.paymentMethod === "cod"
+              ? fmt(shipModal.order.total)
+              : null
+          }
+          extra={shipModal.extra}
+        />
+      )}
 
       {/* Wysylajnami Courier Select */}
       {wnModal && (
