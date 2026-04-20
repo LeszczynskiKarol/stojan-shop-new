@@ -314,7 +314,7 @@ export async function createFedExShipment(
         ${optEl("remarks", `Zamówienie ${orderNumber}`)}
       </shipmentV2>
     </ws:zapiszListV2>`;
-
+  console.log("🔍 FDS WS zapiszListV2 REQUEST BODY:\n", body);
   const responseXml = await soapCall("zapiszListV2", body);
 
   // Parse response — listZapisanyV2 contains waybill
