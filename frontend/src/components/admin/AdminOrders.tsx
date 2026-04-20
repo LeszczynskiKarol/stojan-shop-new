@@ -79,6 +79,7 @@ const statusLabels: Record<string, string> = {
   paid: "Opłacone",
   shipped: "Wysłane",
   delivered: "Dostarczone",
+  cancelled: "Anulowane",
 };
 
 const fmt = (v: number) =>

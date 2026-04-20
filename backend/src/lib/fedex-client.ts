@@ -294,7 +294,7 @@ export async function createFedExShipment(
           </contactDetails>
         </payer>${codXml}${insuranceXml}
         <proofOfDispatch>
-          <senderSignature>${escXml(shipper.companyName || shipper.personName)}</senderSignature>
+          <senderSignature>${escXml((shipper.personName || "Krzysztof Leszczynski").substring(0, 50))}</senderSignature>
           <courierId>000000</courierId>
           <sendDate>${new Date().toISOString().slice(0, 10)} ${new Date().toTimeString().slice(0, 5)}</sendDate>
         </proofOfDispatch>
