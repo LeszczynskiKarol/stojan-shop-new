@@ -79,7 +79,6 @@ const statusLabels: Record<string, string> = {
   paid: "Opłacone",
   shipped: "Wysłane",
   delivered: "Dostarczone",
-  cancelled: "Anulowane",
 };
 
 const fmt = (v: number) =>
@@ -181,6 +180,11 @@ export function AdminOrders() {
   const [showCancellationReason, setShowCancellationReason] = useState<
     string | null
   >(null);
+  const [statusChangeModal, setStatusChangeModal] = useState<{
+    order: Order;
+    newStatus: string;
+    label: string;
+  } | null>(null);
 
   // Invoice upload loading state
   const [uploadingInvoice, setUploadingInvoice] = useState<string | null>(null);
@@ -203,6 +207,22 @@ export function AdminOrders() {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  // Close status dropdowns on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".group\\/status")) {
+        document
+          .querySelectorAll(".group\\/status > div:nth-child(2)")
+          .forEach((el) => {
+            el.classList.add("hidden");
+          });
+      }
+    };
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, []);
 
   // Persist marked orders
   useEffect(() => {
@@ -922,19 +942,93 @@ export function AdminOrders() {
                   {/* Status */}
                   <td className="px-3 py-2">
                     <div className="flex flex-col gap-1">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          order.paymentMethod === "cod" &&
+                      <div className="relative group/status">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const btn = e.currentTarget;
+                            const dropdown =
+                              btn.nextElementSibling as HTMLElement;
+                            if (dropdown) dropdown.classList.toggle("hidden");
+                          }}
+                          className={`px-2 py-1 rounded-full text-xs font-medium cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-blue-400 transition-all ${
+                            order.paymentMethod === "cod" &&
+                            order.status === "paid"
+                              ? "bg-red-100 text-red-700"
+                              : statusColors[order.status]
+                          }`}
+                        >
+                          {order.paymentMethod === "cod" &&
                           order.status === "paid"
-                            ? "bg-red-100 text-red-700"
-                            : statusColors[order.status]
-                        }`}
-                      >
-                        {order.paymentMethod === "cod" &&
-                        order.status === "paid"
-                          ? "Pobranie"
-                          : statusLabels[order.status]}
-                      </span>
+                            ? "Pobranie"
+                            : statusLabels[order.status]}
+                        </button>
+
+                        {/* Dropdown */}
+                        <div
+                          className="hidden absolute z-50 mt-1 left-0 min-w-[160px] rounded-lg shadow-xl overflow-hidden"
+                          style={{
+                            backgroundColor: "#171717",
+                            borderColor: "#333",
+                            border: "1px solid #333",
+                          }}
+                        >
+                          {(
+                            [
+                              {
+                                value: "pending",
+                                label: "Oczekujące",
+                                color: "text-yellow-500",
+                              },
+                              {
+                                value: "paid",
+                                label:
+                                  order.paymentMethod === "cod"
+                                    ? "Pobranie"
+                                    : "Opłacone",
+                                color:
+                                  order.paymentMethod === "cod"
+                                    ? "text-red-500"
+                                    : "text-green-500",
+                              },
+                              {
+                                value: "shipped",
+                                label: "Wysłane",
+                                color: "text-blue-500",
+                              },
+                              {
+                                value: "delivered",
+                                label: "Dostarczone",
+                                color: "text-purple-500",
+                              },
+                            ] as const
+                          )
+                            .filter((s) => s.value !== order.status)
+                            .map((s) => (
+                              <button
+                                key={s.value}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Close dropdown
+                                  (
+                                    e.currentTarget.parentElement as HTMLElement
+                                  )?.classList.add("hidden");
+
+                                  setStatusChangeModal({
+                                    order,
+                                    newStatus: s.value,
+                                    label: s.label,
+                                  });
+                                }}
+                                className={`w-full text-left px-3 py-2 text-xs hover:bg-[hsl(var(--accent))] transition-colors flex items-center gap-2 ${s.color}`}
+                              >
+                                <span className="w-2 h-2 rounded-full bg-current" />
+                                {s.label}
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+
                       {(order.paymentDetails as any)?.fedex?.trackingNumber && (
                         <a
                           href={`https://www.fedex.com/fedextrack/?trknbr=${(order.paymentDetails as any).fedex.trackingNumber}`}
@@ -1543,7 +1637,139 @@ export function AdminOrders() {
           }}
         />
       )}
+      {/* Status Change Confirmation Modal */}
+      {statusChangeModal && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50"
+          onClick={() => setStatusChangeModal(null)}
+        >
+          <div
+            className="border rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 text-white"
+            style={{ backgroundColor: "#171717", borderColor: "#333" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-[hsl(var(--foreground))] mb-4">
+              Zmiana statusu zamówienia
+            </h3>
 
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[hsl(var(--muted-foreground))]">
+                  Zamówienie:
+                </span>
+                <span className="font-semibold">
+                  #{statusChangeModal.order.orderNumber}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[hsl(var(--muted-foreground))]">
+                  Płatność:
+                </span>
+                <span
+                  className={`font-semibold ${statusChangeModal.order.paymentMethod === "cod" ? "text-red-500" : "text-green-500"}`}
+                >
+                  {statusChangeModal.order.paymentMethod === "cod"
+                    ? "Za pobraniem (COD)"
+                    : "Online (Stripe)"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[hsl(var(--muted-foreground))]">
+                  Wartość:
+                </span>
+                <span className="font-semibold">
+                  {fmt(statusChangeModal.order.total)}
+                </span>
+              </div>
+
+              <div className="border-t border-[hsl(var(--border))] pt-3">
+                <div className="flex items-center justify-center gap-3">
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      statusChangeModal.order.paymentMethod === "cod" &&
+                      statusChangeModal.order.status === "paid"
+                        ? "bg-red-100 text-red-700"
+                        : statusColors[statusChangeModal.order.status]
+                    }`}
+                  >
+                    {statusChangeModal.order.paymentMethod === "cod" &&
+                    statusChangeModal.order.status === "paid"
+                      ? "Pobranie"
+                      : statusLabels[statusChangeModal.order.status]}
+                  </span>
+                  <span className="text-[hsl(var(--muted-foreground))] text-lg">
+                    →
+                  </span>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      statusChangeModal.order.paymentMethod === "cod" &&
+                      statusChangeModal.newStatus === "paid"
+                        ? "bg-red-100 text-red-700"
+                        : statusColors[statusChangeModal.newStatus]
+                    }`}
+                  >
+                    {statusChangeModal.label}
+                  </span>
+                </div>
+              </div>
+
+              {statusChangeModal.newStatus === "shipped" && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-xs text-blue-800 dark:text-blue-200">
+                  📦 Zmiana na "Wysłane" uruchomi nadanie FedEx (jeśli waga ≤
+                  36.5 kg) i wyśle email do klienta z informacją o wysyłce.
+                </div>
+              )}
+
+              {statusChangeModal.newStatus === "paid" &&
+                statusChangeModal.order.status === "shipped" && (
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 text-xs text-yellow-800 dark:text-yellow-200">
+                    ⚠️ Cofnięcie do "{statusChangeModal.label}" — jeśli
+                    przesyłka FedEx/DHL została już nadana, anuluj ją osobno.
+                  </div>
+                )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStatusChangeModal(null)}
+                className="flex-1 px-4 py-2 rounded-lg border border-[hsl(var(--border))] text-sm font-medium hover:bg-[hsl(var(--accent))] transition-colors"
+              >
+                Anuluj
+              </button>
+              <button
+                onClick={async () => {
+                  const { order, newStatus } = statusChangeModal;
+                  setStatusChangeModal(null);
+                  try {
+                    const res = await fetch(
+                      `${API}/api/orders/${order.id}/status`,
+                      {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ status: newStatus }),
+                      },
+                    );
+                    const json = await res.json();
+                    if (json.success) {
+                      showToast(
+                        `Status → ${statusLabels[newStatus] || newStatus}`,
+                      );
+                      fetchOrders();
+                    } else {
+                      showToast(json.error || "Błąd zmiany statusu", "err");
+                    }
+                  } catch {
+                    showToast("Błąd zmiany statusu", "err");
+                  }
+                }}
+                className="flex-1 px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] text-sm font-medium hover:opacity-90 transition-opacity"
+              >
+                Zmień status
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <style>{`
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
       `}</style>

@@ -90,13 +90,19 @@ export function CancelOrderModal({
       {/* Modal */}
       <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="w-full max-w-lg bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg shadow-2xl pointer-events-auto max-h-[90vh] overflow-y-auto"
-          style={{ animation: "slideUp .2s ease" }}
+          className="w-full max-w-lg rounded-lg shadow-2xl pointer-events-auto max-h-[90vh] overflow-y-auto text-gray-100"
+          style={{ backgroundColor: "#171717", border: "1px solid #333" }}
           onKeyDown={handleKeyDown}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-[hsl(var(--border))] sticky top-0 bg-[hsl(var(--background))] z-10">
+          <div
+            className="flex items-center justify-between p-6 sticky top-0 z-10"
+            style={{
+              backgroundColor: "#171717",
+              borderBottom: "1px solid #333",
+            }}
+          >
             <div className="flex items-center gap-3">
               <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-full">
                 <svg
@@ -216,7 +222,10 @@ export function CancelOrderModal({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between p-6 border-t border-[hsl(var(--border))] bg-[hsl(var(--accent))]/30 sticky bottom-0">
+          <div
+            className="flex items-center justify-between p-6 sticky bottom-0"
+            style={{ backgroundColor: "#1a1a1a", borderTop: "1px solid #333" }}
+          >
             <div className="text-xs text-[hsl(var(--muted-foreground))]">
               <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-[hsl(var(--accent))] border border-[hsl(var(--border))] rounded">
                 Ctrl
