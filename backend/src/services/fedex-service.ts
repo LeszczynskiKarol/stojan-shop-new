@@ -154,7 +154,7 @@ export async function createFedExShipmentFromOrder(
     cod = {
       codValue: Number(order.total),
       bankAccountNumber: process.env.FEDEX_COD_BANK_ACCOUNT || "",
-      codType: "P", // P = przelew na konto
+      codType: "B", // B = przelew bankowy (jedyny obsługiwany przez FDS WS)
     };
   }
 

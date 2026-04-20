@@ -47,14 +47,14 @@ export const FEDEX_MAX_WEIGHT_KG =
 
 /** Default shipment type for domestic parcels */
 export const FEDEX_DEFAULT_SHIPMENT_TYPE =
-  process.env.FEDEX_FDS_SHIPMENT_TYPE || "P"; // P = paczka (parcel)
+  process.env.FEDEX_FDS_SHIPMENT_TYPE || "K"; // K = krajowa (national)
 
 /** Payment form: G = gotówka, P = przelew */
 export const FEDEX_DEFAULT_PAYMENT_FORM =
   process.env.FEDEX_FDS_PAYMENT_FORM || "P";
 
 /** Payer type: N = nadawca, O = odbiorca */
-export const FEDEX_DEFAULT_PAYER_TYPE = process.env.FEDEX_FDS_PAYER_TYPE || "N";
+export const FEDEX_DEFAULT_PAYER_TYPE = process.env.FEDEX_FDS_PAYER_TYPE || "1"; // 1 = nadawca
 
 /** Label format for wydrukujEtykiete: PDF or EPL */
 export const FEDEX_LABEL_FORMAT = process.env.FEDEX_FDS_LABEL_FORMAT || "PDF";

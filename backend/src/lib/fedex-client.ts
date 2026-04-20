@@ -266,7 +266,7 @@ export async function createFedExShipment(
         </sender>
         <receiver>
           <addressDetails>
-            <isCompany>${recipient.isCompany || !!recipient.companyName ? "T" : "N"}</isCompany>
+            <isCompany>${recipient.isCompany || !!recipient.companyName ? "1" : "0"}</isCompany>
             ${optEl("companyName", recipient.companyName)}
             ${optEl("vatNo", recipient.nip)}
             <name>${escXml(recipient.personName)}</name>
@@ -293,10 +293,16 @@ export async function createFedExShipment(
             <phoneNo>${escXml(shipper.phoneNumber)}</phoneNo>
           </contactDetails>
         </payer>${codXml}${insuranceXml}
+        <proofOfDispatch>
+          <senderSignature>${escXml(shipper.companyName || shipper.personName)}</senderSignature>
+          <courierId>000000</courierId>
+          <sendDate>${new Date().toISOString().slice(0, 10)} ${new Date().toTimeString().slice(0, 5)}</sendDate>
+        </proofOfDispatch>
         <parcels>
           <parcel>
             <weight>${pkg.weightKg}</weight>${dimsXml}
-            ${optEl("type", pkg.type)}
+            <type>PC</type>
+            <shape>0</shape>
             ${optEl("nrExtPp", orderNumber)}
           </parcel>
         </parcels>
@@ -562,7 +568,7 @@ export async function createFedExPickup(
         <sender>
           <senderId>${escXml(senderId)}</senderId>
           <addressDetails>
-            <isCompany>T</isCompany>
+            <isCompany>1</isCompany>
             <companyName>${escXml(shipper.companyName)}</companyName>
             <name>${escXml(shipper.personName.split(" ")[0] || "Krzysztof")}</name>
             <surname>${escXml(shipper.personName.split(" ").slice(1).join(" ") || "Leszczyński")}</surname>
