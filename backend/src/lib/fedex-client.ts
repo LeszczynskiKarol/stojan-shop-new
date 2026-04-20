@@ -284,8 +284,8 @@ export async function createFedExShipment(
             ${optEl("localNo", recipient.localNo)}
           </addressDetails>
           <contactDetails>
-            <name>${escXml(recipient.personName)}</name>
-            <surname>${escXml(recipient.surname)}</surname>
+            <name>${escXml(maxLen(recipient.personName, 30))}</name>
+            <surname>${escXml(maxLen(recipient.surname, 50))}</surname>
             <phoneNo>${escXml(recipient.phoneNumber)}</phoneNo>
             ${optEl("email", recipient.email)}
           </contactDetails>

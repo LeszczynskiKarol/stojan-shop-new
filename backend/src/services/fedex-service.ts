@@ -123,8 +123,8 @@ export async function createFedExShipmentFromOrder(
   const { street, homeNo, localNo } = parseStreet(rawStreet);
 
   const recipient: FedExRecipient = {
-    personName: shipping.firstName || "",
-    surname: shipping.lastName || "",
+    personName: (shipping.firstName || "").substring(0, 30),
+    surname: (shipping.lastName || "-").substring(0, 50),
     companyName: shipping.companyName || undefined,
     nip: shipping.nip || undefined,
     phoneNumber: shipping.phone || "",
