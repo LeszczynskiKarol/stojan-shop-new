@@ -75,6 +75,11 @@ export interface FedExInsuranceOptions {
 // SOAP HELPERS
 // ============================================
 
+/** Truncate to max len for FDS WS fields */
+function maxLen(s: string, max: number): string {
+  return s.substring(0, max);
+}
+
 /**
  * Wraps a SOAP body in a full envelope
  */
@@ -258,8 +263,8 @@ export async function createFedExShipment(
         <sender>
           <senderId>${escXml(senderId)}</senderId>
           <contactDetails>
-            <name>${escXml(shipper.personName.split(" ")[0] || "Krzysztof")}</name>
-            <surname>${escXml(shipper.personName.split(" ").slice(1).join(" ") || "Leszczyński")}</surname>
+            <name>${escXml(maxLen(shipper.personName.split(" ")[0] || "Krzysztof", 30))}</name>
+            <surname>${escXml(maxLen(shipper.personName.split(" ").slice(1).join(" ") || "Leszczyński", 50))}</surname>
             <phoneNo>${escXml(shipper.phoneNumber)}</phoneNo>
             ${optEl("email", shipper.email)}
           </contactDetails>
@@ -269,8 +274,8 @@ export async function createFedExShipment(
             <isCompany>${recipient.isCompany || !!recipient.companyName ? "1" : "0"}</isCompany>
             ${optEl("companyName", recipient.companyName)}
             ${optEl("vatNo", recipient.nip)}
-            <name>${escXml(recipient.personName)}</name>
-            <surname>${escXml(recipient.surname)}</surname>
+            <name>${escXml(maxLen(recipient.personName, 30))}</name>
+            <surname>${escXml(maxLen(recipient.surname, 50))}</surname>
             <city>${escXml(recipient.city)}</city>
             <postalCode>${escXml(recipient.postalCode)}</postalCode>
             <countryCode>${escXml(recipient.countryCode)}</countryCode>
@@ -288,13 +293,13 @@ export async function createFedExShipment(
         <payer>
           <payerId>${escXml(payerId || senderId)}</payerId>
           <contactDetails>
-            <name>${escXml(shipper.personName.split(" ")[0] || "Krzysztof")}</name>
-            <surname>${escXml(shipper.personName.split(" ").slice(1).join(" ") || "Leszczyński")}</surname>
+            <name>${escXml(maxLen(shipper.personName.split(" ")[0] || "Krzysztof", 30))}</name>
+            <surname>${escXml(maxLen(shipper.personName.split(" ").slice(1).join(" ") || "Leszczyński", 50))}</surname>
             <phoneNo>${escXml(shipper.phoneNumber)}</phoneNo>
           </contactDetails>
         </payer>${codXml}${insuranceXml}
         <proofOfDispatch>
-          <senderSignature>${escXml((shipper.personName || "Krzysztof Leszczynski").substring(0, 50))}</senderSignature>
+          <senderSignature>${escXml(maxLen(shipper.personName || "Krzysztof Leszczynski", 50))}</senderSignature>
           <courierId>000000</courierId>
           <sendDate>${new Date().toISOString().slice(0, 10)} ${new Date().toTimeString().slice(0, 5)}</sendDate>
         </proofOfDispatch>

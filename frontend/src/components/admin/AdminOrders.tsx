@@ -977,11 +977,6 @@ export function AdminOrders() {
                           {(
                             [
                               {
-                                value: "pending",
-                                label: "Oczekujące",
-                                color: "text-yellow-500",
-                              },
-                              {
                                 value: "paid",
                                 label:
                                   order.paymentMethod === "cod"
@@ -996,11 +991,6 @@ export function AdminOrders() {
                                 value: "shipped",
                                 label: "Wysłane",
                                 color: "text-blue-500",
-                              },
-                              {
-                                value: "delivered",
-                                label: "Dostarczone",
-                                color: "text-purple-500",
                               },
                             ] as const
                           )
