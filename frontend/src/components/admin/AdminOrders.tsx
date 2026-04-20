@@ -549,6 +549,59 @@ export function AdminOrders() {
             >
               📤 Eksportuj CSV
             </button>
+            {markedOrders.some((o) => o.status === "paid") && (
+              <button
+                onClick={async () => {
+                  const paidOrders = markedOrders.filter(
+                    (o) => o.status === "paid",
+                  );
+                  if (!paidOrders.length) {
+                    showToast("Brak zamówień do nadania", "err");
+                    return;
+                  }
+                  const nums = paidOrders.map((o) => o.orderNumber).join(", ");
+                  if (
+                    !confirm(
+                      `Nadać ${paidOrders.length} zamówień BEZ wysyłki emaila do klienta?\n\n${nums}\n\nFedEx zostanie utworzony dla kwalifikujących się zamówień.`,
+                    )
+                  )
+                    return;
+
+                  let ok = 0,
+                    fail = 0;
+                  for (const order of paidOrders) {
+                    try {
+                      const res = await fetch(
+                        `${API}/api/orders/${order.id}/status`,
+                        {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            status: "shipped",
+                            skipEmail: true,
+                          }),
+                        },
+                      );
+                      const json = await res.json();
+                      if (json.success) ok++;
+                      else fail++;
+                    } catch {
+                      fail++;
+                    }
+                  }
+                  showToast(
+                    `Nadano ${ok}/${paidOrders.length} zamówień (bez emaila)${fail ? `, błędów: ${fail}` : ""}`,
+                    fail ? "err" : "ok",
+                  );
+                  setMarkedOrders([]);
+                  fetchOrders();
+                }}
+                className="h-9 px-3 rounded-lg bg-purple-600 text-white text-sm font-medium"
+              >
+                📦 Nadaj bez email (
+                {markedOrders.filter((o) => o.status === "paid").length})
+              </button>
+            )}
           </>
         )}
 

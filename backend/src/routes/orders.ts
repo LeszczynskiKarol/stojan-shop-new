@@ -551,9 +551,10 @@ export async function orderRoutes(app: FastifyInstance) {
     "/:id/status",
     async (request, reply) => {
       try {
-        const { status, skipCourier } = request.body as {
+        const { status, skipCourier, skipEmail } = request.body as {
           status: string;
           skipCourier?: boolean;
+          skipEmail?: boolean;
         };
         const validStatuses = [
           "pending",
@@ -609,42 +610,48 @@ export async function orderRoutes(app: FastifyInstance) {
             }
           }
 
-          try {
-            const updatedOrder = await prisma.order.findUnique({
-              where: { id: order.id },
-            });
-            const pd = (updatedOrder?.paymentDetails as any) || {};
-            const dhl = pd.dhl;
-            const wn = pd.wysylajnami;
+          if (!skipEmail) {
+            try {
+              const updatedOrder = await prisma.order.findUnique({
+                where: { id: order.id },
+              });
+              const pd = (updatedOrder?.paymentDetails as any) || {};
+              const dhl = pd.dhl;
+              const wn = pd.wysylajnami;
 
-            const trackingNumber =
-              fedexTracking || dhl?.trackingNumber || wn?.waybillNumber;
-            const courierName = fedexTracking
-              ? "FedEx"
-              : dhl?.trackingNumber
-                ? "DHL"
-                : wn?.waybillNumber
-                  ? "Wysylajnami"
-                  : undefined;
-            const trackingUrl = fedexTracking
-              ? fedexTrackingUrl
-              : dhl?.trackingNumber
-                ? `https://www.dhl.com/pl-pl/home/sledzenie.html?tracking-id=${dhl.trackingNumber}`
-                : wn?.trackingUrl || undefined;
+              const trackingNumber =
+                fedexTracking || dhl?.trackingNumber || wn?.waybillNumber;
+              const courierName = fedexTracking
+                ? "FedEx"
+                : dhl?.trackingNumber
+                  ? "DHL"
+                  : wn?.waybillNumber
+                    ? "Wysylajnami"
+                    : undefined;
+              const trackingUrl = fedexTracking
+                ? fedexTrackingUrl
+                : dhl?.trackingNumber
+                  ? `https://www.dhl.com/pl-pl/home/sledzenie.html?tracking-id=${dhl.trackingNumber}`
+                  : wn?.trackingUrl || undefined;
 
-            const emailData = buildEmailDataFromOrder(updatedOrder || order);
-            const sent = await sendShipmentNotification(
-              emailData,
-              trackingNumber,
-              courierName,
-              trackingUrl,
-            );
+              const emailData = buildEmailDataFromOrder(updatedOrder || order);
+              const sent = await sendShipmentNotification(
+                emailData,
+                trackingNumber,
+                courierName,
+                trackingUrl,
+              );
+              app.log.info(
+                `📧 Shipment email ${sent ? "sent" : "FAILED"} for #${order.orderNumber}`,
+              );
+            } catch (emailErr: any) {
+              app.log.error(
+                `[EMAIL] Shipment notification failed for ${order.orderNumber}: ${emailErr.message}`,
+              );
+            }
+          } else {
             app.log.info(
-              `📧 Shipment email ${sent ? "sent" : "FAILED"} for #${order.orderNumber}`,
-            );
-          } catch (emailErr: any) {
-            app.log.error(
-              `[EMAIL] Shipment notification failed for ${order.orderNumber}: ${emailErr.message}`,
+              `📧 Shipment email SKIPPED (skipEmail) for #${order.orderNumber}`,
             );
           }
         }
