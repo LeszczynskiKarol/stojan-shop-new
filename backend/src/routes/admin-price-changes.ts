@@ -17,6 +17,7 @@ interface PriceSnapshot {
   productName: string;
   categoryId: string;
   categoryName: string;
+  powerKw: number; // moc produktu w kW (do wyświetlania)
   oldPrice: number; // ownStore price before change
   newPrice: number; // ownStore price after change
   oldAllegroPrice: number | null;
@@ -28,6 +29,8 @@ interface PriceBatch {
   categoryIds: string[];
   categoryNames: string[];
   percentage: number; // e.g. +10 or -5
+  powerMin: number | null; // dolna granica mocy (kW) lub null = bez filtra
+  powerMax: number | null; // górna granica mocy (kW) lub null = bez filtra
   affectedCount: number;
   snapshot: PriceSnapshot[];
   appliedAt: string; // ISO date
@@ -41,8 +44,19 @@ function roundPrice(val: number): number {
   return Math.round(val); // pełne złotówki, bez groszy
 }
 
-/** Pobierz produkty dla danych kategorii z cenami */
-async function getProductsForCategories(categoryIds: string[]) {
+/** Wyciągnij numeryczną moc z JSON power.value (np. "7,5" → 7.5, "55" → 55) */
+function parsePowerKw(product: any): number {
+  const raw = (product.power as any)?.value;
+  if (!raw) return 0;
+  return parseFloat(String(raw).replace(",", ".")) || 0;
+}
+
+/** Pobierz produkty dla danych kategorii, opcjonalnie filtruj po mocy */
+async function getProductsForCategories(
+  categoryIds: string[],
+  powerMin?: number | null,
+  powerMax?: number | null,
+) {
   const products = await prisma.product.findMany({
     where: {
       categories: {
@@ -57,6 +71,18 @@ async function getProductsForCategories(categoryIds: string[]) {
       },
     },
   });
+
+  // Filtr mocy w JS — power.value to string w JSON, nie da się porównać numerycznie w Prisma
+  if (powerMin != null || powerMax != null) {
+    return products.filter((p) => {
+      const kw = parsePowerKw(p);
+      if (kw === 0) return false; // brak mocy = pomijaj
+      if (powerMin != null && kw < powerMin) return false;
+      if (powerMax != null && kw > powerMax) return false;
+      return true;
+    });
+  }
+
   return products;
 }
 
@@ -72,9 +98,17 @@ export async function adminPriceChangeRoutes(app: FastifyInstance) {
       categoryIds: string[];
       percentage: number; // np. 10 = +10%, -5 = -5%
       changeAllegro?: boolean; // czy zmieniać też cenę Allegro
+      powerMin?: number | null; // dolna granica mocy kW
+      powerMax?: number | null; // górna granica mocy kW
     };
   }>("/preview", async (request, reply) => {
-    const { categoryIds, percentage, changeAllegro = false } = request.body;
+    const {
+      categoryIds,
+      percentage,
+      changeAllegro = false,
+      powerMin,
+      powerMax,
+    } = request.body;
 
     if (!categoryIds?.length) {
       return reply.status(400).send({
@@ -89,7 +123,11 @@ export async function adminPriceChangeRoutes(app: FastifyInstance) {
       });
     }
 
-    const products = await getProductsForCategories(categoryIds);
+    const products = await getProductsForCategories(
+      categoryIds,
+      powerMin,
+      powerMax,
+    );
     const multiplier = 1 + percentage / 100;
 
     const preview: PriceSnapshot[] = products.map((p) => {
@@ -106,12 +144,14 @@ export async function adminPriceChangeRoutes(app: FastifyInstance) {
           : oldAllegroPrice;
 
       const cat = p.categories?.[0]?.category;
+      const powerKw = parsePowerKw(p);
 
       return {
         productId: p.id,
         productName: p.name,
         categoryId: cat?.id || "",
         categoryName: cat?.name || "—",
+        powerKw,
         oldPrice,
         newPrice,
         oldAllegroPrice,
@@ -146,9 +186,17 @@ export async function adminPriceChangeRoutes(app: FastifyInstance) {
       categoryIds: string[];
       percentage: number;
       changeAllegro?: boolean;
+      powerMin?: number | null;
+      powerMax?: number | null;
     };
   }>("/apply", async (request, reply) => {
-    const { categoryIds, percentage, changeAllegro = false } = request.body;
+    const {
+      categoryIds,
+      percentage,
+      changeAllegro = false,
+      powerMin,
+      powerMax,
+    } = request.body;
 
     if (!categoryIds?.length || !percentage) {
       return reply.status(400).send({
@@ -157,7 +205,11 @@ export async function adminPriceChangeRoutes(app: FastifyInstance) {
       });
     }
 
-    const products = await getProductsForCategories(categoryIds);
+    const products = await getProductsForCategories(
+      categoryIds,
+      powerMin,
+      powerMax,
+    );
     const multiplier = 1 + percentage / 100;
 
     // Pobierz nazwy kategorii na potrzeby historii
@@ -184,12 +236,14 @@ export async function adminPriceChangeRoutes(app: FastifyInstance) {
           : oldAllegroPrice;
 
       const cat = p.categories?.[0]?.category;
+      const powerKw = parsePowerKw(p);
 
       snapshot.push({
         productId: p.id,
         productName: p.name,
         categoryId: cat?.id || "",
         categoryName: cat?.name || "—",
+        powerKw,
         oldPrice,
         newPrice,
         oldAllegroPrice,
@@ -228,6 +282,8 @@ export async function adminPriceChangeRoutes(app: FastifyInstance) {
       categoryIds,
       categoryNames: categoryIds.map((id) => catNameMap[id] || id),
       percentage,
+      powerMin: powerMin ?? null,
+      powerMax: powerMax ?? null,
       affectedCount: snapshot.length,
       snapshot,
       appliedAt: new Date().toISOString(),

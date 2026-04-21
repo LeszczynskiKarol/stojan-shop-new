@@ -17,6 +17,7 @@ interface PricePreviewItem {
   productName: string;
   categoryId: string;
   categoryName: string;
+  powerKw: number;
   oldPrice: number;
   newPrice: number;
   oldAllegroPrice: number | null;
@@ -36,6 +37,8 @@ interface PriceBatch {
   categoryIds: string[];
   categoryNames: string[];
   percentage: number;
+  powerMin: number | null;
+  powerMax: number | null;
   affectedCount: number;
   appliedAt: string;
   rolledBackAt: string | null;
@@ -121,6 +124,8 @@ export function PriceChanger() {
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
   const [percentage, setPercentage] = useState<string>("");
   const [changeAllegro, setChangeAllegro] = useState(false);
+  const [powerMin, setPowerMin] = useState<string>("");
+  const [powerMax, setPowerMax] = useState<string>("");
 
   // --- PREVIEW ---
   const [preview, setPreview] = useState<PricePreviewItem[] | null>(null);
@@ -253,6 +258,8 @@ export function PriceChanger() {
           categoryIds: Array.from(selectedCats),
           percentage: pct,
           changeAllegro,
+          powerMin: powerMin ? parseFloat(powerMin) : null,
+          powerMax: powerMax ? parseFloat(powerMax) : null,
         }),
       });
       setPreview(res.data.products);
@@ -272,7 +279,7 @@ export function PriceChanger() {
     setConfirmModal({
       open: true,
       title: `Zmienić ceny ${previewStats.count} produktów?`,
-      desc: `Zmiana: ${fmtPercent(previewStats.percentage)}\nŁączna różnica: ${fmtPrice(previewStats.totalDiff)}\n\nTa operacja jest odwracalna — snapshot zostanie zachowany.`,
+      desc: `Zmiana: ${fmtPercent(previewStats.percentage)}${powerMin || powerMax ? `\nPrzedział mocy: ${powerMin || "0"}–${powerMax || "∞"} kW` : ""}\nŁączna różnica: ${fmtPrice(previewStats.totalDiff)}\n\nTa operacja jest odwracalna — snapshot zostanie zachowany.`,
       label: "Zatwierdź zmianę cen",
       variant: previewStats.percentage > 0 ? "primary" : "warning",
       onConfirm: async () => {
@@ -284,6 +291,8 @@ export function PriceChanger() {
               categoryIds: Array.from(selectedCats),
               percentage: parseFloat(percentage),
               changeAllegro,
+              powerMin: powerMin ? parseFloat(powerMin) : null,
+              powerMax: powerMax ? parseFloat(powerMax) : null,
             }),
           });
           setApplied({
@@ -593,6 +602,113 @@ export function PriceChanger() {
             Zmień też cenę Allegro (jeśli powiązane)
           </label>
 
+          {/* Przedział mocy */}
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 6,
+              }}
+            >
+              Przedział mocy (kW)
+              <span
+                style={{
+                  fontWeight: 400,
+                  color: "var(--text-muted)",
+                  marginLeft: 6,
+                }}
+              >
+                — opcjonalnie
+              </span>
+            </label>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="number"
+                value={powerMin}
+                onChange={(e) => {
+                  setPowerMin(e.target.value);
+                  setPreview(null);
+                  setPreviewStats(null);
+                  setApplied(null);
+                }}
+                placeholder="od"
+                min="0"
+                step="0.1"
+                style={{ width: 100, padding: "8px 10px" }}
+              />
+              <span style={{ color: "var(--text-muted)", fontSize: 14 }}>
+                —
+              </span>
+              <input
+                type="number"
+                value={powerMax}
+                onChange={(e) => {
+                  setPowerMax(e.target.value);
+                  setPreview(null);
+                  setPreviewStats(null);
+                  setApplied(null);
+                }}
+                placeholder="do"
+                min="0"
+                step="0.1"
+                style={{ width: 100, padding: "8px 10px" }}
+              />
+              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                kW
+              </span>
+            </div>
+            {/* Szybkie przedziały */}
+            <div
+              style={{
+                display: "flex",
+                gap: 4,
+                flexWrap: "wrap",
+                marginTop: 8,
+              }}
+            >
+              {[
+                { label: "0–1 kW", min: "0", max: "1" },
+                { label: "1–5 kW", min: "1", max: "5" },
+                { label: "5–15 kW", min: "5", max: "15" },
+                { label: "15–40 kW", min: "15", max: "40" },
+                { label: "40–80 kW", min: "40", max: "80" },
+                { label: "80+ kW", min: "80", max: "" },
+                { label: "Wszystkie", min: "", max: "" },
+              ].map((r) => {
+                const active = powerMin === r.min && powerMax === r.max;
+                return (
+                  <button
+                    key={r.label}
+                    className="btn btn-outline btn-sm"
+                    style={{
+                      fontSize: 11,
+                      padding: "3px 8px",
+                      background: active ? "var(--primary)" : undefined,
+                      color: active ? "#fff" : undefined,
+                      borderColor: active ? "var(--primary)" : undefined,
+                    }}
+                    onClick={() => {
+                      setPowerMin(r.min);
+                      setPowerMax(r.max);
+                      setPreview(null);
+                      setPreviewStats(null);
+                      setApplied(null);
+                    }}
+                  >
+                    {r.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div
+              style={{ marginTop: 6, fontSize: 11, color: "var(--text-muted)" }}
+            >
+              Zostaw puste = zmiana obejmie wszystkie moce
+            </div>
+          </div>
+
           {/* Przycisk podglądu */}
           <button
             className="btn btn-primary"
@@ -631,6 +747,14 @@ export function PriceChanger() {
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
               Produktów: <b>{previewStats.count}</b>
             </div>
+            {(powerMin || powerMax) && (
+              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                Moc:{" "}
+                <b>
+                  {powerMin || "0"}–{powerMax || "∞"} kW
+                </b>
+              </div>
+            )}
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
               Suma przed: <b>{fmtPrice(previewStats.totalOldPrice)}</b>
             </div>
@@ -725,6 +849,17 @@ export function PriceChanger() {
                   </th>
                   <th
                     style={{ cursor: "pointer", textAlign: "right" }}
+                    onClick={() => handlePreviewSort("powerKw")}
+                  >
+                    Moc{" "}
+                    {previewSort.field === "powerKw"
+                      ? previewSort.dir === "asc"
+                        ? "▲"
+                        : "▼"
+                      : "⇅"}
+                  </th>
+                  <th
+                    style={{ cursor: "pointer", textAlign: "right" }}
                     onClick={() => handlePreviewSort("oldPrice")}
                   >
                     Cena teraz{" "}
@@ -773,6 +908,15 @@ export function PriceChanger() {
                         >
                           {item.categoryName}
                         </span>
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: 12,
+                        }}
+                      >
+                        {item.powerKw > 0 ? `${item.powerKw} kW` : "—"}
                       </td>
                       <td
                         style={{ textAlign: "right", fontFamily: "monospace" }}
@@ -832,7 +976,7 @@ export function PriceChanger() {
                 {sortedPreview.length === 0 && (
                   <tr>
                     <td
-                      colSpan={changeAllegro ? 9 : 7}
+                      colSpan={changeAllegro ? 10 : 8}
                       style={{
                         textAlign: "center",
                         padding: 30,
@@ -898,6 +1042,7 @@ export function PriceChanger() {
                   <th>ID</th>
                   <th>Data</th>
                   <th>Zmiana</th>
+                  <th>Moc</th>
                   <th>Produktów</th>
                   <th>Kategorie</th>
                   <th>Status</th>
@@ -925,6 +1070,15 @@ export function PriceChanger() {
                       >
                         {fmtPercent(batch.percentage)}
                       </span>
+                    </td>
+                    <td style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+                      {batch.powerMin != null || batch.powerMax != null ? (
+                        `${batch.powerMin ?? 0}–${batch.powerMax ?? "∞"} kW`
+                      ) : (
+                        <span style={{ color: "var(--text-muted)" }}>
+                          wszystkie
+                        </span>
+                      )}
                     </td>
                     <td>{batch.affectedCount}</td>
                     <td>
