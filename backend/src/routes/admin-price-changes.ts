@@ -31,6 +31,7 @@ interface PriceBatch {
   percentage: number; // e.g. +10 or -5
   powerMin: number | null; // dolna granica mocy (kW) lub null = bez filtra
   powerMax: number | null; // górna granica mocy (kW) lub null = bez filtra
+  conditions: string[] | null; // nowy, uzywany, nieuzywany — lub null = wszystkie
   affectedCount: number;
   snapshot: PriceSnapshot[];
   appliedAt: string; // ISO date
@@ -51,18 +52,26 @@ function parsePowerKw(product: any): number {
   return parseFloat(String(raw).replace(",", ".")) || 0;
 }
 
-/** Pobierz produkty dla danych kategorii, opcjonalnie filtruj po mocy */
+/** Pobierz produkty dla danych kategorii, opcjonalnie filtruj po mocy i stanie */
 async function getProductsForCategories(
   categoryIds: string[],
   powerMin?: number | null,
   powerMax?: number | null,
+  conditions?: string[] | null,
 ) {
-  const products = await prisma.product.findMany({
-    where: {
-      categories: {
-        some: { categoryId: { in: categoryIds } },
-      },
+  const where: Prisma.ProductWhereInput = {
+    categories: {
+      some: { categoryId: { in: categoryIds } },
     },
+  };
+
+  // Filtr stanu produktu — enum w Prisma, filtrujemy na poziomie DB
+  if (conditions?.length) {
+    where.condition = { in: conditions as any };
+  }
+
+  const products = await prisma.product.findMany({
+    where,
     include: {
       categories: {
         include: {
@@ -100,6 +109,7 @@ export async function adminPriceChangeRoutes(app: FastifyInstance) {
       changeAllegro?: boolean; // czy zmieniać też cenę Allegro
       powerMin?: number | null; // dolna granica mocy kW
       powerMax?: number | null; // górna granica mocy kW
+      conditions?: string[] | null; // nowy, uzywany, nieuzywany
     };
   }>("/preview", async (request, reply) => {
     const {
@@ -108,6 +118,7 @@ export async function adminPriceChangeRoutes(app: FastifyInstance) {
       changeAllegro = false,
       powerMin,
       powerMax,
+      conditions,
     } = request.body;
 
     if (!categoryIds?.length) {
@@ -127,6 +138,7 @@ export async function adminPriceChangeRoutes(app: FastifyInstance) {
       categoryIds,
       powerMin,
       powerMax,
+      conditions,
     );
     const multiplier = 1 + percentage / 100;
 
@@ -188,6 +200,7 @@ export async function adminPriceChangeRoutes(app: FastifyInstance) {
       changeAllegro?: boolean;
       powerMin?: number | null;
       powerMax?: number | null;
+      conditions?: string[] | null;
     };
   }>("/apply", async (request, reply) => {
     const {
@@ -196,6 +209,7 @@ export async function adminPriceChangeRoutes(app: FastifyInstance) {
       changeAllegro = false,
       powerMin,
       powerMax,
+      conditions,
     } = request.body;
 
     if (!categoryIds?.length || !percentage) {
@@ -209,6 +223,7 @@ export async function adminPriceChangeRoutes(app: FastifyInstance) {
       categoryIds,
       powerMin,
       powerMax,
+      conditions,
     );
     const multiplier = 1 + percentage / 100;
 
@@ -284,6 +299,7 @@ export async function adminPriceChangeRoutes(app: FastifyInstance) {
       percentage,
       powerMin: powerMin ?? null,
       powerMax: powerMax ?? null,
+      conditions: conditions?.length ? conditions : null,
       affectedCount: snapshot.length,
       snapshot,
       appliedAt: new Date().toISOString(),

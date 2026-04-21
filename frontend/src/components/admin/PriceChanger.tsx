@@ -39,6 +39,7 @@ interface PriceBatch {
   percentage: number;
   powerMin: number | null;
   powerMax: number | null;
+  conditions: string[] | null;
   affectedCount: number;
   appliedAt: string;
   rolledBackAt: string | null;
@@ -115,6 +116,19 @@ function shouldShowCategory(name: string): boolean {
   );
 }
 
+const CONDITION_OPTIONS: { value: string; label: string; emoji: string }[] = [
+  { value: "nowy", label: "Nowy", emoji: "🟢" },
+  { value: "uzywany", label: "Używany", emoji: "🟡" },
+  { value: "nieuzywany", label: "Nieużywany", emoji: "🔵" },
+];
+
+function fmtConditions(conditions: string[] | null): string {
+  if (!conditions?.length) return "wszystkie";
+  return conditions
+    .map((c) => CONDITION_OPTIONS.find((o) => o.value === c)?.label || c)
+    .join(", ");
+}
+
 // ============================================================
 // MAIN COMPONENT
 // ============================================================
@@ -126,6 +140,9 @@ export function PriceChanger() {
   const [changeAllegro, setChangeAllegro] = useState(false);
   const [powerMin, setPowerMin] = useState<string>("");
   const [powerMax, setPowerMax] = useState<string>("");
+  const [selectedConditions, setSelectedConditions] = useState<Set<string>>(
+    new Set(),
+  );
 
   // --- PREVIEW ---
   const [preview, setPreview] = useState<PricePreviewItem[] | null>(null);
@@ -260,6 +277,8 @@ export function PriceChanger() {
           changeAllegro,
           powerMin: powerMin ? parseFloat(powerMin) : null,
           powerMax: powerMax ? parseFloat(powerMax) : null,
+          conditions:
+            selectedConditions.size > 0 ? Array.from(selectedConditions) : null,
         }),
       });
       setPreview(res.data.products);
@@ -279,7 +298,7 @@ export function PriceChanger() {
     setConfirmModal({
       open: true,
       title: `Zmienić ceny ${previewStats.count} produktów?`,
-      desc: `Zmiana: ${fmtPercent(previewStats.percentage)}${powerMin || powerMax ? `\nPrzedział mocy: ${powerMin || "0"}–${powerMax || "∞"} kW` : ""}\nŁączna różnica: ${fmtPrice(previewStats.totalDiff)}\n\nTa operacja jest odwracalna — snapshot zostanie zachowany.`,
+      desc: `Zmiana: ${fmtPercent(previewStats.percentage)}${powerMin || powerMax ? `\nPrzedział mocy: ${powerMin || "0"}–${powerMax || "∞"} kW` : ""}${selectedConditions.size > 0 ? `\nStan: ${fmtConditions(Array.from(selectedConditions))}` : ""}\nŁączna różnica: ${fmtPrice(previewStats.totalDiff)}\n\nTa operacja jest odwracalna — snapshot zostanie zachowany.`,
       label: "Zatwierdź zmianę cen",
       variant: previewStats.percentage > 0 ? "primary" : "warning",
       onConfirm: async () => {
@@ -293,6 +312,10 @@ export function PriceChanger() {
               changeAllegro,
               powerMin: powerMin ? parseFloat(powerMin) : null,
               powerMax: powerMax ? parseFloat(powerMax) : null,
+              conditions:
+                selectedConditions.size > 0
+                  ? Array.from(selectedConditions)
+                  : null,
             }),
           });
           setApplied({
@@ -709,6 +732,78 @@ export function PriceChanger() {
             </div>
           </div>
 
+          {/* Stan produktu */}
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 6,
+              }}
+            >
+              Stan produktu
+              <span
+                style={{
+                  fontWeight: 400,
+                  color: "var(--text-muted)",
+                  marginLeft: 6,
+                }}
+              >
+                — opcjonalnie
+              </span>
+            </label>
+            <div style={{ display: "flex", gap: 6 }}>
+              {CONDITION_OPTIONS.map((opt) => {
+                const checked = selectedConditions.has(opt.value);
+                return (
+                  <label
+                    key={opt.value}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "7px 12px",
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      background: checked
+                        ? "rgba(99,102,241,0.1)"
+                        : "transparent",
+                      border: `1px solid ${checked ? "var(--primary)" : "var(--border)"}`,
+                      transition: "all .15s",
+                      fontSize: 13,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        setSelectedConditions((prev) => {
+                          const next = new Set(prev);
+                          next.has(opt.value)
+                            ? next.delete(opt.value)
+                            : next.add(opt.value);
+                          return next;
+                        });
+                        setPreview(null);
+                        setPreviewStats(null);
+                        setApplied(null);
+                      }}
+                    />
+                    <span>
+                      {opt.emoji} {opt.label}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            <div
+              style={{ marginTop: 6, fontSize: 11, color: "var(--text-muted)" }}
+            >
+              Brak zaznaczenia = zmiana obejmie wszystkie stany
+            </div>
+          </div>
+
           {/* Przycisk podglądu */}
           <button
             className="btn btn-primary"
@@ -753,6 +848,11 @@ export function PriceChanger() {
                 <b>
                   {powerMin || "0"}–{powerMax || "∞"} kW
                 </b>
+              </div>
+            )}
+            {selectedConditions.size > 0 && (
+              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                Stan: <b>{fmtConditions(Array.from(selectedConditions))}</b>
               </div>
             )}
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
@@ -1043,6 +1143,7 @@ export function PriceChanger() {
                   <th>Data</th>
                   <th>Zmiana</th>
                   <th>Moc</th>
+                  <th>Stan</th>
                   <th>Produktów</th>
                   <th>Kategorie</th>
                   <th>Status</th>
@@ -1074,6 +1175,15 @@ export function PriceChanger() {
                     <td style={{ fontSize: 12, whiteSpace: "nowrap" }}>
                       {batch.powerMin != null || batch.powerMax != null ? (
                         `${batch.powerMin ?? 0}–${batch.powerMax ?? "∞"} kW`
+                      ) : (
+                        <span style={{ color: "var(--text-muted)" }}>
+                          wszystkie
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ fontSize: 12 }}>
+                      {batch.conditions?.length ? (
+                        <span>{fmtConditions(batch.conditions)}</span>
                       ) : (
                         <span style={{ color: "var(--text-muted)" }}>
                           wszystkie
