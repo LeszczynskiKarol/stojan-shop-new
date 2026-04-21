@@ -32,6 +32,7 @@ import { adminFedExRoutes } from "./routes/admin-fedex.js";
 import { sitemapRoutes } from "./routes/sitemap.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { allegroRoutes } from "./routes/allegro.js";
+import { adminPriceChangeRoutes } from "./routes/admin-price-changes.js";
 
 // ▶ NEW: Allegro scheduler
 import {
@@ -156,6 +157,10 @@ app.register(async function protectedRoutes(protectedApp) {
   });
 
   await protectedApp.register(adminDHLRoutes, { prefix: "/api/admin/dhl" });
+
+  await protectedApp.register(adminPriceChangeRoutes, {
+    prefix: "/api/admin/price-changes",
+  });
 
   await protectedApp.register(adminWNRoutes, {
     prefix: "/api/admin/wysylajnami",

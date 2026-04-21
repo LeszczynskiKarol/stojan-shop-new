@@ -572,6 +572,7 @@ export async function sendShipmentNotification(
                     <p style="margin:0 0 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#3b82f6;">Śledzenie przesyłki${courierName ? ` — ${escapeHtml(courierName)}` : ""}</p>
                     <p style="margin:0 0 8px;font-size:16px;font-weight:700;color:#1e293b;font-family:monospace;letter-spacing:1px;">${escapeHtml(trackingNumber)}</p>
                     ${trackingUrl ? `<a href="${trackingUrl}" target="_blank" style="display:inline-block;padding:10px 24px;background-color:#2563eb;color:#ffffff;text-decoration:none;font-weight:600;font-size:13px;border-radius:6px;">Śledź przesyłkę →</a>` : ""}
+                    <p style="margin:8px 0 0;font-size:11px;color:#64748b;">Śledzenie przesyłki będzie dostępne po odbiorze paczki przez kuriera (zwykle w ciągu kilku godzin).</p>
                   </td>
                 </tr>
               </table>

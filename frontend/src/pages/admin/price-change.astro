@@ -1,0 +1,8 @@
+---
+// frontend/src/pages/admin/price-change.astro
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import PriceChanger from '../../components/admin/PriceChanger';
+---
+<AdminLayout title="Zmiana cen">
+  <PriceChanger client:load />
+</AdminLayout>

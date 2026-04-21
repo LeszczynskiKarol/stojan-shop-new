@@ -638,12 +638,13 @@ const { title = 'Admin Panel' } = Astro.props;
       <button class="drawer-close" id="drawerClose">✕</button>
     </div>
     <a href="/admin/products">📦 Produkty</a>
+    <a href="/admin/price-change">💰 Zmiana cen</a>
     <a href="/admin/products/add">➕ Dodaj produkt</a>
     <a href="/admin/allegro">🅰️ Allegro</a>
     <a href="/admin/shipping">🚚 Wysyłka</a>
     <a href="/admin/zamowienia">📋 Zamówienia</a>
     <a href="/admin/analytics">📊 Analityka</a>
-    <div class="drawer-footer">
+        <div class="drawer-footer">
       <a href="/" target="_blank" style="font-size:12px;color:var(--accent);">→ Otwórz sklep</a>
       <button id="logoutBtnMobile" class="btn btn-ghost" style="color:var(--danger);font-size:13px;justify-content:flex-start;padding:8px 0;">Wyloguj</button>
     </div>
@@ -655,6 +656,7 @@ const { title = 'Admin Panel' } = Astro.props;
     <a href="/admin" class="logo">⚡ Stojan Admin</a>
     <div class="nav-links">
       <a href="/admin/products">Produkty</a>
+      <a href="/admin/price-change">Ceny</a>
       <a href="/admin/products/add">+ Dodaj</a>
       <a href="/admin/allegro">Allegro</a>
         <a href="/admin/shipping">Wysyłka</a>
