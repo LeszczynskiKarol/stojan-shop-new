@@ -56,14 +56,15 @@ const categoryCovers: Record<string, string> = {
   'akcesoria': '/images/categories/akcesoria-collage.jpg', // kolaż — musisz dodać plik
 };
 
-// Fetch 4 images for accessories collage
-let accessoryImages: string[] = [];
-try {
-  const accResult = await getProducts('category=akcesoria&inStock=true&limit=4&sort=purchaseCount&order=desc');
-  accessoryImages = (accResult?.products || [])
-    .map((p: any) => p.mainImage || p.images?.[0])
-    .filter(Boolean);
-} catch {}
+// Hardcoded images for accessories collage (3x2 grid)
+const accessoryImages: string[] = [
+  'https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1748681646858.JPG',
+  'https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/a3954e58-1fb6-4769-9a52-db800f68ea0f.webp',
+  'https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1757075267554.JPG',
+  'https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/products/products-1739377791216.jpg',
+  'https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/products/360881c7-b4aa-4a7a-b057-8a409f1d2254.jpg',
+  'https://s3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/products/2633b7dc-ecfe-4b13-ae07-c8d0b7740f14.png',
+];
 
 // Dla kategorii bez hardcoded image — pobierz z produktu (z-hamulcem, jednofazowe, wentylatory)
 for (const slug of CATEGORY_ORDER) {
@@ -290,16 +291,16 @@ function stripHtml(html: string | null | undefined): string {
     class="group block bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all duration-200"
   >
     <div class="aspect-[16/10] overflow-hidden bg-accent relative">
-      {cat.slug === 'akcesoria' && accessoryImages.length >= 4 ? (
-        <div class="w-full h-full grid grid-cols-2 grid-rows-2 gap-px bg-border">
-          {accessoryImages.slice(0, 4).map((img, i) => (
-            <div class="bg-card overflow-hidden">
+      {cat.slug === 'akcesoria' && accessoryImages.length >= 6 ? (
+        <div class="w-full h-full grid grid-cols-3 grid-rows-2 gap-px bg-border">
+          {accessoryImages.slice(0, 6).map((img, i) => (
+            <div class="bg-card overflow-hidden flex items-center justify-center">
               <img
                 src={img}
                 alt={`${cat.name} ${i + 1}`}
-                class="w-full h-full object-contain p-1.5 group-hover:scale-105 transition-transform duration-300"
+                class="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform duration-300"
                 loading="lazy"
-                width="200"
+                width="133"
                 height="125"
               />
             </div>

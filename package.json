@@ -6,15 +6,15 @@
     "frontend"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
+    "dev": "concurrently -n BE,FE -c blue,magenta --kill-others-on-fail \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev -w backend",
+    "dev:frontend": "npm run dev -w frontend",
     "build": "npm run build:backend && npm run build:frontend",
-    "build:backend": "cd backend && npm run build",
-    "build:frontend": "cd frontend && npm run build",
-    "db:migrate": "cd backend && npx prisma migrate dev",
-    "db:studio": "cd backend && npx prisma studio",
-    "db:seed": "cd backend && npx tsx prisma/seed.ts"
+    "build:backend": "npm run build -w backend",
+    "build:frontend": "npm run build -w frontend",
+    "db:migrate": "npm run db:migrate -w backend",
+    "db:studio": "npm run db:studio -w backend",
+    "db:seed": "npm run db:seed -w backend"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
