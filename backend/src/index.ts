@@ -58,6 +58,10 @@ if (process.env.ENABLE_CORS !== "false") {
 
 await app.register(helmet, {
   contentSecurityPolicy: false,
+  // HSTS jest serwowany przez nginx (z preload directive — wymóg hstspreload.org).
+  // Helmet domyślnie ustawia max-age=15552000 bez preload, co tworzyłoby duplikat
+  // i blokowało hstspreload eligibility na api.silniki-elektryczne.com.pl.
+  hsts: false,
 });
 
 await app.register(formbody);
