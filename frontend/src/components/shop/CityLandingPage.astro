@@ -1,0 +1,181 @@
+---
+// frontend/src/components/shop/CityLandingPage.astro
+// Lokalna strona "Silniki elektryczne {City}" — uczciwa, bez udawania oddziału.
+// Jeden magazyn w Pigży, wszystkie dostawy kurierem.
+
+export interface CityData {
+  name: string;
+  region: string;
+  distanceKm: number;
+  /** Krótki, faktyczny kontekst lokalny — branże w danym regionie. Może być pusty. */
+  industryHint?: string;
+}
+
+export interface Props {
+  citySlug: string;
+  city: CityData;
+}
+
+const { citySlug, city } = Astro.props;
+---
+
+<div class="container mx-auto px-4 py-8 max-w-4xl">
+  <nav class="text-sm text-muted-foreground mb-6" aria-label="Ścieżka nawigacji">
+    <a href="/" class="hover:text-primary transition-colors">Strona główna</a>
+    <span class="mx-2">›</span>
+    <span class="text-foreground">Silniki elektryczne {city.name}</span>
+  </nav>
+
+  <h1 class="text-3xl md:text-4xl font-bold mb-4 text-foreground">
+    Silniki elektryczne {city.name} — dostawa z magazynu w&nbsp;Pigży
+  </h1>
+
+  <div class="bg-primary/5 border border-primary/20 rounded-xl p-5 mb-8">
+    <p class="text-foreground">
+      <strong>Nie mamy oddziału w {city.name}</strong> — wszystkie zamówienia realizujemy
+      z jednego magazynu w&nbsp;Pigży k.&nbsp;Torunia ({city.distanceKm}&nbsp;km od&nbsp;{city.name}).
+      Wysyłka kurierem standardowo&nbsp;<strong>1–2 dni robocze</strong>.
+      Zamówienia złożone do&nbsp;12:00 wysyłamy tego samego dnia.
+    </p>
+  </div>
+
+  <div class="prose dark:prose-invert max-w-none">
+
+    <h2>Jak zamówić silnik elektryczny z dostawą do&nbsp;{city.name}?</h2>
+    <ol>
+      <li><strong>Wybierz silnik</strong> w naszym katalogu — kategorie <a href="/trojfazowe">trójfazowe</a>, <a href="/jednofazowe">jednofazowe</a>, <a href="/motoreduktory">motoreduktory</a>, <a href="/z-hamulcem">z hamulcem</a>.</li>
+      <li><strong>Dodaj do koszyka</strong> i przejdź do realizacji zamówienia.</li>
+      <li><strong>Podaj adres dostawy</strong> w&nbsp;{city.name} — kurier DHL dostarczy w&nbsp;1–2 dni robocze.</li>
+      <li><strong>Wybierz formę płatności</strong>: BLIK, Przelewy24, karta (Visa/Mastercard), PayPal, Google&nbsp;Pay, Apple&nbsp;Pay, przelew tradycyjny.</li>
+      <li><strong>Zamówienie do&nbsp;12:00</strong> w dzień roboczy — wysyłka tego samego dnia.</li>
+    </ol>
+
+    <h2>Ile kosztuje dostawa silnika do&nbsp;{city.name}?</h2>
+    <p>Koszt dostawy z Pigży do&nbsp;{city.name} zależy od wagi silnika:</p>
+    <ul>
+      <li><strong>Paczka kurierska do&nbsp;30&nbsp;kg</strong> (silniki do ok.&nbsp;3&nbsp;kW, akcesoria, koła pasowe, sprzęgła): od&nbsp;<strong>15&nbsp;zł</strong>.</li>
+      <li><strong>Paczka 30–50&nbsp;kg</strong> (silniki 3–15&nbsp;kW, motoreduktory): <strong>40–70&nbsp;zł</strong>.</li>
+      <li><strong>Paleta</strong> (silniki powyżej 50&nbsp;kg, duże motoreduktory, silniki przemysłowe): <strong>150–300&nbsp;zł</strong>.</li>
+    </ul>
+    <p>Dokładny koszt zobaczysz w koszyku po wybraniu silnika — kalkulator uwzględnia wagę i miejsce dostawy.</p>
+
+    <h2>Czas dostawy z Pigży do&nbsp;{city.name}</h2>
+    <p>
+      Magazyn w Pigży leży <strong>{city.distanceKm}&nbsp;km</strong> od&nbsp;{city.name}.
+      Kurier DHL realizuje dostawę standardowo w&nbsp;<strong>1–2 dni robocze</strong> od momentu nadania.
+      Dla zamówień złożonych do&nbsp;12:00 w dzień roboczy nadanie odbywa się tego samego dnia,
+      więc silnik dotrze do&nbsp;{city.name} zwykle następnego dnia po zamówieniu.
+    </p>
+
+    <h2>Skup silników elektrycznych z&nbsp;{city.name} i okolic</h2>
+    <p>
+      Skupujemy silniki elektryczne — sprawne i niesprawne — z całej Polski, w tym z&nbsp;{city.name}
+      i okolic ({city.region}). Trzy sposoby przekazania silnika:
+    </p>
+    <ul>
+      <li><strong>Pojedyncze silniki (1–3 sztuki)</strong>: wyślij kurierem na nasz koszt lub przywieź osobiście do Pigży po wcześniejszym ustaleniu wyceny.</li>
+      <li><strong>Większe partie (5+ silników, łączna waga 100+&nbsp;kg)</strong>: <strong>przyjeżdżamy własnym transportem do&nbsp;{city.name}</strong> — odbiór bezpłatny, płatność na miejscu lub przelewem.</li>
+      <li><strong>Bardzo duże ilości (samochody dostawcze, kontenery)</strong>: ustalamy indywidualnie. Płacimy z góry, organizujemy odbiór własnym transportem ciężarowym.</li>
+    </ul>
+    <p>
+      <strong>Bezpłatna wycena</strong>: zadzwoń <a href="tel:+48500385112">500&nbsp;385&nbsp;112</a> lub
+      napisz na <a href="mailto:stojan@silniki-elektryczne.com.pl">stojan@silniki-elektryczne.com.pl</a>
+      — podaj liczbę silników, moce i stan techniczny. Odpowiadamy zwykle w ciągu kilku godzin.
+      Więcej informacji: <a href="/skup-silnikow">Skup silników elektrycznych</a>.
+    </p>
+
+    <h2>Co najczęściej kupują klienci z&nbsp;{city.region}?</h2>
+    <p>Wśród zamówień wysyłanych do&nbsp;{city.region} dominują:</p>
+    <ul>
+      <li><a href="/trojfazowe">Silniki trójfazowe</a> 1,5&nbsp;–&nbsp;7,5&nbsp;kW do warsztatu i małej produkcji</li>
+      <li><a href="/motoreduktory">Motoreduktory</a> do maszyn produkcyjnych i&nbsp;gastronomicznych (m.in.&nbsp;maszynki do mięsa)</li>
+      <li><a href="/jednofazowe">Silniki jednofazowe 230V</a> do warsztatów i&nbsp;gospodarstw bez instalacji trójfazowej</li>
+      <li><a href="/z-hamulcem">Silniki z hamulcem</a> do bram, wciągarek, suwnic i&nbsp;dźwigów towarowych</li>
+      <li><a href="/silniki-elektryczne-5-5-kw">Silniki 5,5&nbsp;kW</a>, <a href="/silniki-elektryczne-3-kw">3&nbsp;kW</a>, <a href="/silniki-elektryczne-2-2-kw">2,2&nbsp;kW</a> — najpopularniejsze moce</li>
+    </ul>
+
+    {city.industryHint && (
+      <>
+        <h2>Lokalna specyfika — {city.region}</h2>
+        <p set:html={city.industryHint} />
+      </>
+    )}
+
+    <h2>Stojan&nbsp;S.C. — kim jesteśmy</h2>
+    <p>
+      Stojan&nbsp;S.C. działa od&nbsp;<strong>1992&nbsp;r.</strong> w&nbsp;Pigży k.&nbsp;Torunia.
+      Zajmujemy się sprzedażą silników elektrycznych — nowych, magazynowych (nieużywanych)
+      i&nbsp;używanych po profesjonalnym remoncie — oraz skupem silników z&nbsp;całej Polski.
+      Mamy w&nbsp;ofercie ponad&nbsp;700&nbsp;napędów dostępnych od&nbsp;ręki.
+    </p>
+    <div class="not-prose bg-muted/40 rounded-lg p-5 my-6">
+      <p class="font-semibold mb-2 text-foreground">Magazyn i odbiór osobisty:</p>
+      <address class="not-italic text-sm leading-relaxed">
+        Stojan&nbsp;S.C. Adam Król, Włodzimierz Leszczyński<br />
+        ul.&nbsp;Wojewódzka&nbsp;2<br />
+        87-152 Pigża (k.&nbsp;Torunia)<br />
+        NIP: 8790003705<br />
+        <a href="tel:+48500385112" class="text-primary hover:underline">500&nbsp;385&nbsp;112</a> · <a href="mailto:stojan@silniki-elektryczne.com.pl" class="text-primary hover:underline">stojan@silniki-elektryczne.com.pl</a><br />
+        <span class="text-muted-foreground">Pon–pt&nbsp;8:00–17:00 (po wcześniejszym telefonie)</span>
+      </address>
+    </div>
+
+    <h2>FAQ — silniki elektryczne {city.name}</h2>
+
+    <h3>Czy macie sklep stacjonarny w&nbsp;{city.name}?</h3>
+    <p>
+      Nie. Działamy z jednego magazynu w&nbsp;Pigży k.&nbsp;Torunia. Wszystkie zamówienia
+      z&nbsp;{city.name} realizujemy wysyłkowo kurierem (1–2 dni robocze) lub umożliwiamy
+      <strong>odbiór osobisty</strong> w&nbsp;Pigży po wcześniejszym ustaleniu telefonicznym.
+    </p>
+
+    <h3>Jak szybko dostarczacie silnik do&nbsp;{city.name}?</h3>
+    <p>
+      Standardowo <strong>1–2 dni robocze</strong> kurierem DHL od momentu nadania.
+      Zamówienia złożone do&nbsp;12:00 w dzień roboczy są wysyłane tego samego dnia.
+      W szczególnych przypadkach (silniki ciężkie powyżej 200&nbsp;kg, dostawa paletowa) czas dostawy może wydłużyć się o&nbsp;1 dzień.
+    </p>
+
+    <h3>Czy odbieracie silniki na skup z&nbsp;{city.name}?</h3>
+    <p>
+      Tak. Przy większych partiach (5+ silników lub łączna waga 100+&nbsp;kg)
+      <strong>przyjeżdżamy własnym transportem do&nbsp;{city.name} i okolic</strong> — bezpłatnie.
+      Pojedyncze silniki proszę wysłać kurierem po wcześniejszym ustaleniu wyceny — pokrywamy koszty wysyłki.
+    </p>
+
+    <h3>Czy mogę zwrócić zakupiony silnik?</h3>
+    <p>
+      Tak — masz <strong>14 dni</strong> na odstąpienie od umowy bez podania przyczyny (ustawa o&nbsp;prawach konsumenta).
+      Silnik musi być w stanie nieużywanym. Koszt wysyłki zwrotnej pokrywa kupujący.
+      Więcej: <a href="/warunki-zwrotu">Warunki zwrotu</a>.
+    </p>
+
+    <h3>Jaka jest gwarancja na silniki kupione w&nbsp;{city.name}?</h3>
+    <p>
+      Gwarancja zależy od stanu silnika i jest taka sama niezależnie od miejsca dostawy:
+    </p>
+    <ul>
+      <li><strong>Silniki nowe</strong> — 24 miesiące gwarancji producenta</li>
+      <li><strong>Silniki magazynowe (nieużywane)</strong> — 12 miesięcy</li>
+      <li><strong>Silniki używane po remoncie</strong> — 1 miesiąc gwarancji rozruchowej</li>
+    </ul>
+
+    <h3>Pomożecie dobrać silnik do mojej maszyny?</h3>
+    <p>
+      Tak — to nasz codzienny obowiązek. Zadzwoń na <a href="tel:+48500385112">500&nbsp;385&nbsp;112</a>
+      lub napisz na <a href="mailto:stojan@silniki-elektryczne.com.pl">stojan@silniki-elektryczne.com.pl</a>
+      z opisem aplikacji: rodzaj maszyny, moc, obroty wyjściowe, zasilanie i wymiary mocowania.
+      Pomożemy dobrać najlepszy silnik i sprawdzimy dostępność.
+    </p>
+
+  </div>
+
+  <div class="bg-card border border-border rounded-xl p-6 mt-10 text-center">
+    <p class="text-lg font-semibold text-foreground mb-2">Gotowy zamówić silnik z dostawą do&nbsp;{city.name}?</p>
+    <p class="text-muted-foreground mb-4 text-sm">Wybierz silnik z katalogu lub zadzwoń — pomożemy dobrać.</p>
+    <div class="flex flex-col sm:flex-row gap-3 justify-center">
+      <a href="/trojfazowe" class="inline-flex items-center justify-center px-5 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity">Zobacz katalog silników</a>
+      <a href="tel:+48500385112" class="inline-flex items-center justify-center px-5 py-2.5 border border-border text-foreground rounded-lg font-medium hover:bg-accent transition-colors">Zadzwoń: 500 385 112</a>
+    </div>
+  </div>
+</div>

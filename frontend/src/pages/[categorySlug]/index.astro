@@ -3,9 +3,98 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import CategoryProducts from '@/components/shop/CategoryProducts';
 import ExpandableDescription from '@/components/shop/ExpandableDescription';
+import CityLandingPage from '@/components/shop/CityLandingPage.astro';
+import type { CityData } from '@/components/shop/CityLandingPage.astro';
 import { getCategory, getProducts, getProductsByPower, getLegalPage } from '@/lib/api';
 
+// === Local landing pages (geo-modyfikowane query z GSC) ===
+// Whitelist top miast PL. URL pattern: /silniki-elektryczne-{slug-miasta}.
+// UCZCIWE strony — nie udajemy oddziałów, jasno mówią o jednym magazynie w Pigży.
+const CITY_DATA: Record<string, CityData> = {
+  'warszawa': {
+    name: 'Warszawa',
+    region: 'mazowieckim',
+    distanceKm: 240,
+    industryHint:
+      'Warszawa to centrum biznesowo-administracyjne — najczęściej zamawia się tu silniki do serwisu klimatyzacji i wentylacji w biurowcach, silniki do bram garażowych oraz motoreduktory do automatyki budynkowej. Dla większych projektów (centra handlowe, magazyny logistyczne) realizujemy dostawy paletowe.',
+  },
+  'krakow': {
+    name: 'Kraków',
+    region: 'małopolskim',
+    distanceKm: 440,
+    industryHint:
+      'Małopolska to silna obecność branży automotive i przemysłu okołoenergetycznego. Dla klientów z Krakowa najczęściej wysyłamy motoreduktory do linii produkcyjnych oraz silniki trójfazowe średnich mocy (3–11 kW) do warsztatów obróbczych i mechaniki maszyn.',
+  },
+  'wroclaw': {
+    name: 'Wrocław',
+    region: 'dolnośląskim',
+    distanceKm: 350,
+    industryHint:
+      'Wrocław i Dolny Śląsk to ważne centrum motoryzacyjne (m.in. fabryki Toyoty, Volkswagena, Bosch). Często dostarczamy do tego regionu motoreduktory NORD i SEW do automatyki produkcyjnej oraz silniki z hamulcem do wciągarek warsztatowych.',
+  },
+  'poznan': {
+    name: 'Poznań',
+    region: 'wielkopolskim',
+    distanceKm: 200,
+    industryHint:
+      'Wielkopolska to przemysł spożywczy (mleczarnie, masarnie, browary) i targowy. Dla klientów z Poznania najczęściej zamawiane są motoreduktory do maszyn gastronomicznych (m.in. maszynki do mięsa typu 32, 42) oraz silniki jednofazowe 230V do drobnej produkcji.',
+  },
+  'gdansk': {
+    name: 'Gdańsk',
+    region: 'pomorskim',
+    distanceKm: 180,
+    industryHint:
+      'Trójmiasto to mocna branża morska (stocznie, porty, logistyka kontenerowa) i przemysł rafineryjny. Często dostarczamy tutaj silniki trójfazowe dużych mocy, silniki z wykonaniem Ex (przeciwwybuchowe) oraz motoreduktory ślimakowe do wciągarek portowych i dźwigów.',
+  },
+  'katowice': {
+    name: 'Katowice',
+    region: 'śląskim',
+    distanceKm: 420,
+    industryHint:
+      'Śląsk to historyczne centrum górnictwa, hutnictwa i energetyki. Najczęściej trafiają tu silniki trójfazowe wysokich mocy (15–200 kW), silniki w wykonaniu przeciwwybuchowym Ex (kopalnie, zakłady chemiczne) oraz motoreduktory do maszyn hutniczych i kruszarek. Również obsługujemy klientów z <a href="/silniki-elektryczne-bielsko-biala">Bielska-Białej</a> i całej aglomeracji.',
+  },
+  'lodz': {
+    name: 'Łódź',
+    region: 'łódzkim',
+    distanceKm: 200,
+    industryHint:
+      'Łódź to centrum logistyczne kraju (skrzyżowanie A1/A2) oraz historyczne zaplecze tekstylne. Najczęściej dostarczamy tu silniki do maszyn pakujących, taśm przenośnikowych w magazynach oraz silniki jednofazowe do drobnej produkcji.',
+  },
+  'bydgoszcz': {
+    name: 'Bydgoszcz',
+    region: 'kujawsko-pomorskim',
+    distanceKm: 50,
+    industryHint:
+      'Bydgoszcz to nasz <strong>najbliższy duży rynek</strong> — 50 km od Pigży. Dla klientów z Bydgoszczy realizujemy dostawy w ciągu 1 dnia roboczego, możemy też przywieźć większe zamówienia własnym transportem. Mocna branża to PESA (tabor kolejowy) i przemysł elektromaszynowy.',
+  },
+  'torun': {
+    name: 'Toruń',
+    region: 'kujawsko-pomorskim',
+    distanceKm: 13,
+    industryHint:
+      'Toruń to nasze najbliższe sąsiedztwo — <strong>13 km od magazynu w Pigży</strong>. Dla klientów z Torunia chętnie umawiamy się na <strong>odbiór osobisty</strong> (taniej i szybciej niż kurierem) lub realizujemy dostawę tego samego dnia. Mocny przemysł lokalny to chemia (Anwil w okolicy), elektronika (Apator) i produkcja maszynowa.',
+  },
+  'lublin': {
+    name: 'Lublin',
+    region: 'lubelskim',
+    distanceKm: 410,
+    industryHint:
+      'Lubelskie to rolnictwo, przemysł spożywczy i logistyka wschodnia. Najczęściej dostarczamy do tego regionu silniki do maszyn rolniczych, motoreduktory do pasz/mieszadeł oraz silniki trójfazowe średnich mocy do warsztatów obróbczych.',
+  },
+  'bielsko-biala': {
+    name: 'Bielsko-Biała',
+    region: 'śląskim',
+    distanceKm: 470,
+    industryHint:
+      'Bielsko-Biała to silne centrum motoryzacyjne (Fiat, Magneti Marelli) i automatyki przemysłowej. Często dostarczamy do tego regionu motoreduktory do robotów liniowych i przekładnie do maszyn obróbczych.',
+  },
+};
+
 const { categorySlug } = Astro.params;
+
+// City dispatch — przed całą resztą routingu
+const cityMatch = categorySlug?.match(/^silniki-elektryczne-([a-z][a-z-]*)$/);
+const matchedCity = cityMatch && CITY_DATA[cityMatch[1]] ? cityMatch[1] : null;
 
 // Guard: don't handle static file requests
 if (categorySlug?.includes('.')) return new Response(null, { status: 404 });
@@ -67,7 +156,7 @@ const currentPage = Math.max(1, parseInt(urlSearchParams.get('page') || '1') || 
 let totalProducts = 0;
 let totalPages = 1;
 
-if (!isPowerPage) {
+if (!isPowerPage && !matchedCity) {
   // Z filtrami: render full list (client-side filtering, jak dotychczas)
   // Bez filtrów: SSR pagination 24/strona — mniejszy HTML, lepszy LCP, prawdziwa paginacja dla Googlebota
   const useServerPagination = !hasFilterParams;
@@ -244,7 +333,64 @@ function mapProductForFilter(p: any) {
 ---
 
 {/* ── LEGAL PAGE RENDER ── */}
-{isLegalPage && legalPage ? (
+{matchedCity ? (
+  (() => {
+    const city = CITY_DATA[matchedCity];
+    const cityCanonical = `/silniki-elektryczne-${matchedCity}`;
+    const cityTitle = `Silniki elektryczne ${city.name} — dostawa z magazynu, skup | Stojan`;
+    const cityDesc = `Silniki elektryczne i motoreduktory z dostawą do ${city.name} kurierem (1–2 dni). Skup silników z ${city.region}. Magazyn w Pigży k. Torunia (${city.distanceKm} km). Wysyłka 24 h.`;
+    const cityJsonLd = {
+      "@context": "https://schema.org",
+      "@type": "Service",
+      "@id": `${SITE_URL}${cityCanonical}#service`,
+      "name": `Sprzedaż i skup silników elektrycznych — ${city.name}`,
+      "description": cityDesc,
+      "url": `${SITE_URL}${cityCanonical}`,
+      "serviceType": "Sprzedaż silników elektrycznych z dostawą i skup",
+      "provider": {
+        "@type": "Organization",
+        "name": "Stojan S.C.",
+        "url": SITE_URL,
+        "telephone": "+48500385112",
+        "email": "stojan@silniki-elektryczne.com.pl",
+        "taxID": "PL8790003705",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Wojewódzka 2",
+          "addressLocality": "Pigża",
+          "postalCode": "87-152",
+          "addressRegion": "kujawsko-pomorskie",
+          "addressCountry": "PL"
+        }
+      },
+      "areaServed": { "@type": "City", "name": city.name },
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": `Silniki elektryczne dostępne dla ${city.name}`,
+        "itemListElement": [
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Silniki trójfazowe — dostawa kurierska" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Silniki jednofazowe 230V — dostawa kurierska" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Motoreduktory — dostawa kurierska / paletowa" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": `Skup silników elektrycznych — ${city.name} i okolice` } }
+        ]
+      }
+    };
+    const cityBreadcrumb = {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Strona główna", "item": SITE_URL },
+        { "@type": "ListItem", "position": 2, "name": `Silniki elektryczne ${city.name}`, "item": `${SITE_URL}${cityCanonical}` }
+      ]
+    };
+    return (
+      <BaseLayout title={cityTitle} description={cityDesc} canonical={cityCanonical} jsonLd={cityJsonLd}>
+        <script type="application/ld+json" set:html={JSON.stringify(cityBreadcrumb)} />
+        <CityLandingPage citySlug={matchedCity} city={city} />
+      </BaseLayout>
+    );
+  })()
+) : isLegalPage && legalPage ? (
   <BaseLayout
     title={`${legalPage.title} | Silniki Elektryczne`}
     description={legalPage.title}
