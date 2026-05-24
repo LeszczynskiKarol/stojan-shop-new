@@ -14,16 +14,13 @@ const mfrQuery = manufacturer ? manufacturer.name : slug;
 const productsData = await getProducts(`manufacturer=${encodeURIComponent(mfrQuery)}&limit=2000`);
 const products = productsData?.products || [];
 
-// If no manufacturer record AND no products → 404
+// If no manufacturer record AND no products → 404 (URL nigdy nie istniał)
 if (!manufacturer && products.length === 0) return Astro.rewrite('/404');
 
 const mfrName = manufacturer?.name || products[0]?.manufacturer || slug;
 const inStockCount = products.filter((p: any) => p.stock > 0).length;
-
-// SEO: manufacturer bez produktów w magazynie → 404 (zapobiega soft 404).
-// Przykład: /marka-producent/kuenle pokazywał "0 produktów" — Google indexował, ale to
-// strona bez wartości. Lepiej 404 i czekać aż wróci do oferty.
-if (inStockCount === 0) return Astro.rewrite('/404');
+// Manufacturer w DB bez stocku → 200 INDEX + UX z podobnymi producentami.
+// Lepiej niż 404: klient z Google ma szansę dobrać u podobnego producenta.
 
 const SITE_URL = 'https://www.silniki-elektryczne.com.pl';
 
@@ -116,7 +113,7 @@ function mapProduct(p: any) {
       Silniki elektryczne producenta {mfrName} dostępne w sklepie Stojan. Filtruj według kategorii, mocy, obrotów i ceny.
     </p>
 
-    {products.length > 0 ? (
+    {inStockCount > 0 ? (
       <CategoryProducts
         client:load
         showCategoryFilter={true}
@@ -124,13 +121,33 @@ function mapProduct(p: any) {
         categoryName={mfrName}
       />
     ) : (
-      <div class="text-center py-12 text-muted-foreground">
-        <p class="text-lg mb-2">Brak produktów tego producenta w magazynie</p>
-        <p>
-          <a href="/marka-producent" class="text-primary hover:underline">Zobacz wszystkich producentów</a>
-          {' '}lub{' '}
-          <a href="/kontakt" class="text-primary hover:underline">skontaktuj się z nami</a>.
-        </p>
+      <div class="max-w-3xl mx-auto py-8">
+        <div class="text-center mb-8">
+          <div class="text-5xl mb-4">📦</div>
+          <p class="text-xl font-semibold text-foreground mb-2">
+            Aktualnie brak silników {mfrName} w magazynie
+          </p>
+          <p class="text-muted-foreground">
+            Producent {mfrName} pojawia się okresowo w naszej ofercie. Możesz wybrać silnik podobnego producenta poniżej lub <a href="tel:+48500385112" class="text-primary hover:underline font-medium">zadzwonić: 500 385 112</a> — być może mamy w drodze.
+          </p>
+        </div>
+
+        <div class="bg-card border border-border rounded-xl p-6 mb-6">
+          <h2 class="text-sm font-semibold text-foreground mb-4 text-center">Sprawdź podobne kategorie silników:</h2>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <a href="/trojfazowe" class="block px-4 py-3 rounded-lg border border-border hover:border-primary hover:bg-accent/30 transition-colors text-center text-sm font-medium text-foreground">Silniki trójfazowe</a>
+            <a href="/jednofazowe" class="block px-4 py-3 rounded-lg border border-border hover:border-primary hover:bg-accent/30 transition-colors text-center text-sm font-medium text-foreground">Silniki jednofazowe</a>
+            <a href="/z-hamulcem" class="block px-4 py-3 rounded-lg border border-border hover:border-primary hover:bg-accent/30 transition-colors text-center text-sm font-medium text-foreground">Silniki z hamulcem</a>
+            <a href="/motoreduktory" class="block px-4 py-3 rounded-lg border border-border hover:border-primary hover:bg-accent/30 transition-colors text-center text-sm font-medium text-foreground">Motoreduktory</a>
+            <a href="/marka-producent" class="block px-4 py-3 rounded-lg border border-border hover:border-primary hover:bg-accent/30 transition-colors text-center text-sm font-medium text-foreground">Wszyscy producenci</a>
+            <a href="/skup-silnikow" class="block px-4 py-3 rounded-lg border border-border hover:border-primary hover:bg-accent/30 transition-colors text-center text-sm font-medium text-foreground">Skup silników</a>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+          <a href="tel:+48500385112" class="inline-flex items-center justify-center px-5 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity">Zadzwoń: 500 385 112</a>
+          <a href="/kontakt" class="inline-flex items-center justify-center px-5 py-2.5 border border-border text-foreground rounded-lg font-medium hover:bg-accent transition-colors">Zostaw zapytanie</a>
+        </div>
       </div>
     )}
   </div>

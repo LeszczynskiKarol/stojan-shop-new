@@ -173,23 +173,20 @@ export async function sitemapRoutes(app: FastifyInstance) {
 
     const pages: SitemapEntry[] = [];
 
+    // Bazowe moce (23) — zawsze w sitemap, nawet bez stocku.
+    // Rationale: klient z Google trafia, widzi UX "brak teraz + podobne moce" — wartość.
+    // RPM combos (4×23) — tylko z produktami (zbyt dużo niepustych spamuje GSC).
     for (const p of powers) {
-      if (!powersInStock.has(p)) continue;
       const slug = powerToSlug(p);
       pages.push({
         loc: `/silniki-elektryczne-${slug}-kw`,
-        priority: '0.7',
-        changefreq: 'weekly',
       });
 
-      // Moc + obroty (tylko do 18.5 kW)
       if (parseFloat(p) <= 18.5) {
         for (const r of rpms) {
           if (!combosInStock.has(`${p}:${r}`)) continue;
           pages.push({
             loc: `/silniki-elektryczne-${slug}-kw-${r}-obr`,
-            priority: '0.6',
-            changefreq: 'weekly',
           });
         }
       }

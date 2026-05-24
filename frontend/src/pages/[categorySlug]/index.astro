@@ -90,6 +90,18 @@ const CITY_DATA: Record<string, CityData> = {
   },
 };
 
+// Module-level whitelist (dostępna też w template do sugerowania podobnych mocy)
+const KNOWN_POWERS = ['0.09','0.12','0.18','0.25','0.37','0.55','0.75','1.1','1.5','2.2','3','4','5.5','7.5','11','18.5','22','30','55','75','110','160','200'];
+const KNOWN_RPMS = ['700','900','1400','2900'];
+
+function powerToSlug(p: number): string {
+  if (p < 1) return p.toString().replace('.', '').padEnd(3, '0');
+  return p.toString().replace('.', '-');
+}
+function formatPower(p: number): string {
+  return p.toString().replace('.', ',');
+}
+
 const { categorySlug } = Astro.params;
 
 // City dispatch — przed całą resztą routingu
@@ -137,11 +149,15 @@ if (powerMatch) {
   rpmStr = powerMatch[2] || null;
   powerFormatted = powerRaw.replace('.', ',');
   if (isNaN(power)) return Astro.rewrite('/404');
+
+  // Whitelist znanych mocy + RPM-ów. Strona POZA whitelisty = 404 (nigdy nie istnieje).
+  // Strona z whitelisty BEZ stocku = 200 + UX z podobnymi (klient z Google zawsze może coś dobrać).
+  const isKnownPower = KNOWN_POWERS.some((p) => Math.abs(parseFloat(p) - power) < 0.01);
+  const isKnownRpm = !rpmStr || KNOWN_RPMS.includes(rpmStr);
+  if (!isKnownPower || !isKnownRpm) return Astro.rewrite('/404');
+
   const data = await getProductsByPower(powerRaw, rpmStr || undefined);
   powerProducts = (data?.products || []).filter((p: any) => p.stock > 0);
-  // SEO: power-pages bez produktów w magazynie zwracają 404 zamiast pustego 200 (soft 404).
-  // Sitemap-power-pages.xml też powinno być filtrowane po stocku — TODO.
-  if (powerProducts.length === 0) return Astro.rewrite('/404');
 }
 
 // === SEO: paginacja SSR + detekcja filtrów ===
@@ -500,6 +516,50 @@ function mapProductForFilter(p: any) {
           products={powerProducts.map(mapProductForFilter)}
           categoryName={`Silniki ${powerFormatted} kW${rpmStr ? ` ${rpmStr} obr/min` : ''}`}
         />
+      ) : isPowerPage ? (
+        (() => {
+          // Sugeruj 4 najbliższe moce z whitelisty (po dystansie numerycznym)
+          const currentPower = parseFloat(powerRaw);
+          const nearest = KNOWN_POWERS
+            .map((p) => ({ p, num: parseFloat(p) }))
+            .filter((x) => Math.abs(x.num - currentPower) > 0.001)
+            .sort((a, b) => Math.abs(a.num - currentPower) - Math.abs(b.num - currentPower))
+            .slice(0, 6);
+          return (
+            <div class="max-w-3xl mx-auto py-8">
+              <div class="text-center mb-8">
+                <div class="text-5xl mb-4">📦</div>
+                <p class="text-xl font-semibold text-foreground mb-2">
+                  Aktualnie brak silników {powerFormatted}&nbsp;kW{rpmStr ? ` ${rpmStr} obr/min` : ''} w magazynie
+                </p>
+                <p class="text-muted-foreground">
+                  Codziennie dodajemy nowe silniki — sprawdź regularnie lub <a href="tel:+48500385112" class="text-primary hover:underline font-medium">zadzwoń: 500&nbsp;385&nbsp;112</a>, być może mamy w drodze.
+                </p>
+              </div>
+
+              {nearest.length > 0 && (
+                <div class="bg-card border border-border rounded-xl p-6 mb-6">
+                  <h2 class="text-sm font-semibold text-foreground mb-4 text-center">Podobne moce silników w naszym sklepie:</h2>
+                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {nearest.map((x) => (
+                      <a
+                        href={`/silniki-elektryczne-${powerToSlug(x.num)}-kw`}
+                        class="block px-4 py-3 rounded-lg border border-border hover:border-primary hover:bg-accent/30 transition-colors text-center"
+                      >
+                        <span class="font-medium text-foreground">{formatPower(x.num)} kW</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                <a href="/trojfazowe" class="inline-flex items-center justify-center px-5 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity">Wszystkie silniki trójfazowe</a>
+                <a href="/kontakt" class="inline-flex items-center justify-center px-5 py-2.5 border border-border text-foreground rounded-lg font-medium hover:bg-accent transition-colors">Zostaw zapytanie</a>
+              </div>
+            </div>
+          );
+        })()
       ) : (
         <div class="text-center py-12 text-muted-foreground">
           <p class="text-lg mb-2">Brak silników o tych parametrach w magazynie</p>
