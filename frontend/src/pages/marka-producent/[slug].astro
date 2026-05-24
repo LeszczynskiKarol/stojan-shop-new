@@ -5,7 +5,7 @@ import CategoryProducts from '@/components/shop/CategoryProducts';
 import { getManufacturer, getProducts } from '@/lib/api';
 
 const { slug } = Astro.params;
-if (!slug) return Astro.redirect('/404');
+if (!slug) return Astro.rewrite('/404');
 
 // Fetch manufacturer info and their products in parallel
 // DB stores full path slugs like "marka-producent/siemens"
@@ -15,10 +15,15 @@ const productsData = await getProducts(`manufacturer=${encodeURIComponent(mfrQue
 const products = productsData?.products || [];
 
 // If no manufacturer record AND no products → 404
-if (!manufacturer && products.length === 0) return Astro.redirect('/404');
+if (!manufacturer && products.length === 0) return Astro.rewrite('/404');
 
 const mfrName = manufacturer?.name || products[0]?.manufacturer || slug;
 const inStockCount = products.filter((p: any) => p.stock > 0).length;
+
+// SEO: manufacturer bez produktów w magazynie → 404 (zapobiega soft 404).
+// Przykład: /marka-producent/kuenle pokazywał "0 produktów" — Google indexował, ale to
+// strona bez wartości. Lepiej 404 i czekać aż wróci do oferty.
+if (inStockCount === 0) return Astro.rewrite('/404');
 
 const SITE_URL = 'https://www.silniki-elektryczne.com.pl';
 

@@ -93,18 +93,32 @@ export async function sitemapRoutes(app: FastifyInstance) {
     reply.header('Content-Type', 'application/xml').send(buildProductSitemap(entries));
   });
 
-  // Manufacturers
+  // Manufacturers — tylko z produktami w magazynie (analogicznie do power-pages)
   app.get('/sitemap-manufacturers.xml', async (request, reply) => {
     const manufacturers = await prisma.manufacturer.findMany({
-      select: { slug: true, updatedAt: true },
+      select: { id: true, slug: true, name: true, updatedAt: true },
     });
 
-    const pages = manufacturers.map((m) => ({
-      loc: `/marka-producent/${m.slug}`,
-      lastmod: m.updatedAt.toISOString(),
-      priority: '0.6',
-      changefreq: 'monthly',
-    }));
+    // Pobierz listę producentów którzy mają produkty w stocku (po id lub po nazwie)
+    const inStock = await prisma.product.findMany({
+      where: { stock: { gt: 0 } },
+      select: { manufacturer: true, manufacturerId: true },
+    });
+    const idsInStock = new Set<string>();
+    const namesInStock = new Set<string>();
+    for (const p of inStock) {
+      if (p.manufacturerId) idsInStock.add(p.manufacturerId);
+      if (p.manufacturer) namesInStock.add(p.manufacturer.toLowerCase().trim());
+    }
+
+    const pages = manufacturers
+      .filter((m) =>
+        idsInStock.has(m.id) || namesInStock.has(m.name.toLowerCase().trim()),
+      )
+      .map((m) => ({
+        loc: `/marka-producent/${m.slug}`,
+        lastmod: m.updatedAt.toISOString(),
+      }));
 
     reply.header('Content-Type', 'application/xml').send(buildSitemap(pages));
   });
