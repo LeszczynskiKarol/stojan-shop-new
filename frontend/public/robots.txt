@@ -1,6 +1,6 @@
 # robots.txt — silniki-elektryczne.com.pl
-# Blokuje duplikaty z filtrów, paginacji i wyszukiwania
-# Kanoniczne URL-e kategorii i produktów pozostają indeksowalne
+# Blokuje duplikaty z filtrów i wyszukiwania.
+# Paginacja (?page=) jest indexowalna od audytu SEO (modern best practice: self-canonical, follow).
 
 User-agent: *
 
@@ -8,7 +8,6 @@ User-agent: *
 Disallow: /szukaj
 
 # ── Filtrowane warianty kategorii (query params z CategoryProducts) ──
-# Każdy z tych parametrów tworzy duplikat strony kategorii
 Disallow: /*?*q=
 Disallow: /*?*cat=
 Disallow: /*?*mfr=
@@ -23,9 +22,6 @@ Disallow: /*?*obrmax=
 Disallow: /*?*pmin=
 Disallow: /*?*pmax=
 Disallow: /*?*sort=
-
-# ── Paginacja (strona 2+ to duplikat z innym zakresem) ──
-Disallow: /*?*page=
 
 # ── API / wewnętrzne endpointy ──
 Disallow: /api/
@@ -49,7 +45,7 @@ Allow: /*.svg$
 # ── Sitemap ──
 Sitemap: https://www.silniki-elektryczne.com.pl/sitemap_index.xml
 
-# ── Googlebot — identyczne reguły + crawl-delay jako sugestia ──
+# ── Googlebot — identyczne reguły co dla * ──
 User-agent: Googlebot
 Disallow: /szukaj
 Disallow: /*?*q=
@@ -66,8 +62,16 @@ Disallow: /*?*obrmax=
 Disallow: /*?*pmin=
 Disallow: /*?*pmax=
 Disallow: /*?*sort=
-Disallow: /*?*page=
 Disallow: /api/
+
+# ── Googlebot-Image — pełny dostęp do obrazów (zasilamy Google Images) ──
+User-agent: Googlebot-Image
+Allow: /
+
+# ── Google-Extended — kontrola czy Google używa contentu do trenowania Gemini/Bard ──
+# DECYZJA: ALLOW — pozwala Gemini cytować nasze produkty w odpowiedziach AI.
+User-agent: Google-Extended
+Allow: /
 
 # ── Bingbot — z crawl-delay ──
 User-agent: Bingbot
@@ -87,30 +91,85 @@ Disallow: /*?*obrmax=
 Disallow: /*?*pmin=
 Disallow: /*?*pmax=
 Disallow: /*?*sort=
-Disallow: /*?*page=
 Disallow: /api/
 
-# ── Blokuj agresywne boty AI/scrapery ──
-User-agent: GPTBot
-Disallow: /
+# ──────────────────────────────────────────────────────────────────────
+# AI / LLM crawlers — wpuszczamy te, które generują ruch lub cytowania.
+# Crawl-delay łagodzi obciążenie. Blokujemy tylko najbardziej agresywne
+# (Bytespider, PetalBot) bez wartości referralu w PL.
+# ──────────────────────────────────────────────────────────────────────
 
+# OpenAI search index → ruch z ChatGPT Search
+User-agent: OAI-SearchBot
+Allow: /
+Crawl-delay: 3
+
+# OpenAI live fetch (gdy user pyta ChatGPT o nasz produkt)
 User-agent: ChatGPT-User
-Disallow: /
+Allow: /
 
-User-agent: CCBot
-Disallow: /
+# OpenAI training crawler — opcjonalne. Wpuszczamy: cytowania w ChatGPT podnoszą brand.
+User-agent: GPTBot
+Allow: /
+Crawl-delay: 5
+
+# Anthropic / Claude
+User-agent: ClaudeBot
+Allow: /
+Crawl-delay: 5
+
+User-agent: claude-web
+Allow: /
 
 User-agent: anthropic-ai
-Disallow: /
+Allow: /
 
 User-agent: Claude-Web
-Disallow: /
+Allow: /
 
+# Perplexity
+User-agent: PerplexityBot
+Allow: /
+
+# Common Crawl (zasila wiele LLM-ów, Google też używa)
+User-agent: CCBot
+Allow: /
+Crawl-delay: 5
+
+# Amazon Alexa / Amazon services
+User-agent: Amazonbot
+Allow: /
+Crawl-delay: 3
+
+# Apple Siri / Spotlight
+User-agent: Applebot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+# Meta AI
+User-agent: Meta-ExternalAgent
+Allow: /
+
+User-agent: FacebookBot
+Allow: /
+
+# ── Blokuj agresywne / niskowartościowe scrapery ──
+# Bytespider — bardzo agresywny crawl, brak ruchu referralowego.
 User-agent: Bytespider
 Disallow: /
 
+# PetalBot (Huawei) — agresywny, znikomy ruch z PL.
 User-agent: PetalBot
 Disallow: /
 
-User-agent: Amazonbot
+# Generic skanery podatności
+User-agent: AhrefsBot
+Crawl-delay: 10
+
+User-agent: SemrushBot
+Crawl-delay: 10
+
+User-agent: MJ12bot
 Disallow: /

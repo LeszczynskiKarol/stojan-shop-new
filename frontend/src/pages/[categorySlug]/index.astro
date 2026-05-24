@@ -132,8 +132,9 @@ if (isPowerPage) {
   const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
   const priceStr = minPrice > 0 ? ` od ${minPrice.toLocaleString('pl-PL')} zł` : '';
   const cntStr = powerProducts.length > 0 ? ` — ${powerProducts.length} szt.${priceStr}` : '';
+  // Słowo "elektryczne" w obu wariantach — keyword consistency z URL i query w GSC.
   powerTitle = rpmStr
-    ? `Silniki ${powerFormatted} kW ${rpmStr} obr/min${cntStr} | Stojan`
+    ? `Silniki elektryczne ${powerFormatted} kW ${rpmStr} obr${cntStr} | Stojan`
     : `Silniki elektryczne ${powerFormatted} kW${cntStr} | Stojan`;
 }
 
