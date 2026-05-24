@@ -113,10 +113,57 @@ const breadcrumbLd = {
     { "@type": "ListItem", "position": 3, "name": product.name, "item": productUrl },
   ]
 };
+
+// FAQPage schema — rich snippet w SERP (dropdown z odpowiedziami pod listingiem).
+// Treść dostosowana do stanu produktu — żeby Google nie traktował jako boilerplate.
+const warrantyByCondition: Record<string, string> = {
+  nowy: 'Produkt fabrycznie nowy, objęty 24-miesięczną gwarancją producenta. Pełna dokumentacja techniczna, oryginalne opakowanie.',
+  uzywany: 'Silnik po profesjonalnym remoncie, kompleksowo sprawdzony i przetestowany. Objęty 1-miesięczną gwarancją rozruchową — gwarantujemy że napęd uruchomi się i będzie poprawnie pracować.',
+  nieuzywany: 'Silnik fabrycznie nowy, magazynowany — może mieć minimalne ślady składowania, zachowuje pełną sprawność techniczną. Gwarancja 12 miesięcy.',
+};
+const productFaqLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": `Jaka jest gwarancja na ${product.name}?`,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": warrantyByCondition[product.condition] || warrantyByCondition.uzywany,
+      },
+    },
+    {
+      "@type": "Question",
+      "name": "Jak szybko realizujecie wysyłkę?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Zamówienia złożone do 12:00 w dni robocze wysyłamy tego samego dnia. Standardowy czas dostawy kurierem to 1-2 dni robocze. Koszt dostawy zależy od wagi silnika — minimalna stawka to 15 zł, większe napędy wysyłamy paletą (ok. 100-250 zł).",
+      },
+    },
+    {
+      "@type": "Question",
+      "name": "Czy mogę zwrócić zakupiony silnik elektryczny?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Tak, masz 14 dni na odstąpienie od umowy bez podania przyczyny (Kodeks cywilny, art. 27 ustawy o prawach konsumenta). Silnik musi być w stanie nieużywanym. Koszt wysyłki zwrotnej pokrywa kupujący. Pełen regulamin: /warunki-zwrotu.",
+      },
+    },
+    {
+      "@type": "Question",
+      "name": "Czy pomagacie dobrać silnik do konkretnej maszyny?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Tak — zadzwoń (500 385 112) lub napisz (stojan@silniki-elektryczne.com.pl) z opisem aplikacji: rodzaj maszyny, wymagana moc, obroty, zasilanie i wymiary mocowania. Pomożemy dobrać model i sprawdzimy dostępność.",
+      },
+    },
+  ],
+};
 ---
 
 <BaseLayout title={title} description={description} canonical={`/${categorySlug}/${productSlug}`} ogImage={mainImage} ogType="product" jsonLd={productLd}>
   <script type="application/ld+json" set:html={JSON.stringify(breadcrumbLd)} />
+  <script type="application/ld+json" set:html={JSON.stringify(productFaqLd)} />
 
   <div class="container mx-auto px-4 py-6 max-w-7xl">
     <!-- Breadcrumb -->

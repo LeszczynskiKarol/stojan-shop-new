@@ -2,28 +2,82 @@
 // frontend/src/pages/skup-silnikow.astro
 import BaseLayout from '@/layouts/BaseLayout.astro';
 
-const title = 'Skup silników elektrycznych | Stojan Shop';
-const description = 'Profesjonalny skup silników elektrycznych - uczciwa wycena na podstawie stanu technicznego i wagi. Skup sprawnych i uszkodzonych silników. Zadzwoń: 500 385 112.';
+const title = 'Skup silników elektrycznych — sprawne i niesprawne, cała Polska | Stojan';
+const description = 'Skupujemy silniki elektryczne — sprawne, niesprawne, po remoncie. Od 0,5 kW wzwyż. Bezpłatna wycena, odbiór z całej Polski, płatność z góry. Zadzwoń: 500 385 112.';
 
+// LocalBusiness schema z polem areaServed (lista największych miast) i ofertą skupu —
+// dla query "skup silników elektrycznych" (209 kliknięć / 1346 imp / pos 2,64) podnosi
+// szansę pojawienia się w Map Pack i Knowledge Panel.
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "Service",
-  "name": "Skup silników elektrycznych",
+  "@type": ["LocalBusiness", "Service"],
+  "@id": "https://www.silniki-elektryczne.com.pl/skup-silnikow#service",
+  "name": "Skup silników elektrycznych — Stojan",
+  "alternateName": "Skup silników indukcyjnych, motoreduktorów, pomp",
+  "serviceType": "Skup silników elektrycznych",
+  "description": description,
+  "url": "https://www.silniki-elektryczne.com.pl/skup-silnikow",
+  "telephone": "+48500385112",
+  "email": "stojan@silniki-elektryczne.com.pl",
+  "image": "https://www.silniki-elektryczne.com.pl/logo_dark.png",
+  "priceRange": "PLN",
+  "currenciesAccepted": "PLN",
+  "paymentAccepted": "Przelew bankowy, gotówka",
   "provider": {
     "@type": "Organization",
     "name": "Stojan S.C.",
+    "url": "https://www.silniki-elektryczne.com.pl",
     "telephone": "+48500385112",
     "email": "stojan@silniki-elektryczne.com.pl",
+    "taxID": "PL8790003705",
     "address": {
       "@type": "PostalAddress",
       "streetAddress": "Wojewódzka 2",
       "addressLocality": "Pigża",
       "postalCode": "87-152",
+      "addressRegion": "kujawsko-pomorskie",
       "addressCountry": "PL"
     }
   },
-  "description": description,
-  "areaServed": { "@type": "Country", "name": "PL" },
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "Wojewódzka 2",
+    "addressLocality": "Pigża",
+    "postalCode": "87-152",
+    "addressRegion": "kujawsko-pomorskie",
+    "addressCountry": "PL"
+  },
+  "areaServed": [
+    { "@type": "Country", "name": "Poland" },
+    { "@type": "City", "name": "Warszawa" },
+    { "@type": "City", "name": "Kraków" },
+    { "@type": "City", "name": "Wrocław" },
+    { "@type": "City", "name": "Poznań" },
+    { "@type": "City", "name": "Gdańsk" },
+    { "@type": "City", "name": "Łódź" },
+    { "@type": "City", "name": "Katowice" },
+    { "@type": "City", "name": "Szczecin" },
+    { "@type": "City", "name": "Bydgoszcz" },
+    { "@type": "City", "name": "Lublin" },
+    { "@type": "City", "name": "Toruń" }
+  ],
+  "openingHoursSpecification": [{
+    "@type": "OpeningHoursSpecification",
+    "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"],
+    "opens": "08:00",
+    "closes": "17:00"
+  }],
+  "hasOfferCatalog": {
+    "@type": "OfferCatalog",
+    "name": "Rodzaje skupowanych silników",
+    "itemListElement": [
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Skup silników trójfazowych" } },
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Skup silników jednofazowych" } },
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Skup motoreduktorów" } },
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Skup pomp elektrycznych" } },
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Skup silników niesprawnych" } }
+    ]
+  }
 };
 
 const benefits = [

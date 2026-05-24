@@ -121,10 +121,24 @@ const inStockOnPage = isPowerPage
 const inStockCount = isPowerPage ? powerProducts.length : (totalProducts || inStockOnPage);
 
 const paginationTitleSuffix = !isPowerPage && currentPage > 1 ? ` — strona ${currentPage}` : '';
+
+// Power-page: liczba sztuk + min cena w title → silnie podnosi CTR w SERP (top page
+// /silniki-elektryczne-5-5-kw miał 11 098 imp / CTR 1,3% przy pos 5,9 — bardzo nisko).
+let powerTitle = '';
+if (isPowerPage) {
+  const prices = powerProducts
+    .map((p: any) => Number(p.price))
+    .filter((n: number) => n > 0 && isFinite(n));
+  const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+  const priceStr = minPrice > 0 ? ` od ${minPrice.toLocaleString('pl-PL')} zł` : '';
+  const cntStr = powerProducts.length > 0 ? ` — ${powerProducts.length} szt.${priceStr}` : '';
+  powerTitle = rpmStr
+    ? `Silniki ${powerFormatted} kW ${rpmStr} obr/min${cntStr} | Stojan`
+    : `Silniki elektryczne ${powerFormatted} kW${cntStr} | Stojan`;
+}
+
 const title = isPowerPage
-  ? (rpmStr
-    ? `Silniki elektryczne ${powerFormatted} kW ${rpmStr} - sklep, hurtownia, oferta, ceny, sprzedaż`
-    : `Silniki elektryczne ${powerFormatted} kW - sklep, hurtownia, oferta, ceny, sprzedaż`)
+  ? powerTitle
   : `${category?.metadata?.title || `${category?.name} - sklep, hurtownia, oferta, ceny, sprzedaż`}${paginationTitleSuffix}`;
 
 const description = isPowerPage
