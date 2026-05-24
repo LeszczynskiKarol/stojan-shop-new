@@ -12,11 +12,17 @@ interface MfrDisplay {
   productCount: number;
 }
 
-const SKIP_SLUGS = new Set(['silnik', 'wal', 'wal-zdawczy', 'ramie-reakcyjne', 'kolnierz-boczny', 'wentylator', 'syojan']);
+// SKIP: części/akcesoria/własna firma — nie są realnymi producentami.
+// 'stojan' (poprawne, wcześniej była literówka 'syojan') to 120 produktów oznaczonych
+// nazwą własnej firmy zamiast prawdziwego producenta — temat F z audytu (cleanup).
+const SKIP_SLUGS = new Set(['silnik', 'stojan', 'wal', 'wal-zdawczy', 'ramie-reakcyjne', 'kolnierz-boczny', 'wentylator', 'syojan']);
+const SKIP_NAMES = new Set(['stojan', 'silnik', 'wał zdawczy', 'kołnierz boczny', 'wentylator', 'ramię reakcyjne']);
 
 const mfrList: MfrDisplay[] = allManufacturers
   .filter((m: any) => {
-    if (!m.name || SKIP_SLUGS.has(m.slug)) return false;
+    if (!m.name) return false;
+    if (SKIP_SLUGS.has(m.slug)) return false;
+    if (SKIP_NAMES.has(m.name.toLowerCase().trim())) return false;
     const count = m._count?.products ?? m.productCount ?? 0;
     return count >= 2;
   })
