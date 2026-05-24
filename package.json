@@ -6,9 +6,11 @@
     "frontend"
   ],
   "scripts": {
-    "dev": "concurrently -n BE,FE -c blue,magenta --kill-others-on-fail \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "bash scripts/dev-start.sh",
+    "dev:no-sync": "concurrently -n BE,FE -c blue,magenta --kill-others-on-fail \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "npm run dev -w backend",
     "dev:frontend": "npm run dev -w frontend",
+    "sync:db": "bash scripts/sync-db.sh",
     "build": "npm run build:backend && npm run build:frontend",
     "build:backend": "npm run build -w backend",
     "build:frontend": "npm run build -w frontend",

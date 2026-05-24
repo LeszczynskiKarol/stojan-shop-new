@@ -10,7 +10,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
-    "db:import": "tsx scripts/import-from-dump.ts"
+    "db:import": "tsx scripts/import-from-dump.ts",
+    "seo:categories": "tsx scripts/update-categories-seo.ts"
   },
   "dependencies": {
     "@aws-sdk/client-codebuild": "^3.1003.0",

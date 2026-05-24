@@ -114,23 +114,48 @@ const jsonLd = {
 
 const orgJsonLd = {
   "@context": "https://schema.org",
-  "@type": "Organization",
+  "@type": "OnlineStore",
   "name": "Stojan S.C.",
+  "legalName": "Stojan S.C. Adam Król, Włodzimierz Leszczyński",
+  "alternateName": "Silniki Elektryczne Stojan",
   "url": "https://www.silniki-elektryczne.com.pl",
   "logo": "https://www.silniki-elektryczne.com.pl/logo_dark.png",
-  "contactPoint": {
+  "image": "https://www.silniki-elektryczne.com.pl/logo_dark.png",
+  "email": "stojan@silniki-elektryczne.com.pl",
+  "telephone": "+48500385112",
+  "taxID": "PL8790003705",
+  "vatID": "PL8790003705",
+  "naics": "335312",
+  "priceRange": "200 PLN - 30000 PLN",
+  "currenciesAccepted": "PLN",
+  "paymentAccepted": "BLIK, Przelewy24, Visa, Mastercard, PayPal, Google Pay, Apple Pay, Przelew bankowy",
+  "contactPoint": [{
     "@type": "ContactPoint",
     "telephone": "+48500385112",
+    "email": "stojan@silniki-elektryczne.com.pl",
     "contactType": "sales",
-    "availableLanguage": "Polish"
-  },
+    "areaServed": "PL",
+    "availableLanguage": ["Polish", "English"]
+  }],
   "address": {
     "@type": "PostalAddress",
     "streetAddress": "Wojewódzka 2",
     "addressLocality": "Pigża",
     "postalCode": "87-152",
+    "addressRegion": "kujawsko-pomorskie",
     "addressCountry": "PL"
-  }
+  },
+  "areaServed": { "@type": "Country", "name": "Poland" },
+  "knowsAbout": [
+    "silniki elektryczne",
+    "silniki trójfazowe",
+    "silniki jednofazowe",
+    "motoreduktory",
+    "silniki z hamulcem",
+    "pompy",
+    "wentylatory przemysłowe",
+    "skup silników elektrycznych"
+  ]
 };
 
 // SEO: FAQ Schema — based on existing content sections

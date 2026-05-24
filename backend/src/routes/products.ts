@@ -367,18 +367,27 @@ export async function productRoutes(app: FastifyInstance) {
       limit = "100",
     } = request.query as Record<string, string>;
 
-    // Power is stored with comma ("7,5") but URL uses dot ("7.5")
-    // Match both formats for safety
+    // Power values in DB są niespójne: część jako "0,55", część jako "0,55 kW",
+    // czasem "0.55", a w sporej liczbie produktów z trailing whitespace.
+    // URL przychodzi jako "0.55" (dot). Generujemy wszystkie wiarygodne warianty
+    // (kropka/przecinek × z/bez " kW" × dla whole-numbers także ",0") i robimy
+    // równolegle string_starts_with żeby złapać warianty z dodatkową spacją/sufiksem.
     const pDot = power.replace(",", ".");
     const pComma = power.replace(".", ",");
-    const powerVariants = [pDot, pComma];
-    // Also handle whole numbers: "3" → also try "3,0" and "3.0"
+    const bases = new Set<string>([pDot, pComma]);
     if (!pDot.includes(".")) {
-      powerVariants.push(`${pDot}.0`, `${pDot},0`);
+      bases.add(`${pDot}.0`);
+      bases.add(`${pDot},0`);
+    }
+    const exactVariants = new Set<string>();
+    for (const b of bases) {
+      exactVariants.add(b);
+      exactVariants.add(`${b} kW`);
+      exactVariants.add(`${b}kW`);
     }
 
     const where: Prisma.ProductWhereInput = {
-      OR: powerVariants.map((v) => ({
+      OR: Array.from(exactVariants).map((v) => ({
         power: { path: ["value"], equals: v },
       })),
       stock: { gt: 0 },

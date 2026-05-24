@@ -189,7 +189,9 @@ const currentYear = new Date().getFullYear();
   <title>{title}</title>
   <meta name="description" content={description} />
   <link rel="canonical" href={canonicalUrl} />
-  <meta name="robots" content={noIndex ? "noindex, nofollow" : "index, follow"} />
+  <link rel="alternate" hreflang="pl-PL" href={canonicalUrl} />
+  <link rel="alternate" hreflang="x-default" href={canonicalUrl} />
+  <meta name="robots" content={noIndex ? "noindex, follow, max-image-preview:large" : "index, follow, max-image-preview:large, max-snippet:-1"} />
 
   <!-- Open Graph -->
   <meta property="og:type" content={ogType} />
@@ -302,7 +304,10 @@ const currentYear = new Date().getFullYear();
         <a href="/z-hamulcem" class="py-2.5 px-3 rounded-lg text-sm font-medium text-foreground hover:bg-accent transition-colors">Silniki z hamulcem</a>
         <a href="/motoreduktory" class="py-2.5 px-3 rounded-lg text-sm font-medium text-foreground hover:bg-accent transition-colors">Motoreduktory</a>
         <a href="/dwubiegowe" class="py-2.5 px-3 rounded-lg text-sm font-medium text-foreground hover:bg-accent transition-colors">Silniki dwubiegowe</a>
-        <a href="/dwubiegowe" class="py-2.5 px-3 rounded-lg text-sm font-medium text-foreground hover:bg-accent transition-colors">Akcesoria</a>
+        <a href="/pompy" class="py-2.5 px-3 rounded-lg text-sm font-medium text-foreground hover:bg-accent transition-colors">Pompy</a>
+        <a href="/wentylatory-przemyslowe" class="py-2.5 px-3 rounded-lg text-sm font-medium text-foreground hover:bg-accent transition-colors">Wentylatory</a>
+        <a href="/akcesoria" class="py-2.5 px-3 rounded-lg text-sm font-medium text-foreground hover:bg-accent transition-colors">Akcesoria</a>
+        <a href="/skup-silnikow" class="py-2.5 px-3 rounded-lg text-sm font-medium text-foreground hover:bg-accent transition-colors">Skup silników</a>
         <div class="border-t border-border my-1"></div>
       </nav>
     </div>

@@ -28,6 +28,17 @@ const SITE_URL = 'https://www.silniki-elektryczne.com.pl';
 
 if (powerMatch) {
   isPowerPage = true;
+
+  // SEO: 301 z legacy "0-XX" → kanoniczne "0XX" (sub-1 kW). Oba formaty renderowały
+  // identyczną treść z self-canonical — duplikat. Kanonem jest forma zwarta ("009"),
+  // bo używa jej DB Category i stopka, a Google już ją indeksuje.
+  const legacySub1kW = powerMatch[1].match(/^0-(\d{1,2})$/);
+  if (legacySub1kW) {
+    const canonicalPowerSlug = '0' + legacySub1kW[1].padEnd(2, '0');
+    const rpmPart = powerMatch[2] ? `-${powerMatch[2]}-obr` : '';
+    return Astro.redirect(`/silniki-elektryczne-${canonicalPowerSlug}-kw${rpmPart}`, 301);
+  }
+
   powerRaw = powerMatch[1].replace(/-/g, '.');
   // Handle sub-1kW slugs: "037" → "0.37", "075" → "0.75", "009" → "0.09"
   if (/^0\d{2}$/.test(powerRaw)) {
@@ -36,29 +47,53 @@ if (powerMatch) {
   const power = parseFloat(powerRaw);
   rpmStr = powerMatch[2] || null;
   powerFormatted = powerRaw.replace('.', ',');
-  if (isNaN(power)) return Astro.redirect('/404');
+  if (isNaN(power)) return Astro.rewrite('/404');
   const data = await getProductsByPower(powerRaw, rpmStr || undefined);
   powerProducts = (data?.products || []).filter((p: any) => p.stock > 0);
-} else {
+  // SEO: power-pages bez produktów w magazynie zwracają 404 zamiast pustego 200 (soft 404).
+  // Sitemap-power-pages.xml też powinno być filtrowane po stocku — TODO.
+  if (powerProducts.length === 0) return Astro.rewrite('/404');
+}
+
+// === SEO: paginacja SSR + detekcja filtrów ===
+// Filtr — noindex (treść zależna od użytkownika).
+// Page (paginacja) — index, self-canonical (każda strona to inny zestaw produktów).
+const FILTER_PARAMS = ['q', 'cat', 'mfr', 'cond', 'kw', 'kwmin', 'kwmax', 'rpm', 'rpmr', 'obrmin', 'obrmax', 'pmin', 'pmax', 'sort'];
+const urlSearchParams = Astro.url.searchParams;
+const hasFilterParams = FILTER_PARAMS.some(param => urlSearchParams.has(param));
+
+const PER_PAGE = 24;
+const currentPage = Math.max(1, parseInt(urlSearchParams.get('page') || '1') || 1);
+let totalProducts = 0;
+let totalPages = 1;
+
+if (!isPowerPage) {
+  // Z filtrami: render full list (client-side filtering, jak dotychczas)
+  // Bez filtrów: SSR pagination 24/strona — mniejszy HTML, lepszy LCP, prawdziwa paginacja dla Googlebota
+  const useServerPagination = !hasFilterParams;
+  const productsQuery = useServerPagination
+    ? `category=${categorySlug}&limit=${PER_PAGE}&page=${currentPage}&inStock=true&sort=purchaseCount&order=desc`
+    : `category=${categorySlug}&limit=2000`;
+
   const [cat, productsData] = await Promise.all([
     getCategory(categorySlug!),
-    getProducts(`category=${categorySlug}&limit=2000`),
+    getProducts(productsQuery),
   ]);
   if (!cat) {
-    // Fallback: try legal/info page from DB
     legalPage = await getLegalPage(categorySlug!);
-    if (!legalPage) return Astro.redirect('/404');
+    if (!legalPage) return Astro.rewrite('/404');
     isLegalPage = true;
   } else {
     category = cat;
     categoryProducts = productsData?.products || [];
+    totalProducts = productsData?.pagination?.total || categoryProducts.length;
+    totalPages = productsData?.pagination?.pages || 1;
+    // SEO: out-of-range page → 404 (zapobiega indeksowaniu pustych stron typu ?page=999)
+    if (useServerPagination && currentPage > 1 && currentPage > totalPages) {
+      return Astro.rewrite('/404');
+    }
   }
 }
-
-// SEO: Detect filtered pages (query params) → noindex to prevent duplicate content
-const FILTER_PARAMS = ['q', 'cat', 'mfr', 'cond', 'kw', 'kwmin', 'kwmax', 'rpm', 'rpmr', 'obrmin', 'obrmax', 'pmin', 'pmax', 'sort', 'page'];
-const urlSearchParams = Astro.url.searchParams;
-const hasFilterParams = FILTER_PARAMS.some(param => urlSearchParams.has(param));
 
 // Strip HTML for meta description
 function stripHtml(html: string | null | undefined): string {
@@ -78,15 +113,19 @@ if (isLegalPage && legalPage) {
   // Early return with legal page layout
 }
 
-const inStockCount = isPowerPage
+// Total count: dla power-pages = pobrane produkty; dla kategorii = totalProducts (cała kategoria)
+// inStockOnPage = produkty z tej strony (do CollectionPage.numberOfItems jeśli brak total)
+const inStockOnPage = isPowerPage
   ? powerProducts.length
   : categoryProducts.filter((p: any) => p.stock > 0).length;
+const inStockCount = isPowerPage ? powerProducts.length : (totalProducts || inStockOnPage);
 
+const paginationTitleSuffix = !isPowerPage && currentPage > 1 ? ` — strona ${currentPage}` : '';
 const title = isPowerPage
   ? (rpmStr
     ? `Silniki elektryczne ${powerFormatted} kW ${rpmStr} - sklep, hurtownia, oferta, ceny, sprzedaż`
     : `Silniki elektryczne ${powerFormatted} kW - sklep, hurtownia, oferta, ceny, sprzedaż`)
-  : (category?.metadata?.title || `${category?.name} - sklep, hurtownia, oferta, ceny, sprzedaż`);
+  : `${category?.metadata?.title || `${category?.name} - sklep, hurtownia, oferta, ceny, sprzedaż`}${paginationTitleSuffix}`;
 
 const description = isPowerPage
   ? (rpmStr
@@ -94,9 +133,10 @@ const description = isPowerPage
     : `Silniki elektryczne o mocy ${powerFormatted} kW. ${powerProducts.length} napędów różnych producentów w atrakcyjnych cenach.`)
   : (category?.metadata?.description || stripHtml(category?.description) || `${category?.name} - ${inStockCount} produktów dostępnych od ręki w sklepie Stojan.`);
 
+// Canonical: power-pages bez query; kategorie z paginacją → self-canonical na konkretną stronę.
 const canonical = isPowerPage
   ? (rpmStr ? `/silniki-elektryczne-${powerMatch![1]}-kw-${rpmStr}-obr` : `/silniki-elektryczne-${powerMatch![1]}-kw`)
-  : `/${categorySlug}`;
+  : (currentPage > 1 ? `/${categorySlug}?page=${currentPage}` : `/${categorySlug}`);
 
 const breadcrumbLd = {
   "@context": "https://schema.org",
@@ -144,6 +184,21 @@ const collectionLd = {
     }))
   }
 };
+
+// SSR pagination helpers — używane tylko dla kategorii (NIE power-pages) bez filtrów.
+const showSsrPagination = !isPowerPage && !hasFilterParams && totalPages > 1;
+function pageUrl(p: number): string {
+  return p === 1 ? `/${categorySlug}` : `/${categorySlug}?page=${p}`;
+}
+function paginationRange(current: number, total: number): Array<number | 'ellipsis'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const range: Array<number | 'ellipsis'> = [1];
+  if (current - 2 > 2) range.push('ellipsis');
+  for (let i = Math.max(2, current - 2); i <= Math.min(total - 1, current + 2); i++) range.push(i);
+  if (current + 2 < total - 1) range.push('ellipsis');
+  range.push(total);
+  return range;
+}
 
 // Helper: map product for CategoryProducts component
 function mapProductForFilter(p: any) {
@@ -229,11 +284,54 @@ function mapProductForFilter(p: any) {
       )}
 
       {!isPowerPage ? (
-        <CategoryProducts
-          client:load
-          products={categoryProducts.map(mapProductForFilter)}
-          categoryName={category?.name || ''}
-        />
+        <>
+          <CategoryProducts
+            client:load
+            products={categoryProducts.map(mapProductForFilter)}
+            categoryName={category?.name || ''}
+          />
+
+          {showSsrPagination && (
+            <nav class="mt-8 flex items-center justify-center gap-1 flex-wrap" aria-label="Paginacja produktów">
+              {currentPage > 1 && (
+                <a
+                  href={pageUrl(currentPage - 1)}
+                  class="px-3 py-2 rounded-lg border border-border hover:bg-accent text-sm transition-colors"
+                  rel="prev"
+                >← Poprzednia</a>
+              )}
+
+              {paginationRange(currentPage, totalPages).map((p) =>
+                p === 'ellipsis' ? (
+                  <span class="px-2 text-muted-foreground">…</span>
+                ) : p === currentPage ? (
+                  <span class="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold" aria-current="page">{p}</span>
+                ) : (
+                  <a
+                    href={pageUrl(p)}
+                    class="px-3 py-2 rounded-lg border border-border hover:bg-accent text-sm transition-colors"
+                  >{p}</a>
+                )
+              )}
+
+              {currentPage < totalPages && (
+                <a
+                  href={pageUrl(currentPage + 1)}
+                  class="px-3 py-2 rounded-lg border border-border hover:bg-accent text-sm transition-colors"
+                  rel="next"
+                >Następna →</a>
+              )}
+            </nav>
+          )}
+
+          {!isPowerPage && totalProducts > 0 && (
+            <p class="text-center text-xs text-muted-foreground mt-3">
+              {hasFilterParams
+                ? `Pokazano ${categoryProducts.length} produktów`
+                : `Strona ${currentPage} z ${totalPages} — łącznie ${totalProducts} produktów w kategorii`}
+            </p>
+          )}
+        </>
       ) : powerProducts.length > 0 ? (
         <CategoryProducts
           client:load

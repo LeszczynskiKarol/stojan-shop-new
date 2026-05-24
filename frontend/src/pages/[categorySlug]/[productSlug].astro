@@ -10,7 +10,7 @@ import { ShippingHint } from '@/components/shop/ShippingHint';
 const { categorySlug, productSlug } = Astro.params;
 const data = await getProduct(categorySlug!, productSlug!);
 
-if (!data?.product) return Astro.redirect('/404');
+if (!data?.product) return Astro.rewrite('/404');
 
 const product = data.product;
 const related = (data.related || []).filter((r: any) => r.stock > 0);
@@ -19,6 +19,10 @@ const seo = mp?.ownStore?.seo || {};
 const categoryName = product.categories?.[0]?.category?.name || product.categories?.[0]?.name || '';
 const power = typeof product.power === 'object' ? product.power.value : product.power;
 const rpm = typeof product.rpm === 'object' ? product.rpm.value : product.rpm;
+// Normalize for interpolation in meta description — some DB values already include " kW" / " obr"
+// suffix which produced "kW kW" / "obr obr" in meta tags. Strip unit before re-adding.
+const powerClean = power ? String(power).replace(/\s*kW.*/i, '').trim() : '';
+const rpmClean = rpm ? String(rpm).replace(/\s*obr.*/i, '').trim() : '';
 
 const price = mp?.ownStore?.price ?? product.price ?? 0;
 const priceNum = Number(price);
@@ -40,8 +44,11 @@ const conditionColor = product.condition === 'nowy'
     : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400';
 
 const title = seo.title || `${product.name} | Stojan Shop`;
+const mfrLabel = product.manufacturer && !['silnik', 'stojan', 'brak', '-'].includes(product.manufacturer.toLowerCase())
+  ? ` ${product.manufacturer}.`
+  : '';
 const description = seo.description
-  || `${product.name} - silnik elektryczny ${power} kW ${rpm} obr. ${product.manufacturer}. Stan: ${condition}. Cena: ${fmtPrice(priceNum)} zł brutto.`;
+  || `${product.name}${powerClean ? ` — ${powerClean} kW` : ''}${rpmClean ? `, ${rpmClean} obr/min` : ''}.${mfrLabel} Stan: ${condition}. Cena: ${fmtPrice(priceNum)} zł brutto.`;
 
 const SITE_URL = 'https://www.silniki-elektryczne.com.pl';
 const productUrl = `${SITE_URL}/${categorySlug}/${productSlug}`;
@@ -78,7 +85,6 @@ const productLd = {
   "image": allImages.map((img: string) => img.startsWith('http') ? img : `${SITE_URL}${img}`),
   "brand": { "@type": "Brand", "name": product.manufacturer },
   "sku": product.id,
-  "mpn": product.name.replace(/\s+/g, '-').substring(0, 50),
   "offers": {
     "@type": "Offer",
     "url": productUrl,

@@ -15,6 +15,7 @@ moja-aplikacja-key-pair.pem*
 .env.local
 .env.production
 */.env
+scripts/.sync-env
 
 # Build outputs
 dist/
