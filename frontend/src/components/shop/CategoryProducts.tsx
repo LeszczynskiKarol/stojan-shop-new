@@ -526,18 +526,26 @@ export default function CategoryProducts({
   const filtered = useMemo(() => {
     let r = available;
     if (filters.search.trim()) {
-      const t = filters.search.toLowerCase();
-      r = r.filter(
-        (p) =>
-          p.name.toLowerCase().includes(t) ||
-          p.manufacturer.toLowerCase().includes(t) ||
-          (p.technicalDetails || "").toLowerCase().includes(t) ||
-          (p.customParameters || []).some(
-            (cp) =>
-              cp.name.toLowerCase().includes(t) ||
-              cp.value.toLowerCase().includes(t),
-          ),
-      );
+      // Token-based AND search: każdy token musi się pojawić w którymś z pól produktu.
+      // Bez tego "silnik 3 kw" nie matchuje "silnik elektryczny 3kW 1425obr SIEMENS"
+      // (bo to phrase-match przez .includes()).
+      // Normalizacja: spacja między cyfrą a "kw" (3kw → "3 kw") + lowercase.
+      const normalize = (s: string) =>
+        s.toLowerCase().replace(/(\d)\s*(kw|kW)\b/g, "$1 kw").replace(/\s+/g, " ");
+      const tokens = normalize(filters.search).split(/\s+/).filter(Boolean);
+      r = r.filter((p) => {
+        const haystack = normalize(
+          [
+            p.name,
+            p.manufacturer,
+            p.technicalDetails || "",
+            (p.customParameters || [])
+              .map((cp) => `${cp.name} ${cp.value}`)
+              .join(" "),
+          ].join(" "),
+        );
+        return tokens.every((t) => haystack.includes(t));
+      });
     }
 
     if (filters.categories.length)
