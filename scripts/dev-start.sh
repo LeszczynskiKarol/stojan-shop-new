@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # ============================================================================
-# dev-start.sh — Ask about DB sync, then start backend + frontend
+# dev-start.sh — Ask about DB sync, then start backend + frontend (+ frpc)
 # ============================================================================
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Only ask if .sync-env is configured
 if [[ -f "$SCRIPT_DIR/.sync-env" ]]; then
@@ -15,7 +16,9 @@ if [[ -f "$SCRIPT_DIR/.sync-env" ]]; then
 fi
 
 echo ""
-echo "Starting dev servers..."
-npx concurrently -n BE,FE -c blue,magenta --kill-others-on-fail \
+echo "Starting dev servers (+ frpc tunnel: dev.torweb.pl → :4321, api.torweb.pl → :4000)..."
+
+cd "$ROOT_DIR" && npx concurrently -n BE,FE,frpc -c blue,magenta,cyan --kill-others-on-fail \
   "npm run dev:backend" \
-  "npm run dev:frontend"
+  "npm run dev:frontend" \
+  "bash scripts/start-frpc.sh"

@@ -40,10 +40,12 @@ export async function sitemapRoutes(app: FastifyInstance) {
     reply.header('Content-Type', 'application/xml').send(xml);
   });
 
-  // Categories
+  // Categories — wyklucz power-pages (`silniki-elektryczne-*`), są w sitemap-power-pages.xml.
+  // Historycznie w tabeli Category leżą też power-pages — dedup po stronie sitemap.
   app.get('/sitemap-categories.xml', async (request, reply) => {
     const categories = await prisma.category.findMany({
       select: { slug: true, updatedAt: true },
+      where: { NOT: { slug: { startsWith: 'silniki-elektryczne-' } } },
     });
 
     const pages = categories.map((c) => ({
@@ -121,7 +123,9 @@ export async function sitemapRoutes(app: FastifyInstance) {
         idsInStock.has(m.id) || namesInStock.has(m.name.toLowerCase().trim()),
       )
       .map((m) => ({
-        loc: `/marka-producent/${m.slug}`,
+        // DB-convention: Manufacturer.slug zapisywany jest z prefixem `marka-producent/`
+        // (patrz admin-products.ts:206). Strip żeby uniknąć duplikatu segmentu w URL.
+        loc: `/marka-producent/${m.slug.replace(/^marka-producent\//, '')}`,
         lastmod: m.updatedAt.toISOString(),
       }));
 

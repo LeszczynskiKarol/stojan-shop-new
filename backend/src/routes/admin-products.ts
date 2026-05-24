@@ -203,7 +203,9 @@ export async function adminProductRoutes(app: FastifyInstance) {
           .status(400)
           .send({ success: false, error: "Nazwa wymagana" });
 
-      const slug = `marka-producent/${name
+      // DB-konwencja historycznie była "marka-producent/<slug>" — nowe rekordy zapisujemy
+      // już bez prefixu (sitemap i lookup'y w manufacturers.ts/products.ts akceptują oba warianty).
+      const slug = name
         .toLowerCase()
         .replace(
           /[ąćęłńóśźż]/g,
@@ -221,7 +223,7 @@ export async function adminProductRoutes(app: FastifyInstance) {
             })[c] || c,
         )
         .replace(/\s+/g, "-")
-        .replace(/[^a-z0-9-]/g, "")}`;
+        .replace(/[^a-z0-9-]/g, "");
 
       const existing = await prisma.manufacturer.findFirst({
         where: { name: { equals: name.trim(), mode: "insensitive" } },

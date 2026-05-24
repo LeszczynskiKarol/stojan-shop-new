@@ -4,8 +4,10 @@
 
 User-agent: *
 
-# ── Strona wyszukiwania (ma noindex, ale blokujemy też crawl) ──
-Disallow: /szukaj
+# ── Strona wyszukiwania — NIE blokujemy crawla, bo strona ma już <meta noindex>.
+# Disallow + noindex jednocześnie to anty-wzorzec: Googlebot nie pobiera HTML i nie widzi noindex,
+# więc URL może mimo wszystko pokazywać się w SERP jako "indexed without content".
+# `?q=` i tak jest dalej zablokowane przez `Disallow: /*?*q=`.
 
 # ── Filtrowane warianty kategorii (query params z CategoryProducts) ──
 Disallow: /*?*q=
@@ -47,7 +49,6 @@ Sitemap: https://www.silniki-elektryczne.com.pl/sitemap_index.xml
 
 # ── Googlebot — identyczne reguły co dla * ──
 User-agent: Googlebot
-Disallow: /szukaj
 Disallow: /*?*q=
 Disallow: /*?*cat=
 Disallow: /*?*mfr=
@@ -76,7 +77,6 @@ Allow: /
 # ── Bingbot — z crawl-delay ──
 User-agent: Bingbot
 Crawl-delay: 2
-Disallow: /szukaj
 Disallow: /*?*q=
 Disallow: /*?*cat=
 Disallow: /*?*mfr=

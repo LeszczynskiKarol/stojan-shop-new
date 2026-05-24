@@ -61,3 +61,4 @@ backend/package-lock.json
 # Testing
 coverage/
 .nyc_output/
+frpc.toml

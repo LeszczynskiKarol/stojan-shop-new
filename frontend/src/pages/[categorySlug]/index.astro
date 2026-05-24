@@ -200,6 +200,32 @@ if (!isPowerPage && !matchedCity) {
   }
 }
 
+// ── Popularne marki w kategorii ──
+// Agreguje manufacturer-y z aktualnie SSR-owanych produktów (top purchaseCount). Cel:
+// dodać na każdej stronie kategorii bezpośrednie linki SSR do top 8 producentów, żeby ich
+// strony `/marka-producent/{slug}` dostawały więcej rozproszonych internal linków
+// (audyt: 92 producenci, większość miała internalLinksIn tylko z footera).
+function slugifyMfr(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[ąćęłńóśźż]/g, (c) => ({ ą:'a',ć:'c',ę:'e',ł:'l',ń:'n',ó:'o',ś:'s',ź:'z',ż:'z' } as Record<string,string>)[c] || c)
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+}
+let topMfrsInCategory: { name: string; slug: string; count: number }[] = [];
+if (!isPowerPage && !matchedCity && currentPage === 1 && categoryProducts.length > 0) {
+  const counts = new Map<string, number>();
+  for (const p of categoryProducts) {
+    const m = p.manufacturer;
+    if (!m || p.stock <= 0) continue;
+    counts.set(m, (counts.get(m) || 0) + 1);
+  }
+  topMfrsInCategory = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([name, count]) => ({ name, slug: slugifyMfr(name), count }));
+}
+
 // Strip HTML for meta description
 function stripHtml(html: string | null | undefined): string {
   if (!html) return '';
@@ -462,6 +488,25 @@ function mapProductForFilter(p: any) {
 
       {!isPowerPage ? (
         <>
+          {/* SEO: SSR-owe linki do top producentów z kategorii. Buduje internal-link graph
+              do `/marka-producent/{slug}` — naprawia "manufacturer pages get only footer links". */}
+          {topMfrsInCategory.length >= 4 && (
+            <section class="mb-6 p-4 bg-card border border-border rounded-xl" aria-label="Popularne marki w kategorii">
+              <h2 class="text-sm font-semibold text-foreground mb-2">Popularne marki w&nbsp;tej kategorii</h2>
+              <div class="flex flex-wrap gap-2">
+                {topMfrsInCategory.map((m) => (
+                  <a
+                    href={`/marka-producent/${m.slug}`}
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full bg-accent text-foreground border border-border hover:border-primary/40 hover:text-primary transition-colors"
+                  >
+                    {m.name}
+                    <span class="text-xs text-muted-foreground">({m.count})</span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
+
           <CategoryProducts
             client:load
             products={categoryProducts.map(mapProductForFilter)}

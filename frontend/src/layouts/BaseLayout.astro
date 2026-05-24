@@ -5,6 +5,7 @@ import '@/styles/globals.css';
 import { GlobalSearch } from '@/components/search/GlobalSearch';
 import CartDropdown from '@/components/shop/CartDropdown';
 import CookieConsent from '@/components/CookieConsent';
+import { getPopularProducts } from '@/lib/api';
 
 interface Props {
   title: string;
@@ -110,6 +111,39 @@ const payments = [
 ];
 
 const currentYear = new Date().getFullYear();
+
+// ── Polecane silniki (rotational) ─────────────────────────────
+// Wybiera 6 losowych produktów z top-30 by purchaseCount. Każdy render = inny zestaw,
+// więc internal-link juice rozkłada się równomiernie na popularne produkty zamiast
+// koncentrować się na top-8 zawsze tych samych. Cel: zmniejszyć liczbę orphan pages
+// z ruchem (audyt: 129 orphans z clicks≥1 lub impr≥5).
+let footerPicks: Array<{ name: string; href: string; manufacturer: string | null; power: string | null }> = [];
+try {
+  const popular = await getPopularProducts(30);
+  if (popular && popular.length > 0) {
+    const shuffled = [...popular]
+      .filter((p: any) => p.stock > 0 && p.marketplaces?.ownStore?.slug)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 6);
+    footerPicks = shuffled.map((p: any) => {
+      const catSlug = p.categories?.[0]?.category?.slug || p.categories?.[0]?.slug || 'trojfazowe';
+      const prodSlug = p.marketplaces.ownStore.slug;
+      const rawPower = typeof p.power === 'object' ? p.power?.value : p.power;
+      const pwrClean = rawPower ? String(rawPower).replace(/\s*kw\s*/gi, ' ').trim() : null;
+      // First-letter uppercase
+      const nm = p.name ? p.name.charAt(0).toUpperCase() + p.name.slice(1).toLowerCase() : '';
+      return {
+        name: nm,
+        href: `/${catSlug}/${prodSlug}`,
+        manufacturer: p.manufacturer || null,
+        power: pwrClean ? `${pwrClean} kW` : null,
+      };
+    });
+  }
+} catch {
+  // Failsafe — pusty footer-block jeśli API padło
+  footerPicks = [];
+}
 ---
 
 <!DOCTYPE html>
@@ -416,6 +450,23 @@ const currentYear = new Date().getFullYear();
         </button>
         </div>
       </div>
+
+      <!-- Polecane silniki (rotational — różne za każdym renderem) -->
+      {footerPicks.length > 0 && (
+        <div class="mt-8 pt-6 border-t border-border">
+          <h3 class="font-bold mb-2 text-xs text-foreground">Polecane silniki z magazynu</h3>
+          <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            {footerPicks.map((p, idx) => (
+              <>
+                <a href={p.href} class="hover:underline hover:text-primary transition-colors">
+                  {p.name}
+                </a>
+                {idx < footerPicks.length - 1 && <span class="text-border">·</span>}
+              </>
+            ))}
+          </div>
+        </div>
+      )}
 
       <!-- Dostawa do większych miast (internal linking + geo-local landing pages) -->
       <div class="mt-8 pt-6 border-t border-border">
