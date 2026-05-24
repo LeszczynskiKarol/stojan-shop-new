@@ -21,14 +21,19 @@ export async function sitemapRoutes(app: FastifyInstance) {
     reply.header('Content-Type', 'application/xml').send(xml);
   });
 
-  // Static pages
+  // Static pages — w tym lokalne landing pages dla większych miast PL
   app.get('/sitemap-static.xml', async (request, reply) => {
+    const cities = [
+      'torun', 'bydgoszcz', 'warszawa', 'poznan', 'lodz', 'gdansk',
+      'wroclaw', 'krakow', 'katowice', 'bielsko-biala', 'lublin',
+    ];
     const pages = [
-      { loc: '/', priority: '1.0', changefreq: 'daily' },
-      { loc: '/kontakt', priority: '0.5', changefreq: 'monthly' },
-      { loc: '/o-nas', priority: '0.5', changefreq: 'monthly' },
-      { loc: '/skup-silnikow', priority: '0.6', changefreq: 'monthly' },
-      { loc: '/blog', priority: '0.7', changefreq: 'weekly' },
+      { loc: '/' },
+      { loc: '/kontakt' },
+      { loc: '/o-nas' },
+      { loc: '/skup-silnikow' },
+      { loc: '/blog' },
+      ...cities.map((c) => ({ loc: `/silniki-elektryczne-${c}` })),
     ];
 
     const xml = buildSitemap(pages);
