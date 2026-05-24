@@ -31,33 +31,39 @@ export default function BackToList({
   categoryName: string;
 }) {
   const [backUrl, setBackUrl] = useState(`/${categorySlug}`);
+  const [backLabel, setBackLabel] = useState(categoryName);
   const [hasFilters, setHasFilters] = useState(false);
 
   useEffect(() => {
     try {
       const stored = sessionStorage.getItem("cp_back_url");
+      const storedLabel = sessionStorage.getItem("cp_back_label");
       if (stored) {
         const url = new URL(stored);
-        // Verify it's the same category
-        if (
+        // Akceptuj: ta sama kategoria, /szukaj (wyniki wyszukiwania) lub /marka-producent/...
+        const isSameCategory =
           url.pathname === `/${categorySlug}` ||
-          url.pathname.startsWith(`/${categorySlug}?`)
-        ) {
-          // Strip tracking params (_gl, _ga, gclid, fbclid, utm_*, etc.)
-          // Keep only actual shop filter params
+          url.pathname.startsWith(`/${categorySlug}?`);
+        const isSearch = url.pathname === "/szukaj";
+        const isManufacturer = url.pathname.startsWith("/marka-producent/");
+        if (isSameCategory || isSearch || isManufacturer) {
+          // Strip tracking params (_gl, _ga, gclid, fbclid, utm_*, etc.) — keep only shop filter params
           const cleanParams = new URLSearchParams();
           for (const [key, value] of url.searchParams) {
-            if (FILTER_KEYS.has(key)) {
-              cleanParams.set(key, value);
-            }
+            if (FILTER_KEYS.has(key)) cleanParams.set(key, value);
           }
           const cleanSearch = cleanParams.toString();
           setBackUrl(url.pathname + (cleanSearch ? `?${cleanSearch}` : ""));
           setHasFilters(cleanSearch.length > 0);
+          // Dla /szukaj i /marka-producent użyj label zapisanego z poprzedniej strony
+          // (np. "Wyniki: 'silnik 3 kw'" zamiast nazwy kategorii produktu)
+          if ((isSearch || isManufacturer) && storedLabel) {
+            setBackLabel(storedLabel);
+          }
         }
       }
     } catch {}
-  }, [categorySlug]);
+  }, [categorySlug, categoryName]);
 
   return (
     <a href={backUrl} className="btl-bar">
@@ -73,7 +79,7 @@ export default function BackToList({
         <path d="m15 18-6-6 6-6" />
       </svg>
       <span className="btl-text">
-        Przejdź do: <strong>{categoryName || "lista produktów"}</strong>
+        Wróć do: <strong>{backLabel || categoryName || "lista produktów"}</strong>
       </span>
       {hasFilters && <span className="btl-badge">Filtry aktywne</span>}
 
