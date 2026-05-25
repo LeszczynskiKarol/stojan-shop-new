@@ -247,12 +247,14 @@ jobs:
               [ "$FRONTEND_OK" = "1" ] || fail_stage "frontend health check"
 
               # ─── robots.txt sanity (regression guard) ──
-              ROBOTS_LINE=$(curl -fsS https://www.silniki-elektryczne.com.pl/robots.txt | head -1 | tr -d '\r')
+              # Pierwsza nie-komentarzowa, nie-pusta linia musi być User-agent: *
+              # (komentarze "#" i puste linie na początku są dopuszczone przez standard robots.txt).
+              ROBOTS_LINE=$(curl -fsS https://www.silniki-elektryczne.com.pl/robots.txt | tr -d '\r' | grep -vE '^[[:space:]]*(#|$)' | head -1)
               if [ "$ROBOTS_LINE" != "User-agent: *" ]; then
-                echo "WARN: robots.txt first line is '$ROBOTS_LINE' (expected 'User-agent: *')"
+                echo "WARN: robots.txt first directive is '$ROBOTS_LINE' (expected 'User-agent: *')"
                 fail_stage "robots.txt regression"
               fi
-              echo "robots.txt first line OK: $ROBOTS_LINE"
+              echo "robots.txt first directive OK: $ROBOTS_LINE"
 
               # ─── sitemap index sanity ──
               SITEMAP_CODE=$(curl -sI -o /dev/null -w "%{http_code}" https://www.silniki-elektryczne.com.pl/sitemap_index.xml)
