@@ -313,6 +313,8 @@ export default function CategoryProducts({
     const cat = new Map<string, { name: string; count: number }>();
     const mfr = new Map<string, number>();
     const cond = new Map<string, number>();
+    // Power/RPM keyed by NORMALIZED numeric string ("0.25", "45") not raw value.
+    // Bez tego "45" i "45 kW" i "45kW" tworzyły 3 osobne checkboxy po 1 produkcie zamiast jednego po 3.
     const pw = new Map<string, number>();
     const rp = new Map<string, number>();
     let minP = Infinity,
@@ -338,18 +340,20 @@ export default function CategoryProducts({
       cond.set(p.condition, (cond.get(p.condition) || 0) + 1);
       const pv = p.power?.value;
       if (pv && pv !== "0") {
-        pw.set(pv, (pw.get(pv) || 0) + 1);
         const numPw = parsePower(pv);
         if (numPw > 0) {
+          const key = String(numPw);
+          pw.set(key, (pw.get(key) || 0) + 1);
           if (numPw < minKw) minKw = numPw;
           if (numPw > maxKw) maxKw = numPw;
         }
       }
       const rv = p.rpm?.value;
       if (rv && rv !== "0") {
-        rp.set(rv, (rp.get(rv) || 0) + 1);
         const numRpm = parseFloat(String(rv).replace(",", "."));
         if (numRpm > 0) {
+          const key = String(numRpm);
+          rp.set(key, (rp.get(key) || 0) + 1);
           if (numRpm < minRpm) minRpm = numRpm;
           if (numRpm > maxRpm) maxRpm = numRpm;
         }
@@ -373,9 +377,7 @@ export default function CategoryProducts({
       }),
       conditions: [...cond.entries()],
       powers: [...pw.entries()].sort(
-        (a, b) =>
-          parseFloat(a[0].replace(",", ".")) -
-          parseFloat(b[0].replace(",", ".")),
+        (a, b) => parseFloat(a[0]) - parseFloat(b[0]),
       ),
       rpms: [...rp.entries()].sort(
         (a, b) => parseFloat(a[0]) - parseFloat(b[0]),
@@ -448,21 +450,26 @@ export default function CategoryProducts({
     [opts.minKw, opts.maxKw],
   );
 
-  // Commit power from input fields
+  // Commit power from input fields.
+  // Pozwala na otwarte zakresy: tylko min (np. "3 kw" → 3-∞) lub tylko max.
+  // parseFloat tolerantnie radzi sobie z "3 kw" → 3.
   const commitPowerInputs = useCallback(() => {
-    const lo = parseFloat(powerInputMin.replace(",", "."));
-    const hi = parseFloat(powerInputMax.replace(",", "."));
-    if (!isNaN(lo) && !isNaN(hi) && lo <= hi) {
-      const isFullRange = lo <= opts.minKw && hi >= opts.maxKw;
-      setFilters((prev) => ({
-        ...prev,
-        powerMin: isFullRange ? "" : lo.toString(),
-        powerMax: isFullRange ? "" : hi.toString(),
-        powers: [],
-      }));
-      setPowerSlider([Math.max(opts.minKw, lo), Math.min(opts.maxKw, hi)]);
-      setPage(1);
-    }
+    const minRaw = powerInputMin.replace(",", ".").trim();
+    const maxRaw = powerInputMax.replace(",", ".").trim();
+    const loParsed = minRaw ? parseFloat(minRaw) : NaN;
+    const hiParsed = maxRaw ? parseFloat(maxRaw) : NaN;
+    const lo = !isNaN(loParsed) ? loParsed : opts.minKw;
+    const hi = !isNaN(hiParsed) ? hiParsed : opts.maxKw;
+    if (isNaN(lo) || isNaN(hi) || lo > hi) return;
+    const isFullRange = lo <= opts.minKw && hi >= opts.maxKw;
+    setFilters((prev) => ({
+      ...prev,
+      powerMin: isFullRange ? "" : String(lo),
+      powerMax: isFullRange ? "" : String(hi),
+      powers: [],
+    }));
+    setPowerSlider([Math.max(opts.minKw, lo), Math.min(opts.maxKw, hi)]);
+    setPage(1);
   }, [powerInputMin, powerInputMax, opts.minKw, opts.maxKw]);
 
   // RPM slider state
@@ -506,45 +513,117 @@ export default function CategoryProducts({
   );
 
   const commitRpmInputs = useCallback(() => {
-    const lo = parseFloat(rpmInputMin.replace(",", "."));
-    const hi = parseFloat(rpmInputMax.replace(",", "."));
-    if (!isNaN(lo) && !isNaN(hi) && lo <= hi) {
-      const isFullRange = lo <= opts.minRpm && hi >= opts.maxRpm;
-      setFilters((prev) => ({
-        ...prev,
-        rpmSliderMin: isFullRange ? "" : lo.toString(),
-        rpmSliderMax: isFullRange ? "" : hi.toString(),
-        rpms: [],
-        rpmRanges: [],
-      }));
-      setRpmSlider([Math.max(opts.minRpm, lo), Math.min(opts.maxRpm, hi)]);
-      setPage(1);
-    }
+    const minRaw = rpmInputMin.replace(",", ".").trim();
+    const maxRaw = rpmInputMax.replace(",", ".").trim();
+    const loParsed = minRaw ? parseFloat(minRaw) : NaN;
+    const hiParsed = maxRaw ? parseFloat(maxRaw) : NaN;
+    const lo = !isNaN(loParsed) ? loParsed : opts.minRpm;
+    const hi = !isNaN(hiParsed) ? hiParsed : opts.maxRpm;
+    if (isNaN(lo) || isNaN(hi) || lo > hi) return;
+    const isFullRange = lo <= opts.minRpm && hi >= opts.maxRpm;
+    setFilters((prev) => ({
+      ...prev,
+      rpmSliderMin: isFullRange ? "" : String(lo),
+      rpmSliderMax: isFullRange ? "" : String(hi),
+      rpms: [],
+      rpmRanges: [],
+    }));
+    setRpmSlider([Math.max(opts.minRpm, lo), Math.min(opts.maxRpm, hi)]);
+    setPage(1);
   }, [rpmInputMin, rpmInputMax, opts.minRpm, opts.maxRpm]);
 
   // Filtered + sorted
   const filtered = useMemo(() => {
     let r = available;
     if (filters.search.trim()) {
-      // Token-based AND search: każdy token musi się pojawić w którymś z pól produktu.
-      // Bez tego "silnik 3 kw" nie matchuje "silnik elektryczny 3kW 1425obr SIEMENS"
-      // (bo to phrase-match przez .includes()).
-      // Normalizacja: spacja między cyfrą a "kw" (3kw → "3 kw") + lowercase.
-      const normalize = (s: string) =>
-        s.toLowerCase().replace(/(\d)\s*(kw|kW)\b/g, "$1 kw").replace(/\s+/g, " ");
-      const tokens = normalize(filters.search).split(/\s+/).filter(Boolean);
+      // Smart search: ekstraktujemy strukturalne filtry (power w kW, rpm w obr/min)
+      // i porównujemy je NUMERYCZNIE z power.value / rpm.value produktu.
+      // Pozostały tekst → substring match w nazwie/producencie/szczegółach.
+      //
+      // Przykłady:
+      //  - "0,25 kw" → power≈0.25, brak tekstu → tylko silniki 0.25 kW
+      //  - "45 kw"  → power=45, brak tekstu → tylko 45 kW (NIE łapie RPM 1450)
+      //  - "1450 obr" → rpm=1450, brak tekstu → tylko obroty 1450
+      //  - "siemens 3 kw" → power=3 + tekst "siemens" → 3 kW marki Siemens
+      //  - "45" (sam) → tekst "45" → substring (łapie też 45 w 1450 — zamierzone)
+      let q = filters.search.toLowerCase().replace(/,/g, ".");
+      let powerNum: number | null = null;
+      let rpmNum: number | null = null;
+      const pwMatch = q.match(/(\d+(?:\.\d+)?)\s*kw\b/);
+      if (pwMatch) {
+        const n = parseFloat(pwMatch[1]);
+        if (isFinite(n)) powerNum = n;
+        q = q.replace(pwMatch[0], " ");
+      }
+      const rpmMatch = q.match(/(\d{3,4})\s*(?:obr(?:\/min)?|rpm)\b/);
+      if (rpmMatch) {
+        const n = parseInt(rpmMatch[1], 10);
+        if (isFinite(n)) rpmNum = n;
+        q = q.replace(rpmMatch[0], " ");
+      }
+      let textTokens = q.split(/\s+/).filter((t) => t.length > 0);
+
+      // HEURYSTYKA: czysto numeryczne zapytanie BEZ jednostki (np. "45", "0.25", "1450")
+      // → spróbuj zinterpretować jako power w kW; jeśli nie pasuje do żadnego produktu,
+      // spróbuj jako RPM. Dopiero w ostateczności substring fallback.
+      // Bez tego "45" znajduje 19 wyników (silniki gdzie "45" jest w RPM 1450, 1455 etc.) —
+      // user oczekuje 5 silników 45 kW.
+      if (
+        powerNum === null &&
+        rpmNum === null &&
+        textTokens.length === 1 &&
+        /^\d+(?:\.\d+)?$/.test(textTokens[0])
+      ) {
+        const n = parseFloat(textTokens[0]);
+        const matchesPower = available.some((p) => {
+          const pw = parsePower(p.power?.value);
+          return pw > 0 && Math.abs(pw - n) < 0.001;
+        });
+        if (matchesPower) {
+          powerNum = n;
+          textTokens = [];
+        } else if (Number.isInteger(n) && n >= 100 && n <= 5000) {
+          const matchesRpm = available.some((p) => {
+            const rv = parseFloat(String(p.rpm?.value || "0").replace(",", "."));
+            return rv > 0 && Math.abs(rv - n) < 0.5;
+          });
+          if (matchesRpm) {
+            rpmNum = n;
+            textTokens = [];
+          }
+        }
+      }
+
+      // DEBUG marker — verify fresh bundle in browser console
+      if (typeof window !== "undefined") {
+        // eslint-disable-next-line no-console
+        console.log("[search-v4]", { raw: filters.search, powerNum, rpmNum, textTokens, available: available.length });
+      }
+
       r = r.filter((p) => {
-        const haystack = normalize(
-          [
+        if (powerNum !== null) {
+          const pw = parsePower(p.power?.value);
+          if (pw === 0 || Math.abs(pw - powerNum) > 0.001) return false;
+        }
+        if (rpmNum !== null) {
+          const rv = parseFloat(String(p.rpm?.value || "0").replace(",", "."));
+          if (rv === 0 || Math.abs(rv - rpmNum) > 0.5) return false;
+        }
+        if (textTokens.length > 0) {
+          const haystack = [
             p.name,
             p.manufacturer,
             p.technicalDetails || "",
             (p.customParameters || [])
               .map((cp) => `${cp.name} ${cp.value}`)
               .join(" "),
-          ].join(" "),
-        );
-        return tokens.every((t) => haystack.includes(t));
+          ]
+            .join(" ")
+            .toLowerCase()
+            .replace(/,/g, ".");
+          if (!textTokens.every((t) => haystack.includes(t))) return false;
+        }
+        return true;
       });
     }
 
@@ -559,15 +638,24 @@ export default function CategoryProducts({
     if (filters.conditions.length)
       r = r.filter((p) => filters.conditions.includes(p.condition));
 
-    // Power: range slider OR checkboxes
+    // Power: range slider OR checkboxes.
+    // Checkboxy: keys to znormalizowane numeryczne stringi ("0.25", "45"),
+    // porównujemy numerycznie żeby "45" matchowało "45 kW" i "45kW".
     const hasPowerRange = filters.powerMin || filters.powerMax;
     const hasPowerChecks = filters.powers.length > 0;
+    const checkedPowerNums = hasPowerChecks
+      ? filters.powers.map((s) => parseFloat(s.replace(",", ".")))
+      : [];
     if (hasPowerRange || hasPowerChecks) {
       r = r.filter((p) => {
-        if (hasPowerChecks && filters.powers.includes(p.power?.value))
+        const pw = parsePower(p.power?.value);
+        if (
+          hasPowerChecks &&
+          pw > 0 &&
+          checkedPowerNums.some((n) => Math.abs(n - pw) < 0.001)
+        )
           return true;
         if (hasPowerRange) {
-          const pw = parsePower(p.power?.value);
           if (pw === 0) return false;
           const lo = filters.powerMin ? parseFloat(filters.powerMin) : 0;
           const hi = filters.powerMax ? parseFloat(filters.powerMax) : Infinity;
@@ -577,26 +665,33 @@ export default function CategoryProducts({
       });
     }
 
-    // RPM: slider range OR exact checkboxes OR range buttons (OR logic)
+    // RPM: slider range OR exact checkboxes OR range buttons (OR logic).
+    // Exact checkbox keys = znormalizowany numeryczny string (j.w.).
     const hasExactRpm = filters.rpms.length > 0;
     const hasRpmRange = filters.rpmRanges.length > 0;
     const hasRpmSlider = !!(filters.rpmSliderMin || filters.rpmSliderMax);
+    const checkedRpmNums = hasExactRpm
+      ? filters.rpms.map((s) => parseFloat(s.replace(",", ".")))
+      : [];
     if (hasExactRpm || hasRpmRange || hasRpmSlider) {
       r = r.filter((p) => {
-        const matchesExact = hasExactRpm && filters.rpms.includes(p.rpm?.value);
+        const rvNum = parseFloat(String(p.rpm?.value || "0").replace(",", "."));
+        const matchesExact =
+          hasExactRpm &&
+          rvNum > 0 &&
+          checkedRpmNums.some((n) => Math.abs(n - rvNum) < 0.5);
         const matchesRange =
           hasRpmRange &&
           filters.rpmRanges.some((rpmKey) => productMatchesRpmRange(p, rpmKey));
         if (hasRpmSlider) {
-          const rv = parseFloat(String(p.rpm?.value || "0").replace(",", "."));
-          if (rv === 0) return matchesExact || matchesRange;
+          if (rvNum === 0) return matchesExact || matchesRange;
           const lo = filters.rpmSliderMin
             ? parseFloat(filters.rpmSliderMin)
             : 0;
           const hi = filters.rpmSliderMax
             ? parseFloat(filters.rpmSliderMax)
             : Infinity;
-          if (rv >= lo && rv <= hi) return true;
+          if (rvNum >= lo && rvNum <= hi) return true;
         }
         return matchesExact || matchesRange;
       });
@@ -834,7 +929,7 @@ export default function CategoryProducts({
                 key={v}
                 checked={filters.powers.includes(v)}
                 onChange={() => toggle("powers", v)}
-                label={`${v.replace(/\s*kW$/i, "")} kW`}
+                label={`${v.replace(".", ",")} kW`}
                 count={c}
               />
             ))}
@@ -1086,7 +1181,7 @@ export default function CategoryProducts({
             {filters.powers.map((v) => (
               <Tag
                 key={v}
-                label={`${v} kW`}
+                label={`${v.replace(".", ",")} kW`}
                 onRemove={() => toggle("powers", v)}
               />
             ))}

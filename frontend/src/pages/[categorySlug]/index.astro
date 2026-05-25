@@ -173,12 +173,13 @@ let totalProducts = 0;
 let totalPages = 1;
 
 if (!isPowerPage && !matchedCity) {
-  // Z filtrami: render full list (client-side filtering, jak dotychczas)
-  // Bez filtrów: SSR pagination 24/strona — mniejszy HTML, lepszy LCP, prawdziwa paginacja dla Googlebota
-  const useServerPagination = !hasFilterParams;
-  const productsQuery = useServerPagination
-    ? `category=${categorySlug}&limit=${PER_PAGE}&page=${currentPage}&inStock=true&sort=purchaseCount&order=desc`
-    : `category=${categorySlug}&limit=2000`;
+  // Zawsze ładujemy pełną listę produktów (limit=2000) — wymagane do client-side
+  // filtrowania w sidebarze (search, power range, manufacturer, rpm itd.).
+  // Wcześniejsza optymalizacja SSR-pagination (24/strona przy braku query params)
+  // łamała wyszukiwarkę: gdy user przeszedł na /trojfazowe i wpisał coś w search box,
+  // React miał w stanie tylko 24 produkty — pozostałe 1124 nie istniały.
+  // React i tak paginuje client-side po 30/stronę, więc UX paginacji zachowany.
+  const productsQuery = `category=${categorySlug}&limit=2000`;
 
   const [cat, productsData] = await Promise.all([
     getCategory(categorySlug!),
@@ -193,8 +194,9 @@ if (!isPowerPage && !matchedCity) {
     categoryProducts = productsData?.products || [];
     totalProducts = productsData?.pagination?.total || categoryProducts.length;
     totalPages = productsData?.pagination?.pages || 1;
-    // SEO: out-of-range page → 404 (zapobiega indeksowaniu pustych stron typu ?page=999)
-    if (useServerPagination && currentPage > 1 && currentPage > totalPages) {
+    // SEO: ?page=N poza zakresem → 404 (z limit=2000 mamy 1 stronę dla <2000 produktów,
+    // więc każde ?page=2+ jest out-of-range — zapobiega indeksowaniu pustych stron).
+    if (currentPage > 1 && currentPage > totalPages) {
       return Astro.rewrite('/404');
     }
   }
