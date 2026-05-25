@@ -51,6 +51,7 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
     headers: {
       Authorization: `Basic ${credentials}`,
       "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": allegroConfig.userAgent,
     },
     body: params,
   });
@@ -85,6 +86,7 @@ export async function exchangeAuthCode(code: string): Promise<void> {
     headers: {
       Authorization: `Basic ${credentials}`,
       "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": allegroConfig.userAgent,
     },
     body: params,
   });
@@ -179,6 +181,7 @@ export async function allegroFetch<T = any>(
         Authorization: `Bearer ${token}`,
         "Content-Type": CONTENT_TYPE,
         Accept: CONTENT_TYPE,
+        "User-Agent": allegroConfig.userAgent,
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });

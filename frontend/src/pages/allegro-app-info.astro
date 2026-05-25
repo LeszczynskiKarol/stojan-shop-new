@@ -1,0 +1,62 @@
+---
+// frontend/src/pages/allegro-app-info.astro
+// Strona informacyjna wymagana przez Regulamin REST API Allegro (art. 3.4.c).
+// Adres odpowiada URL-owi z nagłówka User-Agent wysyłanego przez backend.
+import BaseLayout from '@/layouts/BaseLayout.astro';
+
+const title = 'Stojan silniki — informacje o aplikacji Allegro REST API';
+const description = 'Strona informacyjna aplikacji Stojan silniki korzystającej z Allegro REST API. Cel działania, zakres operacji, kontakt z administratorem.';
+---
+
+<BaseLayout title={title} description={description} noIndex={true}>
+  <main class="mx-auto max-w-3xl px-4 py-12 text-gray-800">
+    <h1 class="text-3xl font-bold mb-6">Stojan silniki — aplikacja Allegro REST API</h1>
+
+    <section class="mb-8">
+      <h2 class="text-xl font-semibold mb-2">Identyfikacja</h2>
+      <ul class="list-disc pl-6 space-y-1">
+        <li><strong>Nazwa aplikacji:</strong> Stojan silniki (zarejestrowana w Allegro Developer Portal)</li>
+        <li><strong>User-Agent:</strong> <code>Stojan silniki/2.0.0 (+https://www.silniki-elektryczne.com.pl/allegro-app-info)</code></li>
+        <li><strong>Operator:</strong> Stojan s.c. A. Król W. Leszczyński, ul. Wojewódzka 2, 87-152 Pigża, NIP 8790003705</li>
+      </ul>
+    </section>
+
+    <section class="mb-8">
+      <h2 class="text-xl font-semibold mb-2">Cel działania</h2>
+      <p>
+        Aplikacja służy wyłącznie do obsługi własnego konta sprzedażowego Stojan s.c. w serwisie Allegro.
+        Integruje sklep <a href="https://www.silniki-elektryczne.com.pl" class="text-blue-700 underline">silniki-elektryczne.com.pl</a>
+        z platformą Allegro w zakresie zarządzania ofertami silników elektrycznych i motoreduktorów.
+      </p>
+    </section>
+
+    <section class="mb-8">
+      <h2 class="text-xl font-semibold mb-2">Zakres operacji na REST API</h2>
+      <ul class="list-disc pl-6 space-y-1">
+        <li>tworzenie i aktualizacja ofert produktowych (<code>/sale/product-offers</code>)</li>
+        <li>synchronizacja stanów magazynowych i cen pomiędzy sklepem a Allegro</li>
+        <li>odczyt zdarzeń ofert (<code>/sale/offer-events</code>) w celu monitorowania zmian</li>
+        <li>aktywacja i zakańczanie ofert (<code>/sale/offer-publication-commands</code>)</li>
+        <li>odświeżanie tokenów OAuth wyłącznie dla własnego konta sprzedawcy</li>
+      </ul>
+    </section>
+
+    <section class="mb-8">
+      <h2 class="text-xl font-semibold mb-2">Charakterystyka techniczna</h2>
+      <ul class="list-disc pl-6 space-y-1">
+        <li>aplikacja własna (single-tenant) — nie udostępniana podmiotom trzecim</li>
+        <li>brak publicznego API, brak rejestracji użytkowników zewnętrznych</li>
+        <li>komunikacja inicjowana wyłącznie przez backend sklepu (Node.js, Fastify)</li>
+        <li>częstotliwość żądań ograniczona do harmonogramu synchronizacji i ręcznych akcji administratora</li>
+      </ul>
+    </section>
+
+    <section class="mb-8">
+      <h2 class="text-xl font-semibold mb-2">Kontakt dla administratorów Allegro</h2>
+      <ul class="list-disc pl-6 space-y-1">
+        <li>e-mail: <a href="mailto:stojan@silniki-elektryczne.com.pl" class="text-blue-700 underline">stojan@silniki-elektryczne.com.pl</a></li>
+        <li>telefon: <a href="tel:+48500385112" class="text-blue-700 underline">+48 500 385 112</a></li>
+      </ul>
+    </section>
+  </main>
+</BaseLayout>

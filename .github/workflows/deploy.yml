@@ -3,9 +3,76 @@ name: Deploy Stojan
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why are we rebuilding? (logged in run summary)"
+        required: false
+        default: "manual rebuild"
+      force_full:
+        description: "Force full rebuild (skip conditional logic) — use after Node/dep upgrades"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      deps: ${{ steps.filter.outputs.deps }}
+      prisma: ${{ steps.filter.outputs.prisma }}
+      force_full: ${{ github.event.inputs.force_full || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Determine changed paths
+        id: filter
+        run: |
+          BEFORE="${{ github.event.before }}"
+          # First push to a branch (or workflow_dispatch) — assume full rebuild
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "No comparable previous commit — assuming full rebuild"
+            echo "backend=true"  >> "$GITHUB_OUTPUT"
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+            echo "deps=true"     >> "$GITHUB_OUTPUT"
+            echo "prisma=true"   >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          DIFF=$(git diff --name-only "$BEFORE" "${{ github.sha }}")
+          echo "Changed files:"
+          echo "$DIFF" | sed 's/^/  /'
+          echo ""
+
+          # Root package-lock.json covers both workspaces (npm workspaces) — single deps flag.
+          DEPS=$(echo     "$DIFF" | grep -E '^(package\.json|package-lock\.json|backend/package\.json|frontend/package\.json)$' || true)
+          PRISMA=$(echo   "$DIFF" | grep -E '^backend/prisma/'  || true)
+          BACKEND=$(echo  "$DIFF" | grep -E '^backend/'         || true)
+          FRONTEND=$(echo "$DIFF" | grep -E '^frontend/'        || true)
+
+          [ -n "$BACKEND"  ] && echo "backend=true"  >> "$GITHUB_OUTPUT" || echo "backend=false"  >> "$GITHUB_OUTPUT"
+          [ -n "$FRONTEND" ] && echo "frontend=true" >> "$GITHUB_OUTPUT" || echo "frontend=false" >> "$GITHUB_OUTPUT"
+          [ -n "$DEPS"     ] && echo "deps=true"     >> "$GITHUB_OUTPUT" || echo "deps=false"     >> "$GITHUB_OUTPUT"
+          [ -n "$PRISMA"   ] && echo "prisma=true"   >> "$GITHUB_OUTPUT" || echo "prisma=false"   >> "$GITHUB_OUTPUT"
+
+          echo ""
+          echo "Summary:"
+          echo "  backend:  $([ -n "$BACKEND"  ] && echo yes || echo no)"
+          echo "  frontend: $([ -n "$FRONTEND" ] && echo yes || echo no)"
+          echo "  deps:     $([ -n "$DEPS"     ] && echo yes || echo no)"
+          echo "  prisma:   $([ -n "$PRISMA"   ] && echo yes || echo no)"
+
   deploy:
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.backend == 'true' ||
+      needs.detect-changes.outputs.frontend == 'true' ||
+      needs.detect-changes.outputs.force_full == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Get runner IP
@@ -18,6 +85,16 @@ jobs:
           fi
           echo "ipv4=$PUBLIC_IP" >> "$GITHUB_OUTPUT"
           echo "Runner IP: $PUBLIC_IP"
+
+      - name: Print plan
+        run: |
+          echo "=== Deploy plan (commit ${{ github.sha }}) ==="
+          echo "  reason:         ${{ github.event.inputs.reason || 'push to main' }}"
+          echo "  build backend:  ${{ needs.detect-changes.outputs.backend }}"
+          echo "  build frontend: ${{ needs.detect-changes.outputs.frontend }}"
+          echo "  deps:           ${{ needs.detect-changes.outputs.deps }}"
+          echo "  prisma schema:  ${{ needs.detect-changes.outputs.prisma }}"
+          echo "  force full:     ${{ needs.detect-changes.outputs.force_full }}"
 
       - name: Open SSH
         run: |
@@ -32,54 +109,168 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
+        env:
+          BUILD_BACKEND: ${{ needs.detect-changes.outputs.backend }}
+          BUILD_FRONTEND: ${{ needs.detect-changes.outputs.frontend }}
+          DEPS: ${{ needs.detect-changes.outputs.deps }}
+          PRISMA: ${{ needs.detect-changes.outputs.prisma }}
+          FORCE_FULL: ${{ needs.detect-changes.outputs.force_full }}
         with:
           host: ${{ secrets.STOJAN_HOST }}
           username: ec2-user
           key: ${{ secrets.STOJAN_SSH_KEY }}
-          command_timeout: 300s
+          # 900s — npm ci (workspaces: backend + frontend + Astro/React/Prisma) + astro build
+          # can be 4-7 min on t3.small. Was 300s with full reinstall, often timing out.
+          command_timeout: 900s
+          envs: BUILD_BACKEND,BUILD_FRONTEND,DEPS,PRISMA,FORCE_FULL
           script: |
+            # ── Source nvm BEFORE strict mode (nvm.sh has unbound-var refs internally) ──
             export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
-            echo "=== Using node: $(which node) ($(node --version)) ==="
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            nvm use --lts >/dev/null 2>&1 || nvm use default >/dev/null 2>&1 || true
+            echo "Using node: $(which node) ($(node --version))"
+
+            set -u
+
+            STAGE_LOG=/tmp/stojan-deploy-stages.log
+            : > "$STAGE_LOG"
+            log_stage() { echo "[$(date '+%H:%M:%S')] === $* ===" | tee -a "$STAGE_LOG"; }
+            fail_stage() { echo "[$(date '+%H:%M:%S')] !!! FAILED: $* !!!" | tee -a "$STAGE_LOG"; exit 1; }
+
+            if [ "$FORCE_FULL" = "true" ]; then
+              echo "FORCE_FULL=true — overriding detection, rebuilding everything"
+              BUILD_BACKEND=true; BUILD_FRONTEND=true
+              DEPS=true; PRISMA=true
+            fi
 
             cd /home/ec2-user/stojan-shop-new
 
-            echo "=== Git pull ==="
-            git fetch origin main
-            git reset --hard origin/main
+            log_stage "Git pull"
+            git fetch origin main && git reset --hard origin/main || fail_stage "git pull"
 
-            echo "=== Install all dependencies ==="
-            rm -rf node_modules backend/node_modules frontend/node_modules package-lock.json
-            npm install
+            # ─── Dependencies (npm workspaces — install at root) ──────
+            # Single root package-lock.json hoists deps for backend + frontend.
+            # `npm ci` is 3-5× faster than `rm -rf node_modules && npm install`
+            # and deterministic (errors out on lock drift instead of silently updating).
+            if [ "$DEPS" = "true" ] || [ ! -d node_modules ] || [ ! -d backend/node_modules ] || [ ! -d frontend/node_modules ]; then
+              log_stage "Install deps (npm ci, workspaces)"
+              npm ci --include=dev || fail_stage "npm ci"
+            else
+              echo "deps unchanged — skip npm ci"
+            fi
 
-            echo "=== Backend build ==="
-            cd /home/ec2-user/stojan-shop-new/backend
-            npx prisma migrate deploy
-            npx prisma db push
-            npx prisma generate
-            npm run build || { echo "TSC BUILD FAILED"; exit 1; }
+            # ─── Backend (Fastify + Prisma on :4000) ──────────────────
+            if [ "$BUILD_BACKEND" = "true" ]; then
+              log_stage "Backend: prisma + build"
+              cd backend
 
-            echo "=== Frontend build ==="
-            cd ../frontend
-            npm run build
+              # Prisma generate always (cheap, idempotent) — required after any backend change
+              # because tsc compiles against generated client types.
+              npx prisma generate || fail_stage "prisma generate"
 
-            echo "=== Restart PM2 ==="
-            cd /home/ec2-user/stojan-shop-new/backend
-            pm2 delete stojan-backend || true
-            pm2 start ecosystem.config.cjs
+              # Prisma db push only if schema actually changed (destructive on prod).
+              if [ "$PRISMA" = "true" ]; then
+                log_stage "Backend: prisma db push (schema changed)"
+                npx prisma db push || fail_stage "prisma db push"
+              else
+                echo "schema unchanged — skip prisma db push"
+              fi
 
-            cd /home/ec2-user/stojan-shop-new/frontend
-            pm2 delete stojan-frontend || true
-            pm2 start ecosystem.config.cjs
+              npm run build || fail_stage "backend build (tsc)"
+              [ -f dist/index.js ] || fail_stage "backend build produced no dist/index.js"
 
-            pm2 save
+              log_stage "Backend: pm2 reload stojan-backend"
+              # reload = graceful (fork mode: stop + start fast, ~1-2s); restart fallback if reload races.
+              # Start with ecosystem if app doesn't exist yet (first deploy after server reboot).
+              pm2 reload stojan-backend --update-env 2>/dev/null \
+                || pm2 restart stojan-backend 2>/dev/null \
+                || pm2 start ecosystem.config.cjs \
+                || fail_stage "pm2 backend"
+              pm2 save >/dev/null
+              sleep 2
+              cd ..
+            else
+              log_stage "Backend: unchanged — skip"
+            fi
 
-            sleep 3
-            echo "=== Status ==="
+            # ─── Frontend (Astro SSR via Node adapter on :4321) ───────
+            if [ "$BUILD_FRONTEND" = "true" ]; then
+              log_stage "Frontend: build"
+              cd frontend
+
+              # Astro overwrites dist/ in place. If build fails, old dist/server/entry.mjs
+              # stays — PM2 keeps serving the previous build. So we gate reload on success.
+              npm run build || fail_stage "frontend build (astro)"
+              [ -f dist/server/entry.mjs ] || fail_stage "frontend build produced no dist/server/entry.mjs"
+
+              log_stage "Frontend: pm2 reload stojan-frontend"
+              pm2 reload stojan-frontend --update-env 2>/dev/null \
+                || pm2 restart stojan-frontend 2>/dev/null \
+                || pm2 start ecosystem.config.cjs \
+                || fail_stage "pm2 frontend"
+              pm2 save >/dev/null
+              sleep 3
+              cd ..
+            else
+              log_stage "Frontend: unchanged — skip"
+            fi
+
+            # ─── Health checks ────────────────────────────────────────
+            log_stage "Health checks"
+
+            if [ "$BUILD_BACKEND" = "true" ]; then
+              BACKEND_OK=0
+              for i in $(seq 1 15); do
+                if curl -fsS --max-time 3 http://localhost:4000/api/health > /tmp/backend-health.out 2>&1; then
+                  echo "Backend health OK on attempt $i: $(cat /tmp/backend-health.out)"
+                  BACKEND_OK=1
+                  break
+                fi
+                echo "Backend attempt $i: not ready, retry in 2s..."
+                sleep 2
+              done
+              [ "$BACKEND_OK" = "1" ] || fail_stage "backend health check"
+            fi
+
+            if [ "$BUILD_FRONTEND" = "true" ]; then
+              FRONTEND_OK=0
+              for i in $(seq 1 15); do
+                # Astro SSR on :4321 — fetch home, expect brand string in HTML
+                if curl -fsS --max-time 5 http://localhost:4321/ | grep -qi "stojan\|silniki-elektryczne"; then
+                  echo "Frontend SSR OK on attempt $i (brand string present)"
+                  FRONTEND_OK=1
+                  break
+                fi
+                echo "Frontend attempt $i: not ready, retry in 2s..."
+                sleep 2
+              done
+              [ "$FRONTEND_OK" = "1" ] || fail_stage "frontend health check"
+
+              # ─── robots.txt sanity (regression guard) ──
+              ROBOTS_LINE=$(curl -fsS https://www.silniki-elektryczne.com.pl/robots.txt | head -1 | tr -d '\r')
+              if [ "$ROBOTS_LINE" != "User-agent: *" ]; then
+                echo "WARN: robots.txt first line is '$ROBOTS_LINE' (expected 'User-agent: *')"
+                fail_stage "robots.txt regression"
+              fi
+              echo "robots.txt first line OK: $ROBOTS_LINE"
+
+              # ─── sitemap index sanity ──
+              SITEMAP_CODE=$(curl -sI -o /dev/null -w "%{http_code}" https://www.silniki-elektryczne.com.pl/sitemap_index.xml)
+              if [ "$SITEMAP_CODE" != "200" ]; then
+                echo "WARN: sitemap_index.xml returned $SITEMAP_CODE (expected 200)"
+                fail_stage "sitemap regression"
+              fi
+              echo "sitemap_index.xml OK: $SITEMAP_CODE"
+            fi
+
+            log_stage "Deploy summary"
+            cat "$STAGE_LOG"
             pm2 list
-            pm2 logs stojan-backend --lines 5 --nostream
+
       - name: Notify Google Indexing
-        if: success()
+        # Only ping the indexing lambda if anything indexable on the site actually changed.
+        # Backend-only changes (API logic, schema) don't need re-indexing.
+        if: success() && needs.detect-changes.outputs.frontend == 'true'
         run: |
           aws lambda invoke --function-name google-indexing-notifier \
             --payload '{"siteUrl":"https://www.silniki-elektryczne.com.pl","sitemapPath":"/sitemap_index.xml"}' \
@@ -91,6 +282,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: eu-central-1
+
       - name: Close SSH
         if: always()
         run: |

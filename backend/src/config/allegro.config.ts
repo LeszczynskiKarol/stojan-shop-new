@@ -1,5 +1,11 @@
 // backend/src/config/allegro.config.ts
 
+// User-Agent zgodny z art. 3.4.c Regulaminu REST API Allegro (wymóg od 2026-06-30).
+// Pierwszy człon musi być DOKŁADNIE spójny z nazwą zarejestrowanej aplikacji
+// w Allegro Developer Portal: "Stojan silniki" (ze spacją).
+export const ALLEGRO_USER_AGENT =
+  "Stojan silniki/2.0.0 (+https://www.silniki-elektryczne.com.pl/allegro-app-info)";
+
 export const allegroConfig = {
   clientId: process.env.ALLEGRO_CLIENT_ID || "",
   clientSecret: process.env.ALLEGRO_CLIENT_SECRET || "",
@@ -7,6 +13,7 @@ export const allegroConfig = {
   apiUrl: "https://api.allegro.pl",
   authUrl: "https://allegro.pl/auth/oauth",
   redirectUri: process.env.ALLEGRO_REDIRECT_URI || "",
+  userAgent: ALLEGRO_USER_AGENT,
 } as const;
 
 // Kategorie Allegro dla silników
