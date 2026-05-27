@@ -26,8 +26,10 @@ export default defineConfig({
   ],
 
   // Prerender statyczne strony
+  // hover (nie viewport!) — footer ma 80+ linków, viewport-prefetch zalewałby sieć
+  // przy każdym scrollu do stopki i blokował wątek główny.
   prefetch: {
-    defaultStrategy: "viewport",
+    defaultStrategy: "hover",
   },
 
   vite: {

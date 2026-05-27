@@ -1,5 +1,7 @@
 ---
 // frontend/src/components/shop/ProductCard.astro
+import { s3Webp600, s3Srcset } from '@/lib/img';
+
 interface Props {
   product: any;
 }
@@ -73,10 +75,13 @@ const cc = COND_COLORS[product.condition] || COND_COLORS.nowy;
   <div class="aspect-square overflow-hidden bg-accent relative">
     {image ? (
       <img
-        src={image}
+        src={s3Webp600(image) || image}
+        srcset={s3Srcset(image) || undefined}
+        sizes="(min-width:1024px) 25vw, (min-width:768px) 33vw, 50vw"
         alt={product.name}
         class="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
         loading="lazy"
+        decoding="async"
         width="300"
         height="300"
         itemprop="image"

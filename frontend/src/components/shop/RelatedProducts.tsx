@@ -1,6 +1,7 @@
 // frontend/src/components/shop/RelatedProducts.tsx
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
+import { s3Webp600, s3Srcset } from "@/lib/img";
 
 interface Product {
   id: string;
@@ -186,9 +187,12 @@ export default function RelatedProducts({ products }: { products: Product[] }) {
               >
                 {img ? (
                   <img
-                    src={img}
+                    src={s3Webp600(img) || img}
+                    srcSet={s3Srcset(img) || undefined}
+                    sizes="(min-width:1024px) 25vw, (min-width:768px) 33vw, 50vw"
                     alt={p.name}
                     loading="lazy"
+                    decoding="async"
                     width={300}
                     height={300}
                     style={{

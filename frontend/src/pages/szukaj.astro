@@ -45,7 +45,7 @@ const description = query
 
     {query && inStockCount > 0 ? (
       <CategoryProducts
-        client:load
+        client:idle
         showCategoryFilter={true}
         products={products.map((p: any) => ({
           id: p.id,

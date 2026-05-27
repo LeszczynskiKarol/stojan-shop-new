@@ -4,6 +4,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import ProductCard from '@/components/shop/ProductCard.astro';
 import { GlobalSearch } from '@/components/search/GlobalSearch';
 import { getPopularProducts, getLatestProducts, getCategories, getProducts } from '@/lib/api';
+import { s3Webp600, s3Srcset } from '@/lib/img';
 
 const [popular, latest, categories] = await Promise.all([
   getPopularProducts(8),
@@ -252,7 +253,7 @@ function stripHtml(html: string | null | undefined): string {
       <!-- Search with high z-index so dropdown shows above everything -->
       <div class="relative z-40">
 
-        <GlobalSearch client:load variant="hero" />
+        <GlobalSearch client:idle variant="hero" />
       </div>
 
       <!-- Quick category pills -->
@@ -321,10 +322,13 @@ function stripHtml(html: string | null | undefined): string {
           {accessoryImages.slice(0, 6).map((img, i) => (
             <div class="bg-card overflow-hidden flex items-center justify-center">
               <img
-                src={img}
+                src={s3Webp600(img) || img}
+                srcset={s3Srcset(img) || undefined}
+                sizes="(min-width:1024px) 8vw, (min-width:768px) 11vw, 16vw"
                 alt={`${cat.name} ${i + 1}`}
                 class="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform duration-300"
                 loading="lazy"
+                decoding="async"
                 width="133"
                 height="125"
               />
@@ -333,12 +337,16 @@ function stripHtml(html: string | null | undefined): string {
         </div>
       ) : cat.coverImage ? (
         <img
-          src={cat.coverImage}
+          src={s3Webp600(cat.coverImage) || cat.coverImage}
+          srcset={s3Srcset(cat.coverImage) || undefined}
+          sizes="(min-width:1024px) 25vw, (min-width:768px) 33vw, 50vw"
           alt={cat.name}
           class="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
           loading={idx < 4 ? "eager" : "lazy"}
+          decoding="async"
           width="400"
           height="250"
+          fetchpriority={idx < 2 ? "high" : undefined}
         />
       ) : (
         <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5">

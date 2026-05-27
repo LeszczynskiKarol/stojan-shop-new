@@ -2,6 +2,10 @@
 // Wewnętrzna analityka — lightweight tracker
 // v2 — FIX: session attribution across Stripe redirect, dedup order events
 
+const DEBUG = import.meta.env.DEV;
+const log = DEBUG ? console.log.bind(console) : () => {};
+const warn = DEBUG ? console.warn.bind(console) : () => {};
+
 const API_URL =
   (typeof window !== "undefined" && (window as any).__PUBLIC_API_URL) ||
   (typeof window !== "undefined" && (window as any).__API_URL) ||
@@ -53,7 +57,7 @@ function getVisitorId(): string {
     try {
       sessionStorage.setItem(VISITOR_SESSION_KEY, id);
     } catch {}
-    console.log(
+    log(
       "[TRACKER] New visitorId generated:",
       id.substring(0, 8) + "...",
     );
@@ -63,10 +67,13 @@ function getVisitorId(): string {
   }
 }
 
-/** Check if user is admin (has admin cookie — skips tracking server-side too) */
+/** Check if user is admin (synced from /verify into localStorage on shop domain).
+ *  We can't use document.cookie because:
+ *    - admin_token jest httpOnly (niewidoczne dla JS)
+ *    - admin_session siedzi na api.torweb.pl (cross-domain, niewidoczne na sklepie) */
 function isAdmin(): boolean {
   try {
-    return document.cookie.includes("admin_token=");
+    return localStorage.getItem("admin_logged_in") === "1";
   } catch {
     return false;
   }
@@ -173,7 +180,7 @@ function send(
   if (includeSessionMeta) payload.sessionMeta = getSessionMeta();
 
   // ── DIAGNOSTIC LOG ──
-  console.log(
+  log(
     `[TRACKER] send: type=${type}, page=${page}, vid=${payload.visitorId.substring(0, 8)}..., hasMeta=${includeSessionMeta}`,
     data || "",
   );
@@ -231,7 +238,7 @@ export const tracker = {
     initialized = true;
 
     const vid = getVisitorId();
-    console.log(
+    log(
       `[TRACKER] init: path=${window.location.pathname}, vid=${vid.substring(0, 8)}..., isPaymentReturn=${isPaymentReturn()}`,
     );
 
@@ -240,7 +247,7 @@ export const tracker = {
     // instead of creating a new "direct" session.
     // Order tracking is handled ONLY by CheckoutSuccess component.
     if (isPaymentReturn()) {
-      console.log(
+      log(
         "[TRACKER] Payment return detected — sending page_view WITHOUT sessionMeta (reuse existing session)",
       );
       send("page_view", window.location.pathname + window.location.search);
@@ -328,12 +335,12 @@ export const tracker = {
       sessionStorage.setItem(CHECKOUT_CONTEXT_KEY, JSON.stringify(ctx));
       // Also ensure visitorId is in sessionStorage
       sessionStorage.setItem(VISITOR_SESSION_KEY, ctx.visitorId);
-      console.log(
+      log(
         "[TRACKER] Checkout context saved before payment redirect:",
         ctx.visitorId.substring(0, 8) + "...",
       );
     } catch (e) {
-      console.warn("[TRACKER] Failed to save checkout context:", e);
+      warn("[TRACKER] Failed to save checkout context:", e);
     }
   },
 
@@ -401,13 +408,13 @@ export const tracker = {
     itemCount: number;
   }): void {
     if (this.wasOrderTracked(data.orderId)) {
-      console.log(
+      log(
         "[TRACKER] orderComplete SKIPPED — already tracked:",
         data.orderId,
       );
       return;
     }
-    console.log(
+    log(
       "[TRACKER] orderComplete FIRING:",
       data.orderId,
       "value:",

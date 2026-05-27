@@ -7,6 +7,20 @@ import CartDropdown from '@/components/shop/CartDropdown';
 import CookieConsent from '@/components/CookieConsent';
 import { getPopularProducts } from '@/lib/api';
 
+// Module-level cache dla footera — popular products są wołane na KAŻDEJ stronie SSR.
+// 5-minutowy TTL: dane nie zmieniają się często, a wycina ~30-100ms TTFB per request.
+let _footerPopularCache: { t: number; data: any[] | null } = { t: 0, data: null };
+const FOOTER_CACHE_TTL_MS = 5 * 60 * 1000;
+async function getFooterPopular(): Promise<any[] | null> {
+  const now = Date.now();
+  if (_footerPopularCache.data && now - _footerPopularCache.t < FOOTER_CACHE_TTL_MS) {
+    return _footerPopularCache.data;
+  }
+  const data = await getPopularProducts(30);
+  _footerPopularCache = { t: now, data: data || null };
+  return data;
+}
+
 interface Props {
   title: string;
   description: string;
@@ -119,7 +133,7 @@ const currentYear = new Date().getFullYear();
 // z ruchem (audyt: 129 orphans z clicks≥1 lub impr≥5).
 let footerPicks: Array<{ name: string; href: string; manufacturer: string | null; power: string | null }> = [];
 try {
-  const popular = await getPopularProducts(30);
+  const popular = await getFooterPopular();
   if (popular && popular.length > 0) {
     const shuffled = [...popular]
       .filter((p: any) => p.stock > 0 && p.marketplaces?.ownStore?.slug)
@@ -151,13 +165,18 @@ try {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- wyłączenie zbierania danych dla admina w google analytics -->
+  <!-- wyłączenie zbierania danych dla admina w google analytics
+       Source of truth: localStorage('admin_logged_in') na domenie sklepu.
+       Cookie 'admin_session' jest na api.torweb.pl (cross-domain) i niewidoczne stąd. -->
 <script is:inline>
   (function() {
-    if (document.cookie.includes('admin_session=1')) {
-      window['ga-disable-G-VPV7V6L3KW'] = true;
-      window['ga-disable-AW-988030143'] = true;
-    }
+    try {
+      if (localStorage.getItem('admin_logged_in') === '1') {
+        window['ga-disable-G-VPV7V6L3KW'] = true;
+        window['ga-disable-AW-988030143'] = true;
+        window.__IS_ADMIN = true;
+      }
+    } catch (e) {}
   })();
 </script>
   
@@ -199,23 +218,34 @@ try {
     } catch(e) {}
   </script>
 
-  <!-- 2. Load gtag.js (respects consent mode — no cookies until granted) -->
-  <script is:inline async src="https://www.googletagmanager.com/gtag/js?id=G-VPV7V6L3KW"></script>
+  <!-- 2. Load gtag.js LAZY (idle/interaction) — gtag.js to 176 KB blocking script.
+       Consent defaults już są wyżej, dataLayer kolejkuje config-y do czasu załadowania. -->
   <script is:inline>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    
-    // GA4
-    gtag('config', 'G-VPV7V6L3KW', {
-      send_page_view: true,
-      cookie_flags: 'SameSite=Lax;Secure'
-    });
-    
-    // Google Ads (for conversion tracking + remarketing)
-    gtag('config', 'AW-988030143', {
-      cookie_flags: 'SameSite=Lax;Secure'
-    });
+    (function() {
+      var loaded = false;
+      function loadGtag() {
+        if (loaded) return;
+        loaded = true;
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=G-VPV7V6L3KW';
+        document.head.appendChild(s);
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-VPV7V6L3KW', { send_page_view: true, cookie_flags: 'SameSite=Lax;Secure' });
+        gtag('config', 'AW-988030143', { cookie_flags: 'SameSite=Lax;Secure' });
+      }
+      // 1) idle callback (max 3s timeout)
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(loadGtag, { timeout: 3000 });
+      } else {
+        setTimeout(loadGtag, 1500);
+      }
+      // 2) safety net: pierwsza interakcja użytkownika
+      ['scroll','mousemove','touchstart','keydown'].forEach(function(ev) {
+        window.addEventListener(ev, loadGtag, { once: true, passive: true });
+      });
+    })();
   </script>
   <!-- ═══ END CONSENT + GOOGLE TAGS ═══ -->
 
@@ -317,7 +347,7 @@ try {
           <svg class="w-5 h-5 dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>
 
-        <CartDropdown client:load />
+        <CartDropdown client:idle />
 
         <!-- Mobile hamburger -->
         <button id="mobile-menu-toggle" class="lg:hidden p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground" aria-label="Menu" aria-expanded="false">
@@ -330,7 +360,7 @@ try {
     <!-- Mobile menu panel -->
     <div id="mobile-menu" class="hidden lg:hidden border-t border-border bg-background">
       <div class="px-4 py-3 border-b border-border md:hidden">
-        <GlobalSearch client:load variant="header" />
+        <GlobalSearch client:visible variant="header" />
       </div>
       <nav class="px-4 py-3 flex flex-col gap-1" aria-label="Menu mobilne">
         <a href="/trojfazowe" class="py-2.5 px-3 rounded-lg text-sm font-medium text-foreground hover:bg-accent transition-colors">Silniki trójfazowe</a>
@@ -537,15 +567,18 @@ try {
       });
     })();
 
-    // Show admin link if logged in as admin
+    // Show admin link if logged in as admin + sync localStorage flag for GA disable
     (function() {
       var apiUrl = window.__PUBLIC_API_URL || window.__API_URL || '';
       fetch(apiUrl + '/api/admin/auth/verify', { credentials: 'include' })
         .then(function(r) { return r.json(); })
         .then(function(d) {
           if (d.success) {
+            try { localStorage.setItem('admin_logged_in', '1'); } catch (e) {}
             var el = document.getElementById('admin-link');
             if (el) el.classList.remove('hidden');
+          } else {
+            try { localStorage.removeItem('admin_logged_in'); } catch (e) {}
           }
         })
         .catch(function() {});
@@ -553,7 +586,7 @@ try {
   </script>
   
   <script> import { tracker } from '@/lib/tracker'; tracker.init(); </script>
-    <CookieConsent client:load />
+    <CookieConsent client:idle />
 
 </body>
 </html>

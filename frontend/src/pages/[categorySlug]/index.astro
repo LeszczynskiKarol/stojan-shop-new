@@ -482,7 +482,7 @@ function mapProductForFilter(p: any) {
         </p>
       ) : category?.description ? (
         <div class="max-w-3xl mb-4">
-          <ExpandableDescription client:load html={category.description} maxHeight={80} />
+          <ExpandableDescription client:visible html={category.description} maxHeight={80} />
         </div>
       ) : (
         <p class="text-sm text-muted-foreground mb-6">{category?.name} dostępne w sklepie Stojan. Szeroki wybór w atrakcyjnych cenach.</p>
@@ -510,7 +510,7 @@ function mapProductForFilter(p: any) {
           )}
 
           <CategoryProducts
-            client:load
+            client:idle
             products={categoryProducts.map(mapProductForFilter)}
             categoryName={category?.name || ''}
           />
@@ -558,7 +558,7 @@ function mapProductForFilter(p: any) {
         </>
       ) : powerProducts.length > 0 ? (
         <CategoryProducts
-          client:load
+          client:idle
           showCategoryFilter={true}
           products={powerProducts.map(mapProductForFilter)}
           categoryName={`Silniki ${powerFormatted} kW${rpmStr ? ` ${rpmStr} obr/min` : ''}`}

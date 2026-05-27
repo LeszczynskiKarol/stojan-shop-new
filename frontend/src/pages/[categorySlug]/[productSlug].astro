@@ -6,6 +6,7 @@ import BackToList from '@/components/shop/BackToList';
 import RelatedProducts from '@/components/shop/RelatedProducts';
 import { getProduct } from '@/lib/api';
 import { ShippingHint } from '@/components/shop/ShippingHint';
+import { s3Webp, s3Webp600, s3Webp1200, s3Srcset } from '@/lib/img';
 
 const { categorySlug, productSlug } = Astro.params;
 const data = await getProduct(categorySlug!, productSlug!);
@@ -182,7 +183,7 @@ const productFaqLd = {
     </nav>
 
     <!-- BACK TO LIST — reads saved filter URL from sessionStorage -->
-    <BackToList client:load categorySlug={categorySlug!} categoryName={categoryName} />
+    <BackToList client:idle categorySlug={categorySlug!} categoryName={categoryName} />
 
     <!-- MAIN GRID -->
     <div class="grid lg:grid-cols-2 gap-8 lg:gap-12 mb-12">
@@ -190,14 +191,24 @@ const productFaqLd = {
       <!-- LEFT: GALLERY -->
       <div class="lg:sticky lg:top-20 lg:self-start">
         <div id="mainImgWrap" class="bg-card rounded-xl border border-border overflow-hidden cursor-zoom-in relative group">
-          <img id="mainImg" src={mainImage} alt={displayName} class="w-full object-contain aspect-square p-4" width="600" height="600" loading="eager" />
+          <img id="mainImg"
+               src={s3Webp1200(mainImage) || mainImage}
+               srcset={s3Srcset(mainImage) || undefined}
+               sizes="(min-width:1024px) 600px, 100vw"
+               data-fullsrc={s3Webp(mainImage) || mainImage}
+               alt={displayName}
+               class="w-full object-contain aspect-square p-4"
+               width="600" height="600"
+               loading="eager"
+               decoding="async"
+               fetchpriority="high" />
         </div>
         {allImages.length > 1 && (
           <div class="flex gap-2 mt-3 overflow-x-auto pb-1" id="thumbs">
             {allImages.map((img: string, i: number) => (
-              <button class:list={['shrink-0 w-16 h-16 rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:border-primary/50', i === 0 ? 'border-primary ring-1 ring-primary/20' : 'border-border']} data-img={img} data-idx={i}>
+              <button class:list={['shrink-0 w-16 h-16 rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:border-primary/50', i === 0 ? 'border-primary ring-1 ring-primary/20' : 'border-border']} data-img={s3Webp1200(img) || img} data-full={s3Webp(img) || img} data-srcset={s3Srcset(img)} data-idx={i}>
                 {/* SEO: descriptive alt for gallery thumbnails — helps Google Images indexing */}
-                <img src={img} alt={`${displayName} - zdjęcie ${i + 1}`} class="w-full h-full object-contain p-1" loading="lazy" />
+                <img src={s3Webp600(img) || img} alt={`${displayName} - zdjęcie ${i + 1}`} class="w-full h-full object-contain p-1" loading="lazy" decoding="async" width="64" height="64" />
               </button>
             ))}
           </div>
@@ -231,7 +242,7 @@ const productFaqLd = {
           </div>
           <div class="text-sm text-muted-foreground">{fmtPrice(Number(priceNetto))} zł netto</div>
           <div class="mt-2">
-  <ShippingHint client:load productId={product.id} weight={product.weight} />
+  <ShippingHint client:idle productId={product.id} weight={product.weight} />
 </div>          
 {product.stock > 0 && (
             <div class="mt-5 pt-5 border-t border-border">
@@ -308,7 +319,7 @@ const productFaqLd = {
 
 <!-- RELATED -->
     {related.length > 0 && (
-      <RelatedProducts client:load products={related} />
+      <RelatedProducts client:visible products={related} />
     )}
   </div>
 
@@ -345,12 +356,24 @@ const productFaqLd = {
           thumbs.forEach(t => { t.classList.remove('border-primary', 'ring-1', 'ring-primary/20'); t.classList.add('border-border'); });
           thumb.classList.remove('border-border');
           thumb.classList.add('border-primary', 'ring-1', 'ring-primary/20');
-          if (mainImg) mainImg.src = (thumb as HTMLElement).dataset.img || '';
+          if (mainImg) {
+            const t = thumb as HTMLElement;
+            mainImg.src = t.dataset.img || '';
+            // Sync srcset/fullsrc for newly-selected image
+            const ss = t.dataset.srcset;
+            if (ss) mainImg.srcset = ss; else mainImg.removeAttribute('srcset');
+            mainImg.dataset.fullsrc = t.dataset.full || t.dataset.img || '';
+          }
         });
       });
 
       document.getElementById('mainImgWrap')?.addEventListener('click', () => {
-        if (mainImg && modal && modalImg) { modalImg.src = mainImg.src; modal.classList.remove('hidden'); modal.classList.add('flex'); }
+        if (mainImg && modal && modalImg) {
+          // Use full-resolution webp for fullscreen zoom (not the 1200w variant displayed)
+          modalImg.src = mainImg.dataset.fullsrc || mainImg.src;
+          modal.classList.remove('hidden');
+          modal.classList.add('flex');
+        }
       });
 
       const closeModal = () => { modal?.classList.add('hidden'); modal?.classList.remove('flex'); };

@@ -115,7 +115,7 @@ function mapProduct(p: any) {
 
     {inStockCount > 0 ? (
       <CategoryProducts
-        client:load
+        client:idle
         showCategoryFilter={true}
         products={products.map(mapProduct)}
         categoryName={mfrName}

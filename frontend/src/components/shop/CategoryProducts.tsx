@@ -3,6 +3,7 @@
 // Stores full URL in sessionStorage before navigation so product page can link back
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { s3Webp600, s3Srcset } from "@/lib/img";
 import {
   SlidersHorizontal,
   X,
@@ -1278,10 +1279,13 @@ function Card({ product, url }: { product: Product; url: string }) {
       <div className="cp-card-iw">
         {img ? (
           <img
-            src={img}
+            src={s3Webp600(img) || img}
+            srcSet={s3Srcset(img) || undefined}
+            sizes="(min-width:1024px) 25vw, (min-width:768px) 33vw, 50vw"
             alt={product.name}
             className="cp-card-im"
             loading="lazy"
+            decoding="async"
             width={300}
             height={300}
             itemProp="image"
