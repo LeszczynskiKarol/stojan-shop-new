@@ -165,6 +165,20 @@ try {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Inter font: preconnect równolegle, stylesheet bez blokowania render-path.
+       Wcześniej był @import w globals.css → wolny font + CLS przy swapie metryk. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="preload"
+    as="style"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    onload="this.onload=null;this.rel='stylesheet'"
+  />
+  <noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  </noscript>
   <!-- wyłączenie zbierania danych dla admina w google analytics
        Source of truth: localStorage('admin_logged_in') na domenie sklepu.
        Cookie 'admin_session' jest na api.torweb.pl (cross-domain) i niewidoczne stąd. -->
