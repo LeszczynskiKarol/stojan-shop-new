@@ -247,6 +247,7 @@
         const data = await res.json();
 
         if (data.success) {
+          try { localStorage.setItem('admin_logged_in', '1'); } catch {}
           window.location.href = '/admin/products';
           return;
         }

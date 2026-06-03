@@ -730,6 +730,7 @@ const { title = 'Admin Panel' } = Astro.props;
     // LOGOUT
     // ============================
     async function doLogout() {
+      try { localStorage.removeItem('admin_logged_in'); } catch {}
       try { await fetch(`${API_URL}/api/admin/auth/logout`, { method:'POST', credentials:'include' }); } catch {}
       window.location.href = '/admin/login';
     }
