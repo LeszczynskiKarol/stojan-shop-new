@@ -167,7 +167,7 @@ const FILTER_PARAMS = ['q', 'cat', 'mfr', 'cond', 'kw', 'kwmin', 'kwmax', 'rpm',
 const urlSearchParams = Astro.url.searchParams;
 const hasFilterParams = FILTER_PARAMS.some(param => urlSearchParams.has(param));
 
-const PER_PAGE = 24;
+const PER_PAGE = 30; // MUSI równać się PER_PAGE w CategoryProducts.tsx (crawlowalne ?page=N = strony wyspy)
 const currentPage = Math.max(1, parseInt(urlSearchParams.get('page') || '1') || 1);
 let totalProducts = 0;
 let totalPages = 1;
@@ -192,10 +192,12 @@ if (!isPowerPage && !matchedCity) {
   } else {
     category = cat;
     categoryProducts = productsData?.products || [];
-    totalProducts = productsData?.pagination?.total || categoryProducts.length;
-    totalPages = productsData?.pagination?.pages || 1;
-    // SEO: ?page=N poza zakresem → 404 (z limit=2000 mamy 1 stronę dla <2000 produktów,
-    // więc każde ?page=2+ jest out-of-range — zapobiega indeksowaniu pustych stron).
+    // Paginacja liczona z produktów DOSTĘPNYCH (wyspa renderuje tylko in-stock),
+    // żeby crawlowalne ?page=N pokrywały się 1:1 ze stronami React. PER_PAGE=30.
+    const inStockTotal = categoryProducts.filter((p: any) => p.stock > 0).length;
+    totalProducts = inStockTotal;
+    totalPages = Math.max(1, Math.ceil(inStockTotal / PER_PAGE));
+    // SEO: ?page=N poza zakresem → 404 (zapobiega indeksowaniu pustych stron).
     if (currentPage > 1 && currentPage > totalPages) {
       return Astro.rewrite('/404');
     }
@@ -212,7 +214,11 @@ function slugifyMfr(name: string): string {
     .toLowerCase()
     .replace(/[ąćęłńóśźż]/g, (c) => ({ ą:'a',ć:'c',ę:'e',ł:'l',ń:'n',ó:'o',ś:'s',ź:'z',ż:'z' } as Record<string,string>)[c] || c)
     .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '');
+    .replace(/[^a-z0-9-]/g, '')
+    // Zwiń wielokrotne myślniki i utnij brzegowe — nazwy typu "Nidec / Leroy Somer"
+    // dawały "nidec--leroy-somer" (404); backend ma "nidec-leroy-somer".
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 let topMfrsInCategory: { name: string; slug: string; count: number }[] = [];
 if (!isPowerPage && !matchedCity && currentPage === 1 && categoryProducts.length > 0) {
@@ -333,21 +339,6 @@ const collectionLd = {
   }
 };
 
-// SSR pagination helpers — używane tylko dla kategorii (NIE power-pages) bez filtrów.
-const showSsrPagination = !isPowerPage && !hasFilterParams && totalPages > 1;
-function pageUrl(p: number): string {
-  return p === 1 ? `/${categorySlug}` : `/${categorySlug}?page=${p}`;
-}
-function paginationRange(current: number, total: number): Array<number | 'ellipsis'> {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const range: Array<number | 'ellipsis'> = [1];
-  if (current - 2 > 2) range.push('ellipsis');
-  for (let i = Math.max(2, current - 2); i <= Math.min(total - 1, current + 2); i++) range.push(i);
-  if (current + 2 < total - 1) range.push('ellipsis');
-  range.push(total);
-  return range;
-}
-
 // Helper: map product for CategoryProducts component
 function mapProductForFilter(p: any) {
   return {
@@ -360,7 +351,9 @@ function mapProductForFilter(p: any) {
     condition: p.condition,
     stock: p.stock,
     mainImage: p.mainImage,
-    images: p.images || [],
+    // Grid kategorii pokazuje tylko mainImage; pełną galerię pomijamy (duża oszczędność
+    // payloadu przy setkach produktów). images[0] zostaje TYLKO jako fallback gdy brak mainImage.
+    images: p.mainImage ? [] : (p.images?.slice(0, 1) || []),
     shaftDiameter: Number(p.shaftDiameter || 0),
     mechanicalSize: p.mechanicalSize,
     weight: p.weight ? Number(p.weight) : null,
@@ -371,7 +364,8 @@ function mapProductForFilter(p: any) {
       slug: pc.category?.slug || pc.slug,
     })) || [],
     customParameters: p.customParameters || [],
-    technicalDetails: p.technicalDetails || '',
+    // Strip HTML — search potrzebuje tekstu, nie markupu (mniejszy payload + lepsze dopasowanie).
+    technicalDetails: (p.technicalDetails || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
   };
 }
 ---
@@ -513,41 +507,12 @@ function mapProductForFilter(p: any) {
             client:idle
             products={categoryProducts.map(mapProductForFilter)}
             categoryName={category?.name || ''}
+            initialPage={currentPage}
+            basePath={`/${categorySlug}`}
           />
 
-          {showSsrPagination && (
-            <nav class="mt-8 flex items-center justify-center gap-1 flex-wrap" aria-label="Paginacja produktów">
-              {currentPage > 1 && (
-                <a
-                  href={pageUrl(currentPage - 1)}
-                  class="px-3 py-2 rounded-lg border border-border hover:bg-accent text-sm transition-colors"
-                  rel="prev"
-                >← Poprzednia</a>
-              )}
-
-              {paginationRange(currentPage, totalPages).map((p) =>
-                p === 'ellipsis' ? (
-                  <span class="px-2 text-muted-foreground">…</span>
-                ) : p === currentPage ? (
-                  <span class="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold" aria-current="page">{p}</span>
-                ) : (
-                  <a
-                    href={pageUrl(p)}
-                    class="px-3 py-2 rounded-lg border border-border hover:bg-accent text-sm transition-colors"
-                  >{p}</a>
-                )
-              )}
-
-              {currentPage < totalPages && (
-                <a
-                  href={pageUrl(currentPage + 1)}
-                  class="px-3 py-2 rounded-lg border border-border hover:bg-accent text-sm transition-colors"
-                  rel="next"
-                >Następna →</a>
-              )}
-            </nav>
-          )}
-
+          {/* Paginacja crawlowalna jest renderowana przez wyspę CategoryProducts
+              (komponent Pager → <a href="?page=N">). Tutaj tylko podsumowanie SSR. */}
           {!isPowerPage && totalProducts > 0 && (
             <p class="text-center text-xs text-muted-foreground mt-3">
               {hasFilterParams
@@ -562,6 +527,8 @@ function mapProductForFilter(p: any) {
           showCategoryFilter={true}
           products={powerProducts.map(mapProductForFilter)}
           categoryName={`Silniki ${powerFormatted} kW${rpmStr ? ` ${rpmStr} obr/min` : ''}`}
+          initialPage={currentPage}
+          basePath={canonical}
         />
       ) : isPowerPage ? (
         (() => {

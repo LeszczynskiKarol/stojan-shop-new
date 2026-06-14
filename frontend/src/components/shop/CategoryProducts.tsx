@@ -2,7 +2,7 @@
 // Filters synced to URL search params for persistence
 // Stores full URL in sessionStorage before navigation so product page can link back
 
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, type MouseEvent } from "react";
 import { s3Webp600, s3Srcset } from "@/lib/img";
 import {
   SlidersHorizontal,
@@ -264,14 +264,20 @@ export default function CategoryProducts({
   products,
   categoryName,
   showCategoryFilter = false,
+  initialPage = 1,
+  basePath = "",
 }: {
   products: Product[];
   categoryName: string;
   showCategoryFilter?: boolean;
+  initialPage?: number;
+  basePath?: string;
 }) {
   const initial = useMemo(() => {
+    // SSR: brak window → bierzemy stronę z propsa (Astro czyta ?page= z URL),
+    // dzięki czemu server-render pokazuje WŁAŚCIWĄ stronę produktów (linki crawlowalne).
     if (typeof window === "undefined")
-      return { filters: EMPTY, page: 1, sort: "price-asc" };
+      return { filters: EMPTY, page: initialPage, sort: "price-asc" };
     return paramsToFilters(new URL(window.location.href));
   }, []);
 
@@ -794,6 +800,16 @@ export default function CategoryProducts({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // Crawlowalny href dla paginacji (zachowuje aktywne filtry). Dla strony 1 bez
+  // filtrów = czysty URL kategorii. Googlebot odkrywa wszystkie strony z surowego HTML.
+  const pageHref = (p: number) => {
+    const qs = filtersToParams(filters, p, sortBy).toString();
+    const base =
+      basePath ||
+      (typeof window !== "undefined" ? window.location.pathname : "");
+    return qs ? `${base}?${qs}` : base;
+  };
+
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? "hidden" : "";
     return () => {
@@ -1232,7 +1248,7 @@ export default function CategoryProducts({
         )}
 
         {totalPages > 1 && (
-          <Pager current={safePage} total={totalPages} onChange={goTo} />
+          <Pager current={safePage} total={totalPages} onChange={goTo} hrefFor={pageHref} />
         )}
       </div>
 
@@ -1356,10 +1372,12 @@ function Pager({
   current,
   total,
   onChange,
+  hrefFor,
 }: {
   current: number;
   total: number;
   onChange: (p: number) => void;
+  hrefFor: (p: number) => string;
 }) {
   const pages: (number | "...")[] = [];
   if (total <= 7) {
@@ -1376,41 +1394,62 @@ function Pager({
     if (current < total - 2) pages.push("...");
     pages.push(total);
   }
+  // Linki <a href> (crawlowalne dla Googlebota z surowego HTML); onClick robi
+  // natychmiastową paginację po stronie klienta (bez przeładowania).
+  const go = (e: MouseEvent<HTMLAnchorElement>, p: number) => {
+    e.preventDefault();
+    onChange(p);
+  };
   return (
     <nav className="cp-pag" aria-label="Paginacja produktów">
-      <button
-        disabled={current === 1}
-        onClick={() => onChange(current - 1)}
-        className="cp-pg"
-        aria-label="Poprzednia strona"
-      >
-        <ChevronLeft size={16} />
-      </button>
+      {current === 1 ? (
+        <span className="cp-pg" aria-disabled="true" aria-label="Poprzednia strona">
+          <ChevronLeft size={16} />
+        </span>
+      ) : (
+        <a
+          href={hrefFor(current - 1)}
+          onClick={(e) => go(e, current - 1)}
+          className="cp-pg"
+          aria-label="Poprzednia strona"
+          rel="prev"
+        >
+          <ChevronLeft size={16} />
+        </a>
+      )}
       {pages.map((p, i) =>
         p === "..." ? (
           <span key={`d${i}`} className="cp-dots">
             ...
           </span>
         ) : (
-          <button
+          <a
             key={p}
-            onClick={() => onChange(p as number)}
+            href={hrefFor(p as number)}
+            onClick={(e) => go(e, p as number)}
             className={`cp-pg${current === p ? " act" : ""}`}
             aria-label={`Strona ${p}`}
             aria-current={current === p ? "page" : undefined}
           >
             {p}
-          </button>
+          </a>
         ),
       )}
-      <button
-        disabled={current === total}
-        onClick={() => onChange(current + 1)}
-        className="cp-pg"
-        aria-label="Następna strona"
-      >
-        <ChevronRight size={16} />
-      </button>
+      {current === total ? (
+        <span className="cp-pg" aria-disabled="true" aria-label="Następna strona">
+          <ChevronRight size={16} />
+        </span>
+      ) : (
+        <a
+          href={hrefFor(current + 1)}
+          onClick={(e) => go(e, current + 1)}
+          className="cp-pg"
+          aria-label="Następna strona"
+          rel="next"
+        >
+          <ChevronRight size={16} />
+        </a>
+      )}
       <span className="cp-pinfo">
         Strona {current} z {total}
       </span>
@@ -1535,10 +1574,10 @@ const CSS = `
 .cp-empty{padding:60px 20px;text-align:center;color:hsl(var(--muted-foreground))}
 .cp-empty-btn{margin-top:12px;padding:8px 20px;border-radius:6px;border:1px solid hsl(var(--border));background:hsl(var(--card));color:hsl(var(--foreground));cursor:pointer;font-size:13px}
 .cp-pag{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:28px;padding-top:20px;border-top:1px solid hsl(var(--border));flex-wrap:wrap}
-.cp-pg{display:inline-flex;align-items:center;justify-content:center;min-width:36px;height:36px;padding:0 8px;border:1px solid hsl(var(--border));border-radius:6px;background:hsl(var(--card));color:hsl(var(--foreground));font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
-.cp-pg:hover:not(:disabled):not(.act){border-color:hsl(var(--primary)/.5);color:hsl(var(--primary))}
+.cp-pg{display:inline-flex;align-items:center;justify-content:center;min-width:36px;height:36px;padding:0 8px;border:1px solid hsl(var(--border));border-radius:6px;background:hsl(var(--card));color:hsl(var(--foreground));font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;text-decoration:none}
+.cp-pg:hover:not(:disabled):not(.act):not([aria-disabled="true"]){border-color:hsl(var(--primary)/.5);color:hsl(var(--primary))}
 .cp-pg.act{background:hsl(var(--primary));color:hsl(var(--primary-foreground));border-color:hsl(var(--primary))}
-.cp-pg:disabled{opacity:.4;cursor:not-allowed}
+.cp-pg:disabled,.cp-pg[aria-disabled="true"]{opacity:.4;cursor:not-allowed;pointer-events:none}
 .cp-dots{padding:0 4px;color:hsl(var(--muted-foreground));font-size:14px}
 .cp-pinfo{font-size:12px;color:hsl(var(--muted-foreground));margin-left:12px}
 .cp-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199}@media(max-width:900px){.cp-ov{display:block}}

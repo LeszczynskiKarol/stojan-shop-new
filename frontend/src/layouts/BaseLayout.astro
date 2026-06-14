@@ -581,8 +581,12 @@ try {
       });
     })();
 
-    // Show admin link if logged in as admin + sync localStorage flag for GA disable
+    // Show admin link if logged in as admin + sync localStorage flag for GA disable.
+    // Strzelamy do admin-verify TYLKO gdy flaga admina już istnieje (ustawia ją
+    // admin/login.astro). Anonim nigdy jej nie ma → brak zbędnego 401 na każdym
+    // publicznym pageloadzie (czyściej w konsoli, mniej requestów, lepszy Best Practices).
     (function() {
+      if (localStorage.getItem('admin_logged_in') !== '1') return;
       var apiUrl = window.__PUBLIC_API_URL || window.__API_URL || '';
       fetch(apiUrl + '/api/admin/auth/verify', { credentials: 'include' })
         .then(function(r) { return r.json(); })

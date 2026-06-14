@@ -225,7 +225,8 @@ export async function sitemapRoutes(app: FastifyInstance) {
       '/koszty-i-czas-wysylki',
       '/formy-platnosci',
       '/warunki-zwrotu',
-      '/reklamacje',
+      // '/reklamacje' usunięte 2026-06-15: strona nie istnieje (404), nie była nigdzie
+      // linkowana. Jeśli powstanie dedykowana strona reklamacji — przywrócić wpis.
     ];
 
     const pages = legalPages.map((loc) => ({
