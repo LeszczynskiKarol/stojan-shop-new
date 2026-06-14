@@ -49,6 +49,11 @@ export const getProduct = async (categorySlug: string, productSlug: string) => {
     : null;
 };
 
+export const getTopManufacturers = (category: string, limit = 8) =>
+  api<{ name: string; count: number }[]>(
+    `/products/top-manufacturers?category=${encodeURIComponent(category)}&limit=${limit}`,
+  );
+
 export const getCategories = () => api<any[]>("/categories");
 
 export const getCategory = (slug: string) => api<any>(`/categories/${slug}`);

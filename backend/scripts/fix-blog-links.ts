@@ -13,6 +13,7 @@
  * Uruchomienie:
  *   cd backend && npx tsx scripts/fix-blog-links.ts
  */
+import 'dotenv/config'; // załaduj DATABASE_URL z .env (skrypt nie importuje index.ts)
 import { prisma } from '../src/lib/prisma.js';
 
 const FIXES: { from: string; to: string }[] = [

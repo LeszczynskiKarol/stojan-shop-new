@@ -289,21 +289,53 @@ export async function productRoutes(app: FastifyInstance) {
     const sortField = validSorts.includes(sort) ? sort : "createdAt";
     (orderBy as any)[sortField] = order === "asc" ? "asc" : "desc";
 
-    const [products, total] = await Promise.all([
-      prisma.product.findMany({
-        where,
-        orderBy,
-        skip: (pageNum - 1) * limitNum,
-        take: limitNum,
-        include: {
-          categories: {
-            include: {
-              category: { select: { id: true, name: true, slug: true } },
-            },
-          },
-          manufacturerRel: { select: { id: true, name: true, slug: true } },
+    // light=1 → slim projekcja dla client-side facetów/filtrów (bez ciężkich pól:
+    // description, technicalDetails, dataSheets, attributes, galleryImages...).
+    // Tnie payload pełnego zbioru z ~5 MB do ~300 KB. Domyślne zachowanie bez zmian.
+    const light =
+      (request.query as Record<string, string>).light === "1" ||
+      (request.query as Record<string, string>).light === "true";
+
+    const findArgs: Prisma.ProductFindManyArgs = {
+      where,
+      orderBy,
+      skip: (pageNum - 1) * limitNum,
+      take: limitNum,
+    };
+    if (light) {
+      findArgs.select = {
+        id: true,
+        name: true,
+        manufacturer: true,
+        manufacturerId: true,
+        price: true,
+        power: true,
+        rpm: true,
+        condition: true,
+        stock: true,
+        mainImage: true,
+        shaftDiameter: true,
+        mechanicalSize: true,
+        weight: true,
+        customParameters: true,
+        marketplaces: true,
+        categories: {
+          select: { category: { select: { id: true, name: true, slug: true } } },
         },
-      }),
+      };
+    } else {
+      findArgs.include = {
+        categories: {
+          include: {
+            category: { select: { id: true, name: true, slug: true } },
+          },
+        },
+        manufacturerRel: { select: { id: true, name: true, slug: true } },
+      };
+    }
+
+    const [products, total] = await Promise.all([
+      prisma.product.findMany(findArgs),
       prisma.product.count({ where }),
     ]);
 
@@ -319,6 +351,30 @@ export async function productRoutes(app: FastifyInstance) {
         },
       },
     };
+  });
+
+  // GET /api/products/top-manufacturers?category=slug&limit=8
+  // Cheap groupBy — top producenci (in-stock) w kategorii. Używane do SSR-owych
+  // linków "popularne marki" (internal-linking do /marka-producent/*), bo strona
+  // kategorii nie pobiera już całego zbioru (tylko bieżącą stronę).
+  app.get("/top-manufacturers", async (request) => {
+    const { category, limit = "8" } = request.query as Record<string, string>;
+    const where: Prisma.ProductWhereInput = { stock: { gt: 0 } };
+    if (category) {
+      where.categories = { some: { category: { slug: category } } };
+    }
+    const grouped = await prisma.product.groupBy({
+      by: ["manufacturer"],
+      where,
+      _count: { manufacturer: true },
+      orderBy: { _count: { manufacturer: "desc" } },
+      take: Math.min(30, parseInt(limit) || 8) + 5,
+    });
+    const data = grouped
+      .filter((g) => g.manufacturer && g.manufacturer.trim())
+      .slice(0, Math.min(20, parseInt(limit) || 8))
+      .map((g) => ({ name: g.manufacturer as string, count: g._count.manufacturer }));
+    return { success: true, data };
   });
 
   // GET /api/products/popular

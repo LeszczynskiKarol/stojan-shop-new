@@ -5,7 +5,7 @@ import CategoryProducts from '@/components/shop/CategoryProducts';
 import ExpandableDescription from '@/components/shop/ExpandableDescription';
 import CityLandingPage from '@/components/shop/CityLandingPage.astro';
 import type { CityData } from '@/components/shop/CityLandingPage.astro';
-import { getCategory, getProducts, getProductsByPower, getLegalPage } from '@/lib/api';
+import { getCategory, getProducts, getProductsByPower, getLegalPage, getTopManufacturers } from '@/lib/api';
 
 // === Local landing pages (geo-modyfikowane query z GSC) ===
 // Whitelist top miast PL. URL pattern: /silniki-elektryczne-{slug-miasta}.
@@ -173,13 +173,12 @@ let totalProducts = 0;
 let totalPages = 1;
 
 if (!isPowerPage && !matchedCity) {
-  // Zawsze ładujemy pełną listę produktów (limit=2000) — wymagane do client-side
-  // filtrowania w sidebarze (search, power range, manufacturer, rpm itd.).
-  // Wcześniejsza optymalizacja SSR-pagination (24/strona przy braku query params)
-  // łamała wyszukiwarkę: gdy user przeszedł na /trojfazowe i wpisał coś w search box,
-  // React miał w stanie tylko 24 produkty — pozostałe 1124 nie istniały.
-  // React i tak paginuje client-side po 30/stronę, więc UX paginacji zachowany.
-  const productsQuery = `category=${categorySlug}&limit=2000`;
+  // SERVER-SIDE PAGINATION: SSR pobiera TYLKO bieżącą stronę (light, in-stock) — małe HTML,
+  // szybki TTFB, crawlowalne ?page=N. Pełny lekki zbiór do filtrów/search/facetów doładowuje
+  // wyspa async z API (logika filtrów React bez zmian). Patrz CategoryProducts.tsx (serverPaginated).
+  // sort=price&order=asc — MUSI odpowiadać domyślnemu sortBy="price-asc" w wyspie,
+  // żeby strona SSR (N) pokrywała się ze stroną po hydracji (brak przetasowania).
+  const productsQuery = `category=${categorySlug}&page=${currentPage}&limit=${PER_PAGE}&inStock=true&light=1&sort=price&order=asc`;
 
   const [cat, productsData] = await Promise.all([
     getCategory(categorySlug!),
@@ -191,12 +190,9 @@ if (!isPowerPage && !matchedCity) {
     isLegalPage = true;
   } else {
     category = cat;
-    categoryProducts = productsData?.products || [];
-    // Paginacja liczona z produktów DOSTĘPNYCH (wyspa renderuje tylko in-stock),
-    // żeby crawlowalne ?page=N pokrywały się 1:1 ze stronami React. PER_PAGE=30.
-    const inStockTotal = categoryProducts.filter((p: any) => p.stock > 0).length;
-    totalProducts = inStockTotal;
-    totalPages = Math.max(1, Math.ceil(inStockTotal / PER_PAGE));
+    categoryProducts = productsData?.products || [];          // tylko bieżąca strona (~30)
+    totalProducts = productsData?.pagination?.total ?? categoryProducts.length;
+    totalPages = Math.max(1, Math.ceil(totalProducts / PER_PAGE));
     // SEO: ?page=N poza zakresem → 404 (zapobiega indeksowaniu pustych stron).
     if (currentPage > 1 && currentPage > totalPages) {
       return Astro.rewrite('/404');
@@ -221,17 +217,12 @@ function slugifyMfr(name: string): string {
     .replace(/^-+|-+$/g, '');
 }
 let topMfrsInCategory: { name: string; slug: string; count: number }[] = [];
-if (!isPowerPage && !matchedCity && currentPage === 1 && categoryProducts.length > 0) {
-  const counts = new Map<string, number>();
-  for (const p of categoryProducts) {
-    const m = p.manufacturer;
-    if (!m || p.stock <= 0) continue;
-    counts.set(m, (counts.get(m) || 0) + 1);
-  }
-  topMfrsInCategory = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-    .map(([name, count]) => ({ name, slug: slugifyMfr(name), count }));
+if (!isPowerPage && !matchedCity && category && currentPage === 1) {
+  // Cheap groupBy w backendzie (cała kategoria, in-stock) — bo SSR nie pobiera już całego zbioru.
+  const tops = await getTopManufacturers(categorySlug!, 8);
+  topMfrsInCategory = (tops || [])
+    .filter((m) => m.name && m.count >= 1)
+    .map((m) => ({ name: m.name, slug: slugifyMfr(m.name), count: m.count }));
 }
 
 // Strip HTML for meta description
@@ -357,7 +348,8 @@ function mapProductForFilter(p: any) {
     shaftDiameter: Number(p.shaftDiameter || 0),
     mechanicalSize: p.mechanicalSize,
     weight: p.weight ? Number(p.weight) : null,
-    marketplaces: p.marketplaces,
+    // wyspa używa tylko ownStore.slug (do URL produktu) — reszta (dane Allegro) zbędna w propsach
+    marketplaces: { ownStore: { slug: p.marketplaces?.ownStore?.slug } },
     categories: p.categories?.map((pc: any) => ({
       id: pc.category?.id || pc.id,
       name: pc.category?.name || pc.name,
@@ -509,6 +501,10 @@ function mapProductForFilter(p: any) {
             categoryName={category?.name || ''}
             initialPage={currentPage}
             basePath={`/${categorySlug}`}
+            serverPaginated={true}
+            serverTotalPages={totalPages}
+            serverTotal={totalProducts}
+            categorySlug={categorySlug}
           />
 
           {/* Paginacja crawlowalna jest renderowana przez wyspę CategoryProducts

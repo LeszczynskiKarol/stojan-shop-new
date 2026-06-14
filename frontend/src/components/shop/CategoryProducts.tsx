@@ -266,12 +266,22 @@ export default function CategoryProducts({
   showCategoryFilter = false,
   initialPage = 1,
   basePath = "",
+  serverPaginated = false,
+  serverTotalPages = 1,
+  serverTotal = 0,
+  categorySlug = "",
 }: {
   products: Product[];
   categoryName: string;
   showCategoryFilter?: boolean;
   initialPage?: number;
   basePath?: string;
+  // Server-side pagination: SSR podaje tylko bieżącą stronę (products), a wyspa
+  // doładowuje async pełny lekki zbiór do filtrów. Patrz [categorySlug]/index.astro.
+  serverPaginated?: boolean;
+  serverTotalPages?: number;
+  serverTotal?: number;
+  categorySlug?: string;
 }) {
   const initial = useMemo(() => {
     // SSR: brak window → bierzemy stronę z propsa (Astro czyta ?page= z URL),
@@ -286,6 +296,59 @@ export default function CategoryProducts({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [page, setPage] = useState(initial.page);
   const isInitialMount = useRef(true);
+
+  // ── Server-side pagination: SSR dostarcza tylko bieżącą stronę (products).
+  // Pełny lekki zbiór (do filtrów/search/facetów) doładowujemy async z API.
+  // Gdy serverPaginated=false (np. power-pages) — products to już pełny zbiór.
+  const [allProducts, setAllProducts] = useState<Product[]>(products);
+  const [fullLoaded, setFullLoaded] = useState(!serverPaginated);
+
+  useEffect(() => {
+    if (!serverPaginated || !categorySlug) return;
+    let cancelled = false;
+    const API = (import.meta as any).env?.PUBLIC_API_URL || "";
+    fetch(
+      `${API}/api/products?category=${encodeURIComponent(categorySlug)}&limit=2000&light=1&inStock=true`,
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (cancelled || !j?.success) return;
+        const raw = j.data?.products || [];
+        const mapped: Product[] = raw.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          manufacturer: p.manufacturer,
+          price: Number(p.price),
+          power: p.power,
+          rpm: p.rpm,
+          condition: p.condition,
+          stock: p.stock,
+          mainImage: p.mainImage,
+          images: [],
+          shaftDiameter: Number(p.shaftDiameter || 0),
+          mechanicalSize: p.mechanicalSize,
+          weight: p.weight != null ? Number(p.weight) : null,
+          marketplaces: { ownStore: { slug: p.marketplaces?.ownStore?.slug } },
+          categories: (p.categories || []).map((pc: any) => ({
+            id: pc.category?.id || pc.id,
+            name: pc.category?.name || pc.name,
+            slug: pc.category?.slug || pc.slug,
+          })),
+          customParameters: p.customParameters || [],
+          technicalDetails: "",
+        }));
+        if (mapped.length) {
+          setAllProducts(mapped);
+          setFullLoaded(true);
+        }
+      })
+      .catch(() => {
+        /* zostajemy przy stronie SSR + paginacji serwerowej (linki działają) */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [serverPaginated, categorySlug]);
 
   // Sync state -> URL
   useEffect(() => {
@@ -308,10 +371,10 @@ export default function CategoryProducts({
     } catch {}
   }, [filters, page, sortBy, categoryName]);
 
-  // Only in-stock
+  // Only in-stock (z pełnego zbioru — przed doładowaniem to bieżąca strona SSR)
   const available = useMemo(
-    () => products.filter((p) => p.stock > 0),
-    [products],
+    () => allProducts.filter((p) => p.stock > 0),
+    [allProducts],
   );
 
   const POWER_SLUG_RE = /^silniki?-elektryczn[ey]-?\d/;
@@ -731,12 +794,21 @@ export default function CategoryProducts({
     return r;
   }, [available, filters, sortBy]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  // Paginacja dwutrybowa:
+  //  • PRZED doładowaniem (serverPaginated && !fullLoaded): `filtered` to bieżąca strona
+  //    SSR (~30, już właściwa strona N) — NIE tniemy po globalnym indeksie; totalPages z serwera,
+  //    a paginacja działa przez nawigację <a href="?page=N"> (real reload → SSR kolejnej strony).
+  //  • PO doładowaniu (lub power-pages): pełny zbiór → klasyczny client-side slice + instant pager.
+  const clientTotalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const totalPages =
+    serverPaginated && !fullLoaded
+      ? Math.max(1, serverTotalPages || 1)
+      : clientTotalPages;
   const safePage = Math.min(page, totalPages);
-  const paginated = useMemo(
-    () => filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE),
-    [filtered, safePage],
-  );
+  const paginated = useMemo(() => {
+    if (serverPaginated && !fullLoaded) return filtered; // strona SSR — bez client-slice
+    return filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
+  }, [filtered, safePage, serverPaginated, fullLoaded]);
 
   const update = useCallback((fn: (p: Filters) => Filters) => {
     setFilters(fn);
@@ -1230,6 +1302,12 @@ export default function CategoryProducts({
           </div>
         )}
 
+        {serverPaginated && !fullLoaded && (
+          <div className="cp-loadbar" role="status" aria-live="polite">
+            <span className="cp-spin" /> Ładowanie pełnej listy do filtrowania…
+          </div>
+        )}
+
         {paginated.length > 0 ? (
           <div className="cp-grid">
             {paginated.map((p) => (
@@ -1248,7 +1326,7 @@ export default function CategoryProducts({
         )}
 
         {totalPages > 1 && (
-          <Pager current={safePage} total={totalPages} onChange={goTo} hrefFor={pageHref} />
+          <Pager current={safePage} total={totalPages} onChange={goTo} hrefFor={pageHref} clientNav={fullLoaded || !serverPaginated} />
         )}
       </div>
 
@@ -1373,11 +1451,15 @@ function Pager({
   total,
   onChange,
   hrefFor,
+  clientNav = true,
 }: {
   current: number;
   total: number;
   onChange: (p: number) => void;
   hrefFor: (p: number) => string;
+  // clientNav=false → przed doładowaniem pełnego zbioru: pozwól <a href> realnie nawigować
+  // (przeładowanie → SSR kolejnej strony). =true → instant paginacja po stronie klienta.
+  clientNav?: boolean;
 }) {
   const pages: (number | "...")[] = [];
   if (total <= 7) {
@@ -1397,6 +1479,7 @@ function Pager({
   // Linki <a href> (crawlowalne dla Googlebota z surowego HTML); onClick robi
   // natychmiastową paginację po stronie klienta (bez przeładowania).
   const go = (e: MouseEvent<HTMLAnchorElement>, p: number) => {
+    if (!clientNav) return; // brak pełnych danych → pozwól na realną nawigację (SSR)
     e.preventDefault();
     onChange(p);
   };
@@ -1552,6 +1635,9 @@ const CSS = `
 .cp-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
 .cp-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;font-size:12px;border-radius:20px;background:hsl(var(--primary)/.12);color:hsl(var(--primary));border:none;cursor:pointer}.cp-tag:hover{background:hsl(var(--primary)/.2)}
 .cp-clr-all{font-size:12px;color:hsl(var(--muted-foreground));background:none;border:none;cursor:pointer;text-decoration:underline}
+.cp-loadbar{display:flex;align-items:center;gap:8px;font-size:13px;color:hsl(var(--muted-foreground));padding:8px 12px;margin-bottom:12px;background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:8px}
+.cp-spin{width:14px;height:14px;border:2px solid hsl(var(--border));border-top-color:hsl(var(--primary));border-radius:50%;display:inline-block;animation:cp-spin .7s linear infinite}
+@keyframes cp-spin{to{transform:rotate(360deg)}}
 .cp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
 @media(max-width:600px){.cp-grid{grid-template-columns:repeat(2,1fr);gap:10px}}
 .cp-card{display:flex;flex-direction:column;border:1px solid hsl(var(--border));border-radius:10px;background:hsl(var(--card));overflow:hidden;text-decoration:none;color:inherit;transition:border-color .15s,box-shadow .15s}
