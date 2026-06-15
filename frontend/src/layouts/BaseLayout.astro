@@ -166,6 +166,10 @@ try {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+  <!-- Preconnect do S3 — wszystkie obrazy (karty kategorii/produktów, w tym LCP)
+       lecą z s3.eu-north-1.amazonaws.com. Wczesne nawiązanie połączenia ~320 ms LCP. -->
+  <link rel="preconnect" href="https://s3.eu-north-1.amazonaws.com" crossorigin />
+
   <!-- Inter font: SELF-HOSTED (woff2 wariantowy w /fonts) — @font-face w globals.css.
        Brak round-tripu do fonts.googleapis.com/gstatic.com. Preload latin-ext, bo
        polskie znaki diakrytyczne są na pierwszym widoku każdej strony. -->

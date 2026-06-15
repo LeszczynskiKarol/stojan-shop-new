@@ -13,6 +13,13 @@ export default defineConfig({
   output: "server",
   adapter: node({ mode: "standalone" }),
 
+  build: {
+    // Wstaw CSS inline w <style> zamiast <link rel=stylesheet> — usuwa render-blocking
+    // requesty CSS (~22 KB) ze ścieżki krytycznej. LCP/FCP strony to tekst H1, którego
+    // render czekał na pobranie tych arkuszy (render-delay ~2,4 s w PSI na throttled 4G).
+    inlineStylesheets: "always",
+  },
+
   integrations: [
     react(), // React islands - interaktywne komponenty
     tailwind(), // Tailwind CSS
