@@ -50,7 +50,17 @@ const capFirst = (s: string | null | undefined): string =>
   s ? s.charAt(0).toUpperCase() + s.slice(1) : (s || '');
 const displayName = capFirst(product.name);
 
-const title = seo.title || `${displayName} | Stojan Shop`;
+// SERP ucina tytuły >~65 zn. Gdy tytuł jest długi, zdejmij marketingowy sufiks
+// ("- zamów teraz!" / "| Stojan Shop" / "| Stojan"), żeby kluczowe parametry produktu
+// (moc, obroty, typ) nie wypadły poza widoczną część snippetu. Krótkie tytuły
+// zostawiamy z sufiksem — lepszy CTA i branding bez ryzyka ucięcia.
+const rawTitle = seo.title || (displayName.length > 52 ? displayName : `${displayName} | Stojan`);
+const title = rawTitle.length > 65
+  ? rawTitle
+      .replace(/\s*[–-]\s*zam(?:ó|o)w teraz!?\s*$/i, '')
+      .replace(/\s*\|\s*Stojan(?:\s+Shop)?\s*$/i, '')
+      .trim()
+  : rawTitle;
 const mfrLabel = product.manufacturer && !['silnik', 'stojan', 'brak', '-'].includes(product.manufacturer.toLowerCase())
   ? ` ${product.manufacturer}.`
   : '';

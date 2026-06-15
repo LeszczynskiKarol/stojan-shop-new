@@ -12,7 +12,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:import": "tsx scripts/import-from-dump.ts",
     "seo:categories": "tsx scripts/update-categories-seo.ts",
-    "seo:motoreduktory": "tsx scripts/update-motoreduktory-content.ts"
+    "seo:motoreduktory": "tsx scripts/update-motoreduktory-content.ts",
+    "seo:categories-content": "tsx scripts/update-categories-content.ts",
+    "seo:differentiate-dupes": "tsx scripts/differentiate-duplicate-products.ts"
   },
   "dependencies": {
     "@aws-sdk/client-codebuild": "^3.1003.0",
