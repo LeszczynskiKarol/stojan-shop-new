@@ -178,7 +178,10 @@ const productFaqLd = {
 };
 ---
 
-<BaseLayout title={title} description={description} canonical={`/${categorySlug}/${productSlug}`} ogImage={mainImage} ogType="product" jsonLd={productLd}>
+<BaseLayout title={title} description={description} canonical={`/${categorySlug}/${productSlug}`} ogImage={mainImage} ogType="product" jsonLd={productLd}
+  preloadImage={s3Webp1200(mainImage) || mainImage}
+  preloadImageSrcset={s3Srcset(mainImage) || undefined}
+  preloadImageSizes="(min-width:1024px) 600px, 100vw">
   <script type="application/ld+json" set:html={JSON.stringify(breadcrumbLd)} />
   <script type="application/ld+json" set:html={JSON.stringify(productFaqLd)} />
 

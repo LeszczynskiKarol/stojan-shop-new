@@ -29,6 +29,11 @@ interface Props {
   ogType?: string;
   noIndex?: boolean;
   jsonLd?: object;
+  /** LCP image preload (np. główne zdjęcie produktu) — wstrzykuje <link rel=preload as=image>
+   *  w <head>, żeby obraz LCP startował od razu zamiast po sparsowaniu <body>. */
+  preloadImage?: string;
+  preloadImageSrcset?: string;
+  preloadImageSizes?: string;
 }
 
 const SITE_URL = 'https://www.silniki-elektryczne.com.pl';
@@ -43,6 +48,9 @@ const {
   ogType = 'website',
   noIndex = false,
   jsonLd,
+  preloadImage,
+  preloadImageSrcset,
+  preloadImageSizes,
 } = Astro.props;
 
 const canonicalUrl = canonical
@@ -169,6 +177,18 @@ try {
   <!-- Preconnect do S3 — wszystkie obrazy (karty kategorii/produktów, w tym LCP)
        lecą z s3.eu-north-1.amazonaws.com. Wczesne nawiązanie połączenia ~320 ms LCP. -->
   <link rel="preconnect" href="https://s3.eu-north-1.amazonaws.com" crossorigin />
+
+  {/* Preload obrazu LCP (gł. zdjęcie produktu) — start pobierania w <head>, nie po <body>. */}
+  {preloadImage && (
+    <link
+      rel="preload"
+      as="image"
+      href={preloadImage}
+      imagesrcset={preloadImageSrcset}
+      imagesizes={preloadImageSizes}
+      fetchpriority="high"
+    />
+  )}
 
   <!-- Inter font: SELF-HOSTED (woff2 wariantowy w /fonts) — @font-face w globals.css.
        Brak round-tripu do fonts.googleapis.com/gstatic.com. Preload latin-ext, bo
