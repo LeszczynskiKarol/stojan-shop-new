@@ -6,12 +6,19 @@
 // — jeśli source < 1200px, plik istnieje w mniejszym rozmiarze).
 // Dla URL-i spoza bucketa zwraca oryginał.
 
-const S3_PRODUCTS_PREFIX = 's3.eu-north-1.amazonaws.com/piszemy.com.pl/products/';
+// Prefiksy S3, dla których Lambda piszemy-image-optimizer generuje warianty webp.
+// `products/` — standardowy upload z admina.
+// `stojan/invoices/products/` — legacy-import (m.in. zdjęcia akcesoriów); trigger S3 +
+//   IAM rozszerzone 2026-06-15, backfill wykonany — warianty istnieją dla całego prefiksu.
+const S3_VARIANT_PREFIXES = [
+  's3.eu-north-1.amazonaws.com/piszemy.com.pl/products/',
+  's3.eu-north-1.amazonaws.com/piszemy.com.pl/stojan/invoices/products/',
+];
 const EXT_RE = /\.(jpe?g|png|webp)$/i;
 
 function isOptimizable(url: string | null | undefined): boolean {
   if (!url) return false;
-  return url.includes(S3_PRODUCTS_PREFIX) && EXT_RE.test(url);
+  return S3_VARIANT_PREFIXES.some((p) => url.includes(p)) && EXT_RE.test(url);
 }
 
 /** Zwraca wariant .webp (transcode oryginalnego rozmiaru). */
