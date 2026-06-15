@@ -3,30 +3,44 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import CategoryProducts from '@/components/shop/CategoryProducts';
 import { getManufacturer, getProducts } from '@/lib/api';
+import { computeFacets, type Facets } from '@/lib/facets';
 
 const { slug } = Astro.params;
 if (!slug) return Astro.rewrite('/404');
 
-// Fetch manufacturer info and their products in parallel
+// SERVER-SIDE PAGINATION + FACETY (jak kategorie): SSR pobiera lekki PEŁNY in-stock zbiór,
+// liczy facety + wycina bieżącą stronę; wyspa doładowuje całość leniwie przy 1. interakcji.
+const PER_PAGE = 30;
+const urlSearchParams = Astro.url.searchParams;
+const FILTER_PARAMS = ['q', 'cat', 'mfr', 'cond', 'kw', 'kwmin', 'kwmax', 'rpm', 'rpmr', 'obrmin', 'obrmax', 'pmin', 'pmax', 'sort'];
+const hasFilterParams = FILTER_PARAMS.some((p) => urlSearchParams.has(p));
+const currentPage = Math.max(1, parseInt(urlSearchParams.get('page') || '1') || 1);
+
 // DB stores full path slugs like "marka-producent/siemens"
 const manufacturer = await getManufacturer(slug);
 const mfrQuery = manufacturer ? manufacturer.name : slug;
-const productsData = await getProducts(`manufacturer=${encodeURIComponent(mfrQuery)}&limit=2000`);
-const products = productsData?.products || [];
+const mfrParam = encodeURIComponent(mfrQuery);
+const productsData = await getProducts(`manufacturer=${mfrParam}&limit=2000&inStock=true&light=1&sort=price&order=asc`);
+const allInStock = productsData?.products || [];
 
-// If no manufacturer record AND no products → 404 (URL nigdy nie istniał)
-if (!manufacturer && products.length === 0) return Astro.rewrite('/404');
+// Brak rekordu producenta I brak produktów in-stock → 404 (URL bez treści)
+if (!manufacturer && allInStock.length === 0) return Astro.rewrite('/404');
 
-const mfrName = manufacturer?.name || products[0]?.manufacturer || slug;
-const inStockCount = products.filter((p: any) => p.stock > 0).length;
-// Manufacturer w DB bez stocku → 200 INDEX + UX z podobnymi producentami.
-// Lepiej niż 404: klient z Google ma szansę dobrać u podobnego producenta.
+const mfrName = manufacturer?.name || allInStock[0]?.manufacturer || slug;
+const inStockCount = allInStock.length;
+const totalPages = Math.max(1, Math.ceil(inStockCount / PER_PAGE));
+const serverFacets: Facets | null = inStockCount > 0 ? computeFacets(allInStock) : null;
+const pageProducts = allInStock.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+if (currentPage > 1 && currentPage > totalPages) return Astro.rewrite('/404');
+
+const lazyUrl = `/api/products?manufacturer=${mfrParam}&limit=2000&inStock=true&light=1&sort=price&order=asc`;
+const basePath = `/marka-producent/${slug}`;
 
 const SITE_URL = 'https://www.silniki-elektryczne.com.pl';
 
-const title = `${mfrName} - silniki elektryczne | Stojan Shop`;
+const title = `${mfrName} - silniki elektryczne | Stojan Shop${currentPage > 1 ? ` — strona ${currentPage}` : ''}`;
 const description = `Silniki elektryczne ${mfrName}. ${inStockCount} produktów dostępnych w magazynie. Sprawdź ofertę i zamów z dostawą!`;
-const canonical = `/marka-producent/${slug}`;
+const canonical = currentPage > 1 ? `${basePath}?page=${currentPage}` : basePath;
 
 const breadcrumbLd = {
   "@context": "https://schema.org",
@@ -38,7 +52,7 @@ const breadcrumbLd = {
   ]
 };
 
-const inStockItems = products.filter((p: any) => p.stock > 0);
+const inStockItems = allInStock; // już in-stock (fetch z inStock=true)
 const collectionLd = {
   "@context": "https://schema.org",
   "@type": "CollectionPage",
@@ -86,17 +100,20 @@ function mapProduct(p: any) {
     shaftDiameter: Number(p.shaftDiameter || 0),
     mechanicalSize: p.mechanicalSize,
     weight: p.weight ? Number(p.weight) : null,
-    marketplaces: p.marketplaces,
+    // wyspa używa tylko ownStore.slug — reszta marketplaces zbędna w propsach
+    marketplaces: { ownStore: { slug: p.marketplaces?.ownStore?.slug } },
     categories: p.categories?.map((pc: any) => ({
       id: pc.category?.id || pc.id,
       name: pc.category?.name || pc.name,
       slug: pc.category?.slug || pc.slug,
     })) || [],
+    customParameters: p.customParameters || [],
+    technicalDetails: (p.technicalDetails || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
   };
 }
 ---
 
-<BaseLayout title={title} description={description} canonical={canonical} jsonLd={breadcrumbLd}>
+<BaseLayout title={title} description={description} canonical={canonical} jsonLd={breadcrumbLd} noIndex={hasFilterParams}>
   <script type="application/ld+json" set:html={JSON.stringify(collectionLd)} />
 
   <div class="container mx-auto px-4 py-8">
@@ -117,8 +134,15 @@ function mapProduct(p: any) {
       <CategoryProducts
         client:idle
         showCategoryFilter={true}
-        products={products.map(mapProduct)}
+        products={pageProducts.map(mapProduct)}
         categoryName={mfrName}
+        initialPage={currentPage}
+        basePath={basePath}
+        serverPaginated={true}
+        serverTotalPages={totalPages}
+        serverTotal={inStockCount}
+        serverFacets={serverFacets}
+        lazyUrl={lazyUrl}
       />
     ) : (
       <div class="max-w-3xl mx-auto py-8">

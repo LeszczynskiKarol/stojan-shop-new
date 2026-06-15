@@ -5,6 +5,13 @@
 import { useState, useMemo, useCallback, useEffect, useRef, type MouseEvent } from "react";
 import { s3Webp600, s3Srcset } from "@/lib/img";
 import {
+  computeFacets,
+  parsePower,
+  productMatchesRpmRange,
+  PREDEFINED_RPM_VALUES,
+  type Facets,
+} from "@/lib/facets";
+import {
   SlidersHorizontal,
   X,
   ChevronDown,
@@ -16,31 +23,7 @@ import {
 } from "lucide-react";
 
 const PER_PAGE = 30;
-
-// ============================================
-// RPM RANGE DEFINITIONS (from old shop)
-// ============================================
-const RPM_RANGES: Record<number, [number, number]> = {
-  700: [400, 800],
-  900: [800, 1200],
-  1400: [1200, 2100],
-  2900: [2500, 3500],
-};
-const PREDEFINED_RPM_VALUES = [700, 900, 1400, 2900] as const;
-
-/** Check if a product's rpm.value falls within a predefined RPM range */
-function productMatchesRpmRange(p: Product, rpmKey: number): boolean {
-  const range = RPM_RANGES[rpmKey];
-  if (!range) return false;
-  const val = parseFloat(String(p.rpm?.value || "0").replace(",", "."));
-  return val >= range[0] && val <= range[1];
-}
-
-/** Parse power value string to number (handles both "7,5" and "7.5") */
-function parsePower(v: string | undefined | null): number {
-  if (!v || v === "0") return 0;
-  return parseFloat(String(v).replace(",", ".")) || 0;
-}
+// RPM_RANGES / PREDEFINED_RPM_VALUES / productMatchesRpmRange / parsePower → @/lib/facets
 
 interface Product {
   id: string;
@@ -270,18 +253,25 @@ export default function CategoryProducts({
   serverTotalPages = 1,
   serverTotal = 0,
   categorySlug = "",
+  serverFacets = null,
+  lazyUrl = "",
 }: {
   products: Product[];
   categoryName: string;
   showCategoryFilter?: boolean;
   initialPage?: number;
   basePath?: string;
-  // Server-side pagination: SSR podaje tylko bieżącą stronę (products), a wyspa
-  // doładowuje async pełny lekki zbiór do filtrów. Patrz [categorySlug]/index.astro.
+  // Server-side pagination: SSR podaje tylko bieżącą stronę (products) + policzone
+  // facety (serverFacets). Pełny zbiór doładowujemy LENIWIE przy 1. interakcji z filtrem
+  // (PSI nie klika → nie płaci kosztu). Patrz [categorySlug]/index.astro.
   serverPaginated?: boolean;
   serverTotalPages?: number;
   serverTotal?: number;
   categorySlug?: string;
+  serverFacets?: Facets | null;
+  // Pełny lekki zbiór do client-side filtrowania (ścieżka API). Pozwala używać tej samej
+  // wyspy dla kategorii (?category=), producentów (?manufacturer=) itd. Fallback: kategoria.
+  lazyUrl?: string;
 }) {
   const initial = useMemo(() => {
     // SSR: brak window → bierzemy stronę z propsa (Astro czyta ?page= z URL),
@@ -297,22 +287,27 @@ export default function CategoryProducts({
   const [page, setPage] = useState(initial.page);
   const isInitialMount = useRef(true);
 
-  // ── Server-side pagination: SSR dostarcza tylko bieżącą stronę (products).
-  // Pełny lekki zbiór (do filtrów/search/facetów) doładowujemy async z API.
-  // Gdy serverPaginated=false (np. power-pages) — products to już pełny zbiór.
+  // ── Server-side pagination: SSR dostarcza tylko bieżącą stronę (products) + facety.
+  // Pełny lekki zbiór doładowujemy LENIWIE — dopiero przy 1. interakcji z filtrem/search/sort.
+  // Dzięki temu PSI (nie klika) nie płaci kosztu fetch/map/re-render. Gdy serverPaginated=false
+  // (power-pages) — products to już pełny zbiór, fullLoaded od razu true.
   const [allProducts, setAllProducts] = useState<Product[]>(products);
   const [fullLoaded, setFullLoaded] = useState(!serverPaginated);
+  const [fullLoading, setFullLoading] = useState(false);
+  const loadStarted = useRef(!serverPaginated);
 
-  useEffect(() => {
-    if (!serverPaginated || !categorySlug) return;
-    let cancelled = false;
+  const ensureFull = useCallback(() => {
+    if (loadStarted.current) return;
+    loadStarted.current = true;
+    setFullLoading(true);
     const API = (import.meta as any).env?.PUBLIC_API_URL || "";
-    fetch(
-      `${API}/api/products?category=${encodeURIComponent(categorySlug)}&limit=2000&light=1&inStock=true`,
-    )
+    const path =
+      lazyUrl ||
+      `/api/products?category=${encodeURIComponent(categorySlug)}&limit=2000&light=1&inStock=true`;
+    fetch(`${API}${path}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
-        if (cancelled || !j?.success) return;
+        if (!j?.success) throw new Error("bad response");
         const raw = j.data?.products || [];
         const mapped: Product[] = raw.map((p: any) => ({
           id: p.id,
@@ -337,18 +332,40 @@ export default function CategoryProducts({
           customParameters: p.customParameters || [],
           technicalDetails: "",
         }));
-        if (mapped.length) {
-          setAllProducts(mapped);
-          setFullLoaded(true);
-        }
+        if (mapped.length) setAllProducts(mapped);
+        setFullLoaded(true);
       })
       .catch(() => {
-        /* zostajemy przy stronie SSR + paginacji serwerowej (linki działają) */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [serverPaginated, categorySlug]);
+        // błąd → pozwól spróbować ponownie przy kolejnej interakcji (paginacja serwerowa działa)
+        loadStarted.current = false;
+      })
+      .finally(() => setFullLoading(false));
+  }, [categorySlug, lazyUrl]);
+
+  // Współdzielony URL z aktywnym sortem/filtrem → doładuj pełny zbiór NA STARCIE,
+  // żeby sort/filtr był policzony z całości (nie z 30 SSR). Czysty URL (bez sortu/filtru)
+  // NIE ładuje → PSI nie płaci kosztu na wejściu.
+  useEffect(() => {
+    const f = initial.filters;
+    const hasFilter =
+      !!f.search ||
+      f.categories.length > 0 ||
+      f.manufacturers.length > 0 ||
+      f.conditions.length > 0 ||
+      f.powers.length > 0 ||
+      f.rpms.length > 0 ||
+      f.rpmRanges.length > 0 ||
+      !!f.powerMin ||
+      !!f.powerMax ||
+      !!f.rpmSliderMin ||
+      !!f.rpmSliderMax ||
+      !!f.priceMin ||
+      !!f.priceMax;
+    if (serverPaginated && (initial.sort !== "price-asc" || hasFilter)) {
+      ensureFull();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Sync state -> URL
   useEffect(() => {
@@ -377,102 +394,17 @@ export default function CategoryProducts({
     [allProducts],
   );
 
-  const POWER_SLUG_RE = /^silniki?-elektryczn[ey]-?\d/;
-
-  const opts = useMemo(() => {
-    const cat = new Map<string, { name: string; count: number }>();
-    const mfr = new Map<string, number>();
-    const cond = new Map<string, number>();
-    // Power/RPM keyed by NORMALIZED numeric string ("0.25", "45") not raw value.
-    // Bez tego "45" i "45 kW" i "45kW" tworzyły 3 osobne checkboxy po 1 produkcie zamiast jednego po 3.
-    const pw = new Map<string, number>();
-    const rp = new Map<string, number>();
-    let minP = Infinity,
-      maxP = 0;
-    let minKw = Infinity,
-      maxKw = 0;
-    let minRpm = Infinity,
-      maxRpm = 0;
-    available.forEach((p) => {
-      if (p.categories) {
-        for (const c of p.categories) {
-          const slug = (c as any).slug;
-          const name = (c as any).name;
-          if (slug && name && !POWER_SLUG_RE.test(slug)) {
-            const existing = cat.get(slug);
-            if (existing) existing.count++;
-            else cat.set(slug, { name, count: 1 });
-          }
-        }
-      }
-      if (p.manufacturer)
-        mfr.set(p.manufacturer, (mfr.get(p.manufacturer) || 0) + 1);
-      cond.set(p.condition, (cond.get(p.condition) || 0) + 1);
-      const pv = p.power?.value;
-      if (pv && pv !== "0") {
-        const numPw = parsePower(pv);
-        if (numPw > 0) {
-          const key = String(numPw);
-          pw.set(key, (pw.get(key) || 0) + 1);
-          if (numPw < minKw) minKw = numPw;
-          if (numPw > maxKw) maxKw = numPw;
-        }
-      }
-      const rv = p.rpm?.value;
-      if (rv && rv !== "0") {
-        const numRpm = parseFloat(String(rv).replace(",", "."));
-        if (numRpm > 0) {
-          const key = String(numRpm);
-          rp.set(key, (rp.get(key) || 0) + 1);
-          if (numRpm < minRpm) minRpm = numRpm;
-          if (numRpm > maxRpm) maxRpm = numRpm;
-        }
-      }
-      if (p.price < minP) minP = p.price;
-      if (p.price > maxP) maxP = p.price;
-    });
-
-    const availableRpmRanges = PREDEFINED_RPM_VALUES.filter((rpmKey) =>
-      available.some((p) => productMatchesRpmRange(p, rpmKey)),
-    );
-
-    return {
-      categories: [...cat.entries()]
-        .map(([slug, { name, count }]) => ({ slug, name, count }))
-        .sort((a, b) => b.count - a.count),
-      manufacturers: [...mfr.entries()].sort((a, b) => {
-        if (a[0].toLowerCase() === "silnik") return 1;
-        if (b[0].toLowerCase() === "silnik") return -1;
-        return b[1] - a[1];
-      }),
-      conditions: [...cond.entries()],
-      powers: [...pw.entries()].sort(
-        (a, b) => parseFloat(a[0]) - parseFloat(b[0]),
-      ),
-      rpms: [...rp.entries()].sort(
-        (a, b) => parseFloat(a[0]) - parseFloat(b[0]),
-      ),
-      availableRpmRanges,
-      minPrice: minP === Infinity ? 0 : Math.floor(minP),
-      maxPrice: Math.ceil(maxP),
-      // Round to clean numbers for slider bounds
-      minKw: minKw === Infinity ? 0 : Math.floor(minKw * 10) / 10,
-      maxKw: maxKw === 0 ? 300 : Math.ceil(maxKw),
-      minRpm: minRpm === Infinity ? 0 : Math.floor(minRpm / 10) * 10,
-      maxRpm: maxRpm === 0 ? 3000 : Math.ceil(maxRpm / 10) * 10,
-    };
-  }, [available]);
-
-  // RPM range product counts
-  const rpmRangeCounts = useMemo(() => {
-    const counts: Record<number, number> = {};
-    for (const rpmKey of PREDEFINED_RPM_VALUES) {
-      counts[rpmKey] = available.filter((p) =>
-        productMatchesRpmRange(p, rpmKey),
-      ).length;
-    }
-    return counts;
-  }, [available]);
+  // Facety: PRZED leniwym doładowaniem bierzemy gotowe z SSR (serverFacets) — wyspa
+  // nie liczy nic ciężkiego na mount (PSI OK). PO doładowaniu liczymy z pełnego zbioru
+  // tą samą funkcją (computeFacets) → identyczne liczniki, zero przeskoku.
+  const opts = useMemo(
+    () =>
+      serverPaginated && !fullLoaded && serverFacets
+        ? serverFacets
+        : computeFacets(available),
+    [available, fullLoaded, serverPaginated, serverFacets],
+  );
+  const rpmRangeCounts = opts.rpmRangeCounts;
 
   // Power slider state (local, committed on release)
   const [powerSlider, setPowerSlider] = useState<[number, number]>([
@@ -783,11 +715,29 @@ export default function CategoryProducts({
         r = [...r].sort((a, b) => b.price - a.price);
         break;
       case "name-asc":
-        r = [...r].sort((a, b) => a.name.localeCompare(b.name, "pl"));
+        r = [...r].sort((a, b) =>
+          (a.name || "").trim().localeCompare((b.name || "").trim(), "pl", {
+            numeric: true,
+            sensitivity: "base",
+          }),
+        );
+        break;
+      case "name-desc":
+        r = [...r].sort((a, b) =>
+          (b.name || "").trim().localeCompare((a.name || "").trim(), "pl", {
+            numeric: true,
+            sensitivity: "base",
+          }),
+        );
         break;
       case "power-asc":
         r = [...r].sort(
           (a, b) => parsePower(a.power?.value) - parsePower(b.power?.value),
+        );
+        break;
+      case "power-desc":
+        r = [...r].sort(
+          (a, b) => parsePower(b.power?.value) - parsePower(a.power?.value),
         );
         break;
     }
@@ -810,10 +760,19 @@ export default function CategoryProducts({
     return filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
   }, [filtered, safePage, serverPaginated, fullLoaded]);
 
-  const update = useCallback((fn: (p: Filters) => Filters) => {
-    setFilters(fn);
-    setPage(1);
-  }, []);
+  // Licznik: przed doładowaniem pokazujemy PRAWDZIWĄ liczbę z serwera (serverTotal),
+  // nie długość strony SSR (30). Po doładowaniu / przy filtrach — realny filtered.length.
+  const displayCount =
+    serverPaginated && !fullLoaded ? serverTotal : filtered.length;
+
+  const update = useCallback(
+    (fn: (p: Filters) => Filters) => {
+      ensureFull(); // 1. interakcja z filtrem → leniwie doładuj pełny zbiór
+      setFilters(fn);
+      setPage(1);
+    },
+    [ensureFull],
+  );
   const toggle = useCallback(
     (key: keyof Filters, val: string) => {
       update((p) => {
@@ -902,8 +861,12 @@ export default function CategoryProducts({
 
   return (
     <div className="cp-wrap">
-      {/* SIDEBAR */}
-      <aside className={`cp-side${mobileOpen ? " open" : ""}`}>
+      {/* SIDEBAR — pierwsza interakcja (pointer/focus) leniwie doładowuje pełny zbiór */}
+      <aside
+        className={`cp-side${mobileOpen ? " open" : ""}`}
+        onPointerDownCapture={ensureFull}
+        onFocusCapture={ensureFull}
+      >
         <div className="cp-side-hd">
           <div className="cp-side-title">
             <SlidersHorizontal size={15} />
@@ -1192,10 +1155,12 @@ export default function CategoryProducts({
               )}
             </button>
             <span className="cp-cnt">
-              {filtered.length}{" "}
-              {filtered.length === 1
+              {displayCount}{" "}
+              {displayCount === 1
                 ? "produkt"
-                : filtered.length < 5
+                : displayCount % 10 >= 2 &&
+                    displayCount % 10 <= 4 &&
+                    (displayCount % 100 < 10 || displayCount % 100 >= 20)
                   ? "produkty"
                   : "produktów"}
             </span>
@@ -1203,6 +1168,7 @@ export default function CategoryProducts({
           <select
             value={sortBy}
             onChange={(e) => {
+              ensureFull(); // sort wymaga pełnego zbioru
               setSortBy(e.target.value);
               setPage(1);
             }}
@@ -1211,7 +1177,9 @@ export default function CategoryProducts({
             <option value="price-asc">Cena: rosnąco</option>
             <option value="price-desc">Cena: malejąco</option>
             <option value="name-asc">Nazwa A-Z</option>
+            <option value="name-desc">Nazwa Z-A</option>
             <option value="power-asc">Moc: rosnąco</option>
+            <option value="power-desc">Moc: malejąco</option>
           </select>
         </div>
 
@@ -1302,7 +1270,7 @@ export default function CategoryProducts({
           </div>
         )}
 
-        {serverPaginated && !fullLoaded && (
+        {fullLoading && (
           <div className="cp-loadbar" role="status" aria-live="polite">
             <span className="cp-spin" /> Ładowanie pełnej listy do filtrowania…
           </div>

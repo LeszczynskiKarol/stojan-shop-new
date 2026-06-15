@@ -5,7 +5,8 @@ import CategoryProducts from '@/components/shop/CategoryProducts';
 import ExpandableDescription from '@/components/shop/ExpandableDescription';
 import CityLandingPage from '@/components/shop/CityLandingPage.astro';
 import type { CityData } from '@/components/shop/CityLandingPage.astro';
-import { getCategory, getProducts, getProductsByPower, getLegalPage, getTopManufacturers } from '@/lib/api';
+import { getCategory, getProducts, getProductsByPower, getLegalPage } from '@/lib/api';
+import { computeFacets, type Facets } from '@/lib/facets';
 
 // === Local landing pages (geo-modyfikowane query z GSC) ===
 // Whitelist top miast PL. URL pattern: /silniki-elektryczne-{slug-miasta}.
@@ -171,14 +172,18 @@ const PER_PAGE = 30; // MUSI równać się PER_PAGE w CategoryProducts.tsx (craw
 const currentPage = Math.max(1, parseInt(urlSearchParams.get('page') || '1') || 1);
 let totalProducts = 0;
 let totalPages = 1;
+let serverFacets: Facets | null = null;
+let allInStock: any[] = []; // pełny lekki in-stock zbiór (do facetów + topMfrs); NIE trafia w całości do HTML
 
 if (!isPowerPage && !matchedCity) {
-  // SERVER-SIDE PAGINATION: SSR pobiera TYLKO bieżącą stronę (light, in-stock) — małe HTML,
-  // szybki TTFB, crawlowalne ?page=N. Pełny lekki zbiór do filtrów/search/facetów doładowuje
-  // wyspa async z API (logika filtrów React bez zmian). Patrz CategoryProducts.tsx (serverPaginated).
-  // sort=price&order=asc — MUSI odpowiadać domyślnemu sortBy="price-asc" w wyspie,
-  // żeby strona SSR (N) pokrywała się ze stroną po hydracji (brak przetasowania).
-  const productsQuery = `category=${categorySlug}&page=${currentPage}&limit=${PER_PAGE}&inStock=true&light=1&sort=price&order=asc`;
+  // SERVER-SIDE PAGINATION + FACETY:
+  // SSR pobiera lekki PEŁNY in-stock zbiór (server-side; lokalny backend → szybko) i z niego:
+  //  • liczy facety (computeFacets — TEN SAM kod co wyspa → zero driftu liczników),
+  //  • wycina bieżącą stronę (PER_PAGE) do renderu.
+  // Do HTML trafia tylko ~30 produktów + małe facety → małe HTML, PSI nie płaci na starcie.
+  // Pełny zbiór do client-side filtrowania wyspa doładowuje LENIWIE przy 1. interakcji.
+  // sort=price&order=asc = domyślny sortBy wyspy → strona SSR == strona po hydracji (brak przeskoku).
+  const productsQuery = `category=${categorySlug}&limit=2000&inStock=true&light=1&sort=price&order=asc`;
 
   const [cat, productsData] = await Promise.all([
     getCategory(categorySlug!),
@@ -190,9 +195,12 @@ if (!isPowerPage && !matchedCity) {
     isLegalPage = true;
   } else {
     category = cat;
-    categoryProducts = productsData?.products || [];          // tylko bieżąca strona (~30)
-    totalProducts = productsData?.pagination?.total ?? categoryProducts.length;
+    allInStock = productsData?.products || [];                // pełny lekki in-stock zbiór
+    totalProducts = allInStock.length;
     totalPages = Math.max(1, Math.ceil(totalProducts / PER_PAGE));
+    serverFacets = computeFacets(allInStock);
+    // bieżąca strona do renderu (price-asc → zgodne z domyślnym sortem wyspy)
+    categoryProducts = allInStock.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
     // SEO: ?page=N poza zakresem → 404 (zapobiega indeksowaniu pustych stron).
     if (currentPage > 1 && currentPage > totalPages) {
       return Astro.rewrite('/404');
@@ -217,12 +225,16 @@ function slugifyMfr(name: string): string {
     .replace(/^-+|-+$/g, '');
 }
 let topMfrsInCategory: { name: string; slug: string; count: number }[] = [];
-if (!isPowerPage && !matchedCity && category && currentPage === 1) {
-  // Cheap groupBy w backendzie (cała kategoria, in-stock) — bo SSR nie pobiera już całego zbioru.
-  const tops = await getTopManufacturers(categorySlug!, 8);
-  topMfrsInCategory = (tops || [])
-    .filter((m) => m.name && m.count >= 1)
-    .map((m) => ({ name: m.name, slug: slugifyMfr(m.name), count: m.count }));
+if (!isPowerPage && !matchedCity && category && currentPage === 1 && allInStock.length > 0) {
+  // Z pełnego in-stock zbioru (i tak pobranego do facetów) — top 8 producentów do SSR linków.
+  const counts = new Map<string, number>();
+  for (const p of allInStock) {
+    if (p.manufacturer) counts.set(p.manufacturer, (counts.get(p.manufacturer) || 0) + 1);
+  }
+  topMfrsInCategory = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([name, count]) => ({ name, slug: slugifyMfr(name), count }));
 }
 
 // Strip HTML for meta description
@@ -505,6 +517,7 @@ function mapProductForFilter(p: any) {
             serverTotalPages={totalPages}
             serverTotal={totalProducts}
             categorySlug={categorySlug}
+            serverFacets={serverFacets}
           />
 
           {/* Paginacja crawlowalna jest renderowana przez wyspę CategoryProducts
