@@ -27,6 +27,15 @@ export async function sitemapRoutes(app: FastifyInstance) {
       'torun', 'bydgoszcz', 'warszawa', 'poznan', 'lodz', 'gdansk',
       'wroclaw', 'krakow', 'katowice', 'bielsko-biala', 'lublin',
     ];
+    // Landingi motoreduktorów (marki/cechy) — INDEKSOWALNE strony obsługiwane przez
+    // frontend [categorySlug]/index.astro (MOTO_LANDINGS). Przy zmianie listy zaktualizuj OBA miejsca.
+    const motoLandings = [
+      'motoreduktory-sew',
+      'motoreduktory-nord',
+      'motoreduktory-lenze',
+      'motoreduktory-z-hamulcem',
+      'motoreduktory-wolnoobrotowe',
+    ];
     const pages = [
       { loc: '/' },
       { loc: '/kontakt' },
@@ -34,6 +43,7 @@ export async function sitemapRoutes(app: FastifyInstance) {
       { loc: '/skup-silnikow' },
       { loc: '/blog' },
       ...cities.map((c) => ({ loc: `/silniki-elektryczne-${c}` })),
+      ...motoLandings.map((s) => ({ loc: `/${s}` })),
     ];
 
     const xml = buildSitemap(pages);

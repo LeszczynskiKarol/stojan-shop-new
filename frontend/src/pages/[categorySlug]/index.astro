@@ -103,6 +103,84 @@ function formatPower(p: number): string {
   return p.toString().replace('.', ',');
 }
 
+// === Landingi motoreduktorów (SEO: dedykowane, INDEKSOWALNE strony pod marki/cechy) ===
+// Pole productFilters w DB jest martwe (backend go nie czyta), więc landingi robimy przez
+// routing: pobieramy pełny in-stock zbiór /motoreduktory i filtrujemy w JS (pełna kontrola
+// nad dopasowaniem i licznikami). URL-e są też wpisane w backend/src/routes/sitemap.ts
+// (sitemap-static.xml) — przy zmianie listy zaktualizuj OBA miejsca.
+function landingRpm(p: any): number {
+  const v = typeof p?.rpm === 'object' ? p?.rpm?.value : p?.rpm;
+  return parseFloat(String(v ?? '0').replace(',', '.')) || 0;
+}
+interface MotoLanding {
+  name: string;                              // H1 + breadcrumb
+  title: (n: number) => string;
+  description: (n: number) => string;
+  intro: (n: number) => string;              // HTML
+  faq?: { q: string; a: string }[];
+  match: (p: any) => boolean;
+}
+const MOTO_LANDINGS: Record<string, MotoLanding> = {
+  'motoreduktory-sew': {
+    name: 'Motoreduktory SEW-Eurodrive',
+    title: (n) => `Motoreduktory SEW-Eurodrive${n ? ` — ${n} szt.` : ''} | Stojan`,
+    description: (n) =>
+      `Motoreduktory SEW-Eurodrive używane po przeglądzie i nowe${n ? ` — ${n} szt. od ręki` : ''}. Serie R, F, K, S, wersje z hamulcem. Dobór przełożenia, wysyłka 24 h.`,
+    intro: (n) =>
+      `<p>SEW-Eurodrive to najczęściej spotykana marka motoreduktorów w polskim przemyśle — stąd jej duży udział w naszym magazynie${n ? ` (aktualnie ${n} szt. od ręki)` : ''}. Znajdziesz tu przekładnie z serii <strong>R</strong> (walcowe, współosiowe), <strong>F</strong> (walcowe płaskie, do montażu równoległego), <strong>K</strong> (stożkowe, z wałem pod kątem 90°) i <strong>S</strong> (ślimakowe), a także wersje z hamulcem elektromagnetycznym (oznaczenia BMG/BM).</p>
+       <p>Egzemplarze używane sprzedajemy po przeglądzie i teście pod obciążeniem; w ofercie są też napędy nowe. Jeśli potrzebujesz konkretnych obrotów wyjściowych lub momentu — zadzwoń, dobierzemy przełożenie do Twojej maszyny.</p>`,
+    faq: [
+      { q: 'Czym różnią się serie R, F, K i S w motoreduktorach SEW?', a: 'R to przekładnie walcowe (współosiowe), F — walcowe płaskie do montażu równoległego, K — stożkowe (kątowe, wał wyjściowy pod 90°), S — ślimakowe. Wybór zależy od geometrii zabudowy i wymaganego momentu.' },
+      { q: 'Czy macie motoreduktory SEW z hamulcem?', a: 'Tak, część egzemplarzy ma wbudowany hamulec elektromagnetyczny (oznaczenia BMG/BM na tabliczce). Filtruj listę lub zadzwoń — podpowiemy dostępne sztuki.' },
+    ],
+    match: (p) => /sew/i.test(p?.manufacturer || ''),
+  },
+  'motoreduktory-nord': {
+    name: 'Motoreduktory NORD',
+    title: (n) => `Motoreduktory NORD${n ? ` — ${n} szt.` : ''} | Stojan`,
+    description: (n) =>
+      `Motoreduktory NORD Drivesystems używane po regeneracji i nowe${n ? ` — ${n} szt. od ręki` : ''}. Przekładnie walcowe i kątowe, wersje z hamulcem. Wysyłka 24 h.`,
+    intro: (n) =>
+      `<p>NORD Drivesystems (Getriebebau NORD) to niemiecki producent motoreduktorów cenionych w logistyce, przemyśle spożywczym i automatyce przenośników. W magazynie mamy głównie przekładnie walcowe i kątowe NORD${n ? ` — łącznie ${n} szt. od ręki` : ''}, w tym wersje z hamulcem oraz o dużym przełożeniu (wolnoobrotowe).</p>
+       <p>Napędy używane przechodzą przegląd i test sprawności; dostępne są też egzemplarze nowe. Pomożemy dobrać przełożenie i sposób montażu (łapowy, kołnierzowy, na ramieniu reakcyjnym).</p>`,
+    match: (p) => /nord/i.test(p?.manufacturer || ''),
+  },
+  'motoreduktory-lenze': {
+    name: 'Motoreduktory Lenze',
+    title: (n) => `Motoreduktory Lenze${n ? ` — ${n} szt.` : ''} | Stojan`,
+    description: (n) =>
+      `Motoreduktory i przekładnie Lenze używane po przeglądzie i nowe${n ? ` — ${n} szt. od ręki` : ''}. Wersje walcowe, kątowe i z hamulcem. Wysyłka 24 h.`,
+    intro: (n) =>
+      `<p>Lenze to motoreduktory i przekładnie często stosowane w maszynach produkcyjnych i automatyce. W ofercie mamy przekładnie walcowe i kątowe Lenze${n ? ` — ${n} szt. od ręki` : ''}, w tym wersje z hamulcem oraz z silnikami o różnych mocach.</p>
+       <p>Każdy egzemplarz używany przechodzi przegląd i test pod obciążeniem. Doradzimy w doborze przełożenia i obrotów wyjściowych do konkretnego zastosowania.</p>`,
+    match: (p) => /lenze/i.test(p?.manufacturer || ''),
+  },
+  'motoreduktory-z-hamulcem': {
+    name: 'Motoreduktory z hamulcem',
+    title: (n) => `Motoreduktory z hamulcem${n ? ` — ${n} szt.` : ''} | Stojan`,
+    description: (n) =>
+      `Motoreduktory z hamulcem elektromagnetycznym${n ? ` — ${n} szt. od ręki` : ''}. Trzymanie pozycji i bezpieczne zatrzymanie przy zaniku napięcia. SEW, NORD i inni. Wysyłka 24 h.`,
+    intro: (n) =>
+      `<p>Motoreduktor z hamulcem ma wbudowany hamulec elektromagnetyczny, który zaciska się przy zaniku zasilania (hamulec spoczynkowy). Dzięki temu napęd zatrzymuje i utrzymuje pozycję — to niezbędne w dźwignicach, wciągnikach, bramach, podnośnikach i wszędzie tam, gdzie obciążenie nie może opaść po wyłączeniu prądu.</p>
+       <p>W magazynie mamy${n ? ` ${n}` : ''} motoreduktorów z hamulcem różnych producentów (najwięcej SEW i NORD), używanych po przeglądzie i nowych.</p>`,
+    faq: [
+      { q: 'Jak działa hamulec w motoreduktorze?', a: 'To hamulec elektromagnetyczny typu spoczynkowego: sprężyny dociskają tarczę hamulcową, a podanie napięcia na cewkę zwalnia hamulec. Po odcięciu zasilania hamulec automatycznie się zaciska i utrzymuje wał — bezpieczne przy podnoszeniu ciężarów.' },
+      { q: 'Po czym poznać, że motoreduktor ma hamulec?', a: 'Po dłuższej obudowie silnika od strony wentylatora i oznaczeniu na tabliczce (np. BMG u SEW). W naszych opisach zaznaczamy to słowem HAMULEC.' },
+    ],
+    match: (p) => /hamulec/i.test(p?.name || ''),
+  },
+  'motoreduktory-wolnoobrotowe': {
+    name: 'Motoreduktory wolnoobrotowe',
+    title: (n) => `Motoreduktory wolnoobrotowe (do 50 obr/min)${n ? ` — ${n} szt.` : ''} | Stojan`,
+    description: (n) =>
+      `Motoreduktory wolnoobrotowe o dużym przełożeniu i wysokim momencie${n ? ` — ${n} szt. od ręki` : ''}. Do mieszadeł, podajników, obrotnic. Wysyłka 24 h.`,
+    intro: (n) =>
+      `<p>Motoreduktory wolnoobrotowe to napędy o dużym przełożeniu, dające na wyjściu niskie obroty (poniżej ~50 obr/min) przy wysokim momencie. Sprawdzają się w mieszadłach, podajnikach ślimakowych, obrotnicach, bębnach i wolnobieżnych przenośnikach.</p>
+       <p>W magazynie mamy${n ? ` ${n}` : ''} takich egzemplarzy — od kilku do kilkudziesięciu obrotów na minutę, różnych producentów. Dobierzemy moment i obroty wyjściowe do Twojej aplikacji.</p>`,
+    match: (p) => { const r = landingRpm(p); return r > 0 && r < 50; },
+  },
+};
+
 const { categorySlug } = Astro.params;
 
 // City dispatch — przed całą resztą routingu
@@ -161,6 +239,21 @@ if (powerMatch) {
   powerProducts = (data?.products || []).filter((p: any) => p.stock > 0);
 }
 
+// === Motoreduktory landing: pobierz in-stock /motoreduktory i przefiltruj wg definicji ===
+const landingDef: MotoLanding | undefined =
+  categorySlug && !isPowerPage ? MOTO_LANDINGS[categorySlug] : undefined;
+let isLanding = false;
+let landingProducts: any[] = [];
+if (landingDef) {
+  isLanding = true;
+  const ld = await getProducts(
+    `category=motoreduktory&limit=2000&inStock=true&light=1&sort=price&order=asc`,
+  );
+  landingProducts = (ld?.products || [])
+    .filter((p: any) => p.stock > 0)
+    .filter(landingDef.match);
+}
+
 // === SEO: paginacja SSR + detekcja filtrów ===
 // Filtr — noindex (treść zależna od użytkownika).
 // Page (paginacja) — index, self-canonical (każda strona to inny zestaw produktów).
@@ -175,7 +268,7 @@ let totalPages = 1;
 let serverFacets: Facets | null = null;
 let allInStock: any[] = []; // pełny lekki in-stock zbiór (do facetów + topMfrs); NIE trafia w całości do HTML
 
-if (!isPowerPage && !matchedCity) {
+if (!isPowerPage && !matchedCity && !isLanding) {
   // SERVER-SIDE PAGINATION + FACETY:
   // SSR pobiera lekki PEŁNY in-stock zbiór (server-side; lokalny backend → szybko) i z niego:
   //  • liczy facety (computeFacets — TEN SAM kod co wyspa → zero driftu liczników),
@@ -432,6 +525,84 @@ function mapProductForFilter(p: any) {
       </BaseLayout>
     );
   })()
+) : isLanding && landingDef ? (
+  (() => {
+    const lTitle = landingDef.title(landingProducts.length);
+    const lDesc = landingDef.description(landingProducts.length);
+    const lCanonical = `/${categorySlug}`;
+    const lBreadcrumb = {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Strona główna", "item": SITE_URL },
+        { "@type": "ListItem", "position": 2, "name": "Motoreduktory", "item": `${SITE_URL}/motoreduktory` },
+        { "@type": "ListItem", "position": 3, "name": landingDef.name, "item": `${SITE_URL}${lCanonical}` },
+      ],
+    };
+    const lFaqLd = landingDef.faq && landingDef.faq.length > 0 ? {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": landingDef.faq.map((f) => ({
+        "@type": "Question",
+        "name": f.q,
+        "acceptedAnswer": { "@type": "Answer", "text": f.a },
+      })),
+    } : null;
+    return (
+      <BaseLayout title={lTitle} description={lDesc} canonical={lCanonical} jsonLd={lBreadcrumb}>
+        {lFaqLd && <script type="application/ld+json" set:html={JSON.stringify(lFaqLd)} />}
+        <div class="container mx-auto px-4 py-8">
+          <nav class="text-sm text-muted-foreground mb-6" aria-label="Ścieżka nawigacji">
+            <a href="/" class="hover:text-primary transition-colors">Strona główna</a>
+            <span class="mx-2">›</span>
+            <a href="/motoreduktory" class="hover:text-primary transition-colors">Motoreduktory</a>
+            <span class="mx-2">›</span>
+            <span class="text-foreground">{landingDef.name}</span>
+          </nav>
+
+          <h1 class="text-3xl font-bold mb-4 text-foreground">{landingDef.name}</h1>
+
+          <div
+            class="prose dark:prose-invert max-w-3xl mb-6 leading-relaxed"
+            set:html={landingDef.intro(landingProducts.length)}
+          />
+
+          {landingProducts.length > 0 ? (
+            <CategoryProducts
+              client:idle
+              products={landingProducts.map(mapProductForFilter)}
+              categoryName={landingDef.name}
+              initialPage={1}
+              basePath={lCanonical}
+            />
+          ) : (
+            <div class="text-center py-10 text-muted-foreground">
+              <p class="text-lg mb-2">Aktualnie brak tych motoreduktorów w magazynie.</p>
+              <p>
+                <a href="/motoreduktory" class="text-primary hover:underline">Zobacz wszystkie motoreduktory</a>
+                {' '}lub{' '}
+                <a href="/kontakt" class="text-primary hover:underline">zostaw zapytanie</a>.
+              </p>
+            </div>
+          )}
+
+          {landingDef.faq && landingDef.faq.length > 0 && (
+            <section class="max-w-3xl mt-10">
+              <h2 class="text-xl font-bold mb-4 text-foreground">Najczęstsze pytania</h2>
+              <div class="space-y-3">
+                {landingDef.faq.map((f) => (
+                  <details class="bg-card border border-border rounded-lg p-4">
+                    <summary class="font-medium text-foreground cursor-pointer">{f.q}</summary>
+                    <p class="mt-2 text-sm text-muted-foreground leading-relaxed">{f.a}</p>
+                  </details>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+      </BaseLayout>
+    );
+  })()
 ) : isLegalPage && legalPage ? (
   <BaseLayout
     title={`${legalPage.title} | Silniki Elektryczne`}
@@ -484,6 +655,24 @@ function mapProductForFilter(p: any) {
         </div>
       ) : (
         <p class="text-sm text-muted-foreground mb-6">{category?.name} dostępne w sklepie Stojan. Szeroki wybór w atrakcyjnych cenach.</p>
+      )}
+
+      {/* SEO: linki wewnętrzne do landingów motoreduktorów (marki/cechy). Widoczne tylko
+          na /motoreduktory — Googlebot odkrywa landingi z surowego HTML, link juice płynie. */}
+      {!isPowerPage && categorySlug === 'motoreduktory' && (
+        <section class="mb-6 p-4 bg-card border border-border rounded-xl" aria-label="Motoreduktory według marki i typu">
+          <h2 class="text-sm font-semibold text-foreground mb-2">Motoreduktory według marki i&nbsp;typu</h2>
+          <div class="flex flex-wrap gap-2">
+            {Object.entries(MOTO_LANDINGS).map(([slug, def]) => (
+              <a
+                href={`/${slug}`}
+                class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full bg-accent text-foreground border border-border hover:border-primary/40 hover:text-primary transition-colors"
+              >
+                {def.name}
+              </a>
+            ))}
+          </div>
+        </section>
       )}
 
       {!isPowerPage ? (
