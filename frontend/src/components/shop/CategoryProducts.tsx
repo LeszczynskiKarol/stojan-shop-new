@@ -1278,8 +1278,8 @@ export default function CategoryProducts({
 
         {paginated.length > 0 ? (
           <div className="cp-grid">
-            {paginated.map((p) => (
-              <Card key={p.id} product={p} url={productUrl(p)} />
+            {paginated.map((p, i) => (
+              <Card key={p.id} product={p} url={productUrl(p)} index={i} />
             ))}
           </div>
         ) : (
@@ -1309,9 +1309,13 @@ export default function CategoryProducts({
 // ============================================
 // PRODUCT CARD
 // ============================================
-function Card({ product, url }: { product: Product; url: string }) {
+function Card({ product, url, index = 99 }: { product: Product; url: string; index?: number }) {
   const [tip, setTip] = useState(false);
   const img = product.mainImage || product.images?.[0];
+  // LCP: pierwszy rząd kafelków (do 4 kolumn na desktopie) ładujemy zachłannie,
+  // a obraz LCP (pierwsze 2) dostaje fetchPriority=high. Reszta lazy → PSI nie płaci.
+  const eager = index < 4;
+  const highPriority = index < 2;
   const pw = product.power?.value;
   const rpm = product.rpm?.value;
   const s = COND_STYLE[product.condition] || COND_STYLE.nowy;
@@ -1346,7 +1350,8 @@ function Card({ product, url }: { product: Product; url: string }) {
             sizes="(min-width:1024px) 25vw, (min-width:768px) 33vw, 50vw"
             alt={product.name}
             className="cp-card-im"
-            loading="lazy"
+            loading={eager ? "eager" : "lazy"}
+            fetchPriority={highPriority ? "high" : "auto"}
             decoding="async"
             width={300}
             height={300}
