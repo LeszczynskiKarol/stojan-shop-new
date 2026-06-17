@@ -318,18 +318,15 @@ function slugifyMfr(name: string): string {
     .replace(/^-+|-+$/g, '');
 }
 let topMfrsInCategory: { name: string; slug: string; count: number }[] = [];
-if (!isPowerPage && !matchedCity && category && currentPage === 1 && allInStock.length > 0) {
+// Na /motoreduktory NIE pokazujemy "Popularne marki" — markami zajmuje się dedykowana
+// sekcja "Motoreduktory wg marki i typu" (landingi). Dwie sekcje o markach = redundancja.
+if (!isPowerPage && !matchedCity && category && categorySlug !== 'motoreduktory' && currentPage === 1 && allInStock.length > 0) {
   // Z pełnego in-stock zbioru (i tak pobranego do facetów) — top 8 producentów do SSR linków.
   const counts = new Map<string, number>();
   for (const p of allInStock) {
     if (p.manufacturer) counts.set(p.manufacturer, (counts.get(p.manufacturer) || 0) + 1);
   }
-  // Dedup z sekcją „Motoreduktory wg marki i typu": na /motoreduktory marki, które mają
-  // własny landing (SEW/NORD/Lenze), pomijamy tutaj — inaczej te same nazwy są dwa razy.
-  // Zostają komplementarne marki (STOJAN, TRANSTECNO, Bonfiglioli…) linkujące do /marka-producent.
-  const landingBrands = categorySlug === 'motoreduktory' ? /sew|nord|lenze/i : null;
   topMfrsInCategory = [...counts.entries()]
-    .filter(([name]) => !(landingBrands && landingBrands.test(name)))
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
     .map(([name, count]) => ({ name, slug: slugifyMfr(name), count }));
