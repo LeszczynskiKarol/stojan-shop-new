@@ -324,7 +324,12 @@ if (!isPowerPage && !matchedCity && category && currentPage === 1 && allInStock.
   for (const p of allInStock) {
     if (p.manufacturer) counts.set(p.manufacturer, (counts.get(p.manufacturer) || 0) + 1);
   }
+  // Dedup z sekcją „Motoreduktory wg marki i typu": na /motoreduktory marki, które mają
+  // własny landing (SEW/NORD/Lenze), pomijamy tutaj — inaczej te same nazwy są dwa razy.
+  // Zostają komplementarne marki (STOJAN, TRANSTECNO, Bonfiglioli…) linkujące do /marka-producent.
+  const landingBrands = categorySlug === 'motoreduktory' ? /sew|nord|lenze/i : null;
   topMfrsInCategory = [...counts.entries()]
+    .filter(([name]) => !(landingBrands && landingBrands.test(name)))
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
     .map(([name, count]) => ({ name, slug: slugifyMfr(name), count }));
