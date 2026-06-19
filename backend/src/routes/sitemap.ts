@@ -33,6 +33,9 @@ export async function sitemapRoutes(app: FastifyInstance) {
       'motoreduktory-sew',
       'motoreduktory-nord',
       'motoreduktory-lenze',
+      'motoreduktory-walcowe',
+      'motoreduktory-plaskie',
+      'motoreduktory-katowe',
       'motoreduktory-z-hamulcem',
       'motoreduktory-wolnoobrotowe',
     ];

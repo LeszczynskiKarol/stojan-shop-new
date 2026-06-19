@@ -155,6 +155,45 @@ const MOTO_LANDINGS: Record<string, MotoLanding> = {
        <p>Każdy egzemplarz używany przechodzi przegląd i test pod obciążeniem. Doradzimy w doborze przełożenia i obrotów wyjściowych do konkretnego zastosowania.</p>`,
     match: (p) => /lenze/i.test(p?.manufacturer || ''),
   },
+  'motoreduktory-walcowe': {
+    name: 'Motoreduktory walcowe (współosiowe)',
+    title: (n) => `Motoreduktory walcowe (współosiowe)${n ? ` — ${n} szt.` : ''} | Stojan`,
+    description: (n) =>
+      `Motoreduktory walcowe współosiowe — wał wejściowy i wyjściowy w jednej osi${n ? `, ${n} szt. od ręki` : ''}. Wysoka sprawność, uniwersalne. Używane i nowe, wysyłka 24 h.`,
+    intro: (n) =>
+      `<p>Motoreduktory walcowe (współosiowe) to najpopularniejszy typ przekładni — wał wejściowy i wyjściowy leżą w jednej osi. Zwarta, wytrzymała konstrukcja o wysokiej sprawności (zwykle 94–98%) sprawdza się w przenośnikach, pompach, mieszadłach i większości maszyn ogólnego przeznaczenia${n ? ` (mamy ${n} szt. od ręki)` : ''}.</p>
+       <p>Egzemplarze używane sprzedajemy po przeglądzie i teście pod obciążeniem; dostępne też nowe. Pomożemy dobrać przełożenie, moment i sposób montażu (łapowy lub kołnierzowy).</p>`,
+    faq: [
+      { q: 'Czym różni się motoreduktor walcowy od płaskiego?', a: 'W walcowym (współosiowym) wał wejściowy i wyjściowy leżą w jednej osi. W płaskim wały są równoległe, ale przesunięte — pozwala to na niską, płaską zabudowę. Walcowy współosiowy jest najbardziej uniwersalny i najczęściej stosowany.' },
+    ],
+    match: (p) => p?.gearType === 'walcowe-proste',
+  },
+  'motoreduktory-plaskie': {
+    name: 'Motoreduktory płaskie',
+    title: (n) => `Motoreduktory płaskie (walcowe, wały równoległe)${n ? ` — ${n} szt.` : ''} | Stojan`,
+    description: (n) =>
+      `Motoreduktory płaskie o niskiej zabudowie i wałach równoległych${n ? ` — ${n} szt. od ręki` : ''}. Często z wałem drążonym do montażu nasadzanego. Używane i nowe, wysyłka 24 h.`,
+    intro: (n) =>
+      `<p>Motoreduktory płaskie to przekładnie walcowe o wałach równoległych (przesuniętych), o niskiej, płaskiej budowie. Sprawdzają się tam, gdzie liczy się mała wysokość zabudowy — pod przenośnikami i w maszynach o ograniczonej przestrzeni montażowej${n ? ` (${n} szt. od ręki)` : ''}. Często występują z wałem drążonym do montażu nasadzanego na wał maszyny.</p>
+       <p>Napędy używane po przeglądzie i teście, dostępne też nowe. Doradzimy w doborze przełożenia i wariantu montażu.</p>`,
+    faq: [
+      { q: 'Kiedy wybrać motoreduktor płaski?', a: 'Gdy zależy Ci na niskiej zabudowie i montażu nasadzanym na wał maszyny (wał drążony). Płaska konstrukcja oszczędza miejsce w pionie w porównaniu z walcowym współosiowym.' },
+    ],
+    match: (p) => p?.gearType === 'walcowe-plaskie',
+  },
+  'motoreduktory-katowe': {
+    name: 'Motoreduktory kątowe (walcowo-stożkowe)',
+    title: (n) => `Motoreduktory kątowe (walcowo-stożkowe)${n ? ` — ${n} szt.` : ''} | Stojan`,
+    description: (n) =>
+      `Motoreduktory kątowe walcowo-stożkowe — napęd pod kątem 90°${n ? `, ${n} szt. od ręki` : ''}. Wysoka sprawność, do przenośników i maszyn. Używane i nowe, wysyłka 24 h.`,
+    intro: (n) =>
+      `<p>Motoreduktory kątowe (walcowo-stożkowe) przenoszą napęd pod kątem 90° — wał wyjściowy jest prostopadły do wejściowego. Łączą wysoką sprawność przekładni walcowej z kątowym układem stożkowym${n ? ` (${n} szt. od ręki)` : ''}. Stosuje się je wszędzie tam, gdzie napęd trzeba „zawinąć" pod kątem: przenośniki, bramy, mieszalniki, maszyny pakujące.</p>
+       <p>Egzemplarze używane po przeglądzie i teście pod obciążeniem; dostępne też nowe. Pomożemy dobrać moment i obroty wyjściowe do aplikacji.</p>`,
+    faq: [
+      { q: 'Czym różni się motoreduktor kątowy walcowo-stożkowy od ślimakowego?', a: 'Oba dają kąt 90°, ale walcowo-stożkowy ma znacznie wyższą sprawność (ok. 94–97% wobec ~50–90% u ślimakowego) i lepiej znosi pracę ciągłą. Ślimakowy bywa tańszy i cichszy przy bardzo dużych przełożeniach.' },
+    ],
+    match: (p) => p?.gearType === 'walcowo-stozkowe',
+  },
   'motoreduktory-z-hamulcem': {
     name: 'Motoreduktory z hamulcem',
     title: (n) => `Motoreduktory z hamulcem${n ? ` — ${n} szt.` : ''} | Stojan`,

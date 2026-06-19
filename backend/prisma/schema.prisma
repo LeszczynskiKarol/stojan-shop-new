@@ -39,6 +39,11 @@ hasEx             Boolean  @default(false)
 hasBreak          Boolean  @default(false)
 hasForeignCooling Boolean  @default(false)
 
+// Typ przekładni motoreduktora (tagowane ręcznie przez admina).
+// Wartości: 'walcowe-proste' | 'walcowe-plaskie' | 'walcowo-stozkowe' | null.
+// Dotyczy tylko produktów z kategorii motoreduktory; null = nieoznaczony.
+gearType          String?  @map("gear_type")
+
 // Rozruch
 startType         String?
 

@@ -317,6 +317,7 @@ export async function productRoutes(app: FastifyInstance) {
         shaftDiameter: true,
         mechanicalSize: true,
         weight: true,
+        gearType: true,
         customParameters: true,
         marketplaces: true,
         categories: {

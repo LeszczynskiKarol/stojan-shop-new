@@ -3,6 +3,7 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { OrderButton } from '@/components/shop/OrderButton';
 import BackToList from '@/components/shop/BackToList';
+import AdminGearTypeTagger from '@/components/shop/AdminGearTypeTagger';
 import RelatedProducts from '@/components/shop/RelatedProducts';
 import { getProduct } from '@/lib/api';
 import { ShippingHint } from '@/components/shop/ShippingHint';
@@ -197,6 +198,11 @@ const productFaqLd = {
 
     <!-- BACK TO LIST — reads saved filter URL from sessionStorage -->
     <BackToList client:idle categorySlug={categorySlug!} categoryName={categoryName} />
+
+    {/* Admin-only: tagowanie typu przekładni dla motoreduktorów (widoczne tylko dla zalogowanego admina) */}
+    {categorySlug === 'motoreduktory' && (
+      <AdminGearTypeTagger client:idle productId={product.id} initialGearType={(product as any).gearType ?? null} />
+    )}
 
     <!-- MAIN GRID -->
     <div class="grid lg:grid-cols-2 gap-8 lg:gap-12 mb-12">
