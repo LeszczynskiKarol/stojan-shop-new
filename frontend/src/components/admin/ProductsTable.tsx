@@ -23,6 +23,7 @@ interface Product {
   hasForeignCooling: boolean;
   hasEx: boolean;
   startType: string | null;
+  gearType: string | null;
   mainImage: string;
   galleryImages: string[];
   description: string;
@@ -508,6 +509,7 @@ export function ProductsTable() {
           if (body.hasForeignCooling !== undefined)
             updated.hasForeignCooling = body.hasForeignCooling;
           if (body.startType !== undefined) updated.startType = body.startType;
+          if (body.gearType !== undefined) updated.gearType = body.gearType;
           if (body.weight !== undefined) updated.weight = body.weight;
           if (body.mechanicalSize !== undefined)
             updated.mechanicalSize = body.mechanicalSize;
@@ -1090,6 +1092,7 @@ export function ProductsTable() {
     { key: "hasBreak", label: "Hamulec", width: "min-w-[80px]" },
     { key: "hasForeignCooling", label: "Obce chł.", width: "min-w-[80px]" },
     { key: "startType", label: "Rozruch", width: "min-w-[180px]" },
+    { key: "gearType", label: "Typ przekładni (motoreduktory)", width: "min-w-[180px]" },
     { key: "customParameters", label: "Parametry", width: "min-w-[260px]" },
     { key: "dataSheet", label: "Dokumentacja", width: "min-w-[220px]" },
     {
@@ -1467,6 +1470,30 @@ export function ProductsTable() {
             ))}
           </select>
         );
+
+      case "gearType": {
+        const isMoto = (product.categories || []).some(
+          (c) => c.slug === "motoreduktory",
+        );
+        if (!isMoto)
+          return (
+            <span style={{ color: "var(--text-muted)", fontSize: 11 }}>—</span>
+          );
+        return (
+          <select
+            value={product.gearType || ""}
+            onChange={(e) =>
+              updateField(product.id, "gearType", e.target.value || null)
+            }
+            style={{ width: "100%" }}
+          >
+            <option value="">(nieoznaczony)</option>
+            <option value="walcowe-proste">Walcowe proste</option>
+            <option value="walcowe-plaskie">Walcowe płaskie</option>
+            <option value="walcowo-stozkowe">Walcowo-stożkowe</option>
+          </select>
+        );
+      }
 
       case "customParameters": {
         const params = product.customParameters || [];

@@ -266,6 +266,14 @@ export async function adminProductRoutes(app: FastifyInstance) {
         if (body[f] !== undefined) (data as any)[f] = body[f];
       }
 
+      // Typ przekładni motoreduktora — whitelist; cokolwiek spoza listy (lub '') => null (odznaczenie).
+      if (body.gearType !== undefined) {
+        const allowedGear = ["walcowe-proste", "walcowe-plaskie", "walcowo-stozkowe"];
+        (data as any).gearType = allowedGear.includes(body.gearType)
+          ? body.gearType
+          : null;
+      }
+
       // Decimal fields
       if (body.price !== undefined)
         data.price = new Prisma.Decimal(toNumber(body.price));
