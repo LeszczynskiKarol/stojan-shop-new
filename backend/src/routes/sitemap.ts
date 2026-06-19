@@ -36,6 +36,9 @@ export async function sitemapRoutes(app: FastifyInstance) {
       'motoreduktory-walcowe',
       'motoreduktory-plaskie',
       'motoreduktory-katowe',
+      'motoreduktory-stozkowe',
+      'motoreduktory-slimakowe',
+      'motoreduktory-planetarne',
       'motoreduktory-z-hamulcem',
       'motoreduktory-wolnoobrotowe',
     ];

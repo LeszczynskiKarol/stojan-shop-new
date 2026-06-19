@@ -1491,6 +1491,9 @@ export function ProductsTable() {
             <option value="walcowe-proste">Walcowe proste</option>
             <option value="walcowe-plaskie">Walcowe płaskie</option>
             <option value="walcowo-stozkowe">Walcowo-stożkowe</option>
+            <option value="stozkowe">Stożkowe</option>
+            <option value="slimakowe">Ślimakowe</option>
+            <option value="planetarne">Planetarne</option>
           </select>
         );
       }

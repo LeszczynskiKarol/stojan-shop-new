@@ -194,6 +194,45 @@ const MOTO_LANDINGS: Record<string, MotoLanding> = {
     ],
     match: (p) => p?.gearType === 'walcowo-stozkowe',
   },
+  'motoreduktory-stozkowe': {
+    name: 'Motoreduktory stożkowe',
+    title: (n) => `Motoreduktory stożkowe${n ? ` — ${n} szt.` : ''} | Stojan`,
+    description: (n) =>
+      `Motoreduktory stożkowe — napęd pod kątem 90° z kołami stożkowymi${n ? `, ${n} szt. od ręki` : ''}. Wysoka sprawność i moment. Używane i nowe, wysyłka 24 h.`,
+    intro: (n) =>
+      `<p>Motoreduktory stożkowe przenoszą napęd pod kątem 90° dzięki przekładni z kołami stożkowymi. Łączą kątowy układ wałów z wysoką sprawnością i dużym momentem${n ? ` (${n} szt. od ręki)` : ''} — sprawdzają się w przenośnikach, mieszadłach, obrotnicach i maszynach pakujących.</p>
+       <p>Egzemplarze używane po przeglądzie i teście pod obciążeniem; dostępne też nowe. Pomożemy dobrać przełożenie i obroty wyjściowe.</p>`,
+    faq: [
+      { q: 'Czym różni się motoreduktor stożkowy od ślimakowego?', a: 'Stożkowy ma wyższą sprawność (ok. 90–97%) i lepiej znosi pracę ciągłą oraz duże obciążenia. Ślimakowy bywa cichszy i tańszy przy bardzo dużych przełożeniach, ale traci więcej energii na tarcie.' },
+    ],
+    match: (p) => p?.gearType === 'stozkowe',
+  },
+  'motoreduktory-slimakowe': {
+    name: 'Motoreduktory ślimakowe',
+    title: (n) => `Motoreduktory ślimakowe${n ? ` — ${n} szt.` : ''} | Stojan`,
+    description: (n) =>
+      `Motoreduktory ślimakowe — duże przełożenie w zwartej obudowie, cicha praca${n ? `, ${n} szt. od ręki` : ''}. Często samohamowne. Używane i nowe, wysyłka 24 h.`,
+    intro: (n) =>
+      `<p>Motoreduktory ślimakowe przenoszą napęd pod kątem 90° za pomocą przekładni ślimakowej. Cechują się dużym przełożeniem w zwartej obudowie, cichą pracą i — przy dużych przełożeniach — samohamownością${n ? ` (${n} szt. od ręki)` : ''}. Popularne w bramach, podajnikach, mieszadłach i tam, gdzie liczy się prostota i niski koszt.</p>
+       <p>Egzemplarze używane po przeglądzie i teście; dostępne też nowe. Doradzimy w doborze przełożenia i sprawdzimy samohamowność dla konkretnego modelu.</p>`,
+    faq: [
+      { q: 'Czy motoreduktor ślimakowy jest samohamowny?', a: 'Przy odpowiednio dużym przełożeniu — tak: ślimaka nie da się obrócić od strony wału wyjściowego, co pozwala utrzymać pozycję bez hamulca. Dla małych przełożeń trzeba to potwierdzić dla konkretnego modelu.' },
+    ],
+    match: (p) => p?.gearType === 'slimakowe',
+  },
+  'motoreduktory-planetarne': {
+    name: 'Motoreduktory planetarne',
+    title: (n) => `Motoreduktory planetarne${n ? ` — ${n} szt.` : ''} | Stojan`,
+    description: (n) =>
+      `Motoreduktory planetarne — wysoki moment w małej obudowie, mały luz${n ? `, ${n} szt. od ręki` : ''}. Do napędów precyzyjnych i automatyki. Używane i nowe, wysyłka 24 h.`,
+    intro: (n) =>
+      `<p>Motoreduktory planetarne oferują bardzo wysoki moment przy małych gabarytach i niskim luzie obrotowym — dzięki układowi kół planetarnych, które rozkładają obciążenie na kilka satelitów${n ? ` (${n} szt. od ręki)` : ''}. Stosuje się je w napędach precyzyjnych, automatyce, robotyce i wszędzie tam, gdzie liczy się gęstość momentu i dokładność pozycjonowania.</p>
+       <p>Egzemplarze używane po przeglądzie i teście; dostępne też nowe. Pomożemy dobrać moment, przełożenie i klasę luzu do aplikacji.</p>`,
+    faq: [
+      { q: 'Kiedy wybrać motoreduktor planetarny?', a: 'Gdy potrzebujesz dużego momentu w małej obudowie, wysokiej sztywności i małego luzu — np. precyzyjne pozycjonowanie, robotyka, napędy osi. Planetarne są droższe, ale kompaktowe i bardzo wytrzymałe.' },
+    ],
+    match: (p) => p?.gearType === 'planetarne',
+  },
   'motoreduktory-z-hamulcem': {
     name: 'Motoreduktory z hamulcem',
     title: (n) => `Motoreduktory z hamulcem${n ? ` — ${n} szt.` : ''} | Stojan`,

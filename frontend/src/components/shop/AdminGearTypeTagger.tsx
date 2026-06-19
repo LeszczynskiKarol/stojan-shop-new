@@ -9,6 +9,9 @@ const OPTIONS: { value: string; label: string }[] = [
   { value: "walcowe-proste", label: "Walcowe proste" },
   { value: "walcowe-plaskie", label: "Walcowe płaskie" },
   { value: "walcowo-stozkowe", label: "Walcowo-stożkowe" },
+  { value: "stozkowe", label: "Stożkowe" },
+  { value: "slimakowe", label: "Ślimakowe" },
+  { value: "planetarne", label: "Planetarne" },
 ];
 
 const LABELS: Record<string, string> = Object.fromEntries(

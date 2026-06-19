@@ -268,7 +268,14 @@ export async function adminProductRoutes(app: FastifyInstance) {
 
       // Typ przekładni motoreduktora — whitelist; cokolwiek spoza listy (lub '') => null (odznaczenie).
       if (body.gearType !== undefined) {
-        const allowedGear = ["walcowe-proste", "walcowe-plaskie", "walcowo-stozkowe"];
+        const allowedGear = [
+          "walcowe-proste",
+          "walcowe-plaskie",
+          "walcowo-stozkowe",
+          "stozkowe",
+          "slimakowe",
+          "planetarne",
+        ];
         (data as any).gearType = allowedGear.includes(body.gearType)
           ? body.gearType
           : null;
