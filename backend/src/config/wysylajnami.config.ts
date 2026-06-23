@@ -9,6 +9,32 @@ export const WN_PASSWORD = process.env.WN_PASSWORD || "";
 // Default courier: 5 = DHL through Wysylajnami
 export const WN_COURIER_ID = parseInt(process.env.WN_COURIER_ID || "5");
 
+// Shipment type threshold: at/above this weight the shipment is sent as a
+// pallet (product_id = 3, half-pallet 80×60 footprint) instead of a package
+// (product_id = 2). Below it a "package" exceeds courier weight limits and the
+// API only returns the single expensive option (e.g. Ambro Express ~2224 zł).
+export const WN_PALLET_MIN_WEIGHT_KG = parseFloat(
+  process.env.WN_PALLET_MIN_WEIGHT_KG || "37",
+);
+
+// Half-pallet (półpaleta) footprint used for pallet shipments, in cm.
+export const WN_PALLET_DIMS = {
+  length: parseInt(process.env.WN_PALLET_LENGTH_CM || "80"),
+  width: parseInt(process.env.WN_PALLET_WIDTH_CM || "60"),
+  height: parseInt(process.env.WN_PALLET_HEIGHT_CM || "80"),
+};
+
+// Package dimensions fallback (used below the pallet threshold), in cm.
+export const WN_PACKAGE_DIMS = {
+  length: parseInt(process.env.WN_PACKAGE_LENGTH_CM || "80"),
+  width: parseInt(process.env.WN_PACKAGE_WIDTH_CM || "60"),
+  height: parseInt(process.env.WN_PACKAGE_HEIGHT_CM || "60"),
+};
+
+// product_id values in the wysylajnami API
+export const WN_PRODUCT_PACKAGE = 2; // paczka
+export const WN_PRODUCT_PALLET = 3; // paleta / półpaleta
+
 // Shipper (same as FedEx/DHL)
 export const WN_SHIPPER = {
   name: process.env.WN_SHIPPER_NAME || "Stojan",

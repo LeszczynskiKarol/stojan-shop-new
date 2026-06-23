@@ -7,7 +7,44 @@ import {
   WN_PASSWORD,
   WN_COURIER_ID,
   WN_SHIPPER,
+  WN_PALLET_MIN_WEIGHT_KG,
+  WN_PALLET_DIMS,
+  WN_PACKAGE_DIMS,
+  WN_PRODUCT_PACKAGE,
+  WN_PRODUCT_PALLET,
 } from "../config/wysylajnami.config.js";
+
+// ============================================
+// Shipment type resolution
+// ============================================
+// Single source of truth for pallet-vs-package decision, so the quoted offer
+// (getWNOffers) and the actually created shipment (createWNShipment) always
+// use the same product_id and dimensions. Heavy shipments must go as a pallet
+// (product_id = 3, half-pallet 80×60 footprint), otherwise the API treats them
+// as an oversized package and only returns the single expensive option.
+export interface WNShipmentType {
+  productId: number;
+  length: number;
+  width: number;
+  height: number;
+  isPallet: boolean;
+}
+
+export function resolveWNShipmentType(
+  weightKg: number,
+  override?: { length?: number; width?: number; height?: number },
+): WNShipmentType {
+  const w = Number(weightKg) || 0;
+  const isPallet = w >= WN_PALLET_MIN_WEIGHT_KG;
+  const dims = isPallet ? WN_PALLET_DIMS : WN_PACKAGE_DIMS;
+  return {
+    productId: isPallet ? WN_PRODUCT_PALLET : WN_PRODUCT_PACKAGE,
+    length: Number(override?.length) || dims.length,
+    width: Number(override?.width) || dims.width,
+    height: Number(override?.height) || dims.height,
+    isPallet,
+  };
+}
 
 // ============================================
 // Token cache
@@ -131,9 +168,16 @@ export async function getWNOffers(
   heightCm?: number,
 ): Promise<WNOffer[]> {
   const w = Number(weightKg);
+  const shipmentType = resolveWNShipmentType(w, {
+    length: lengthCm,
+    width: widthCm,
+    height: heightCm,
+  });
   console.log(
     "📦 WN getOffers request, weight:",
     w,
+    "type:",
+    shipmentType.isPallet ? "paleta" : "paczka",
     "receiver:",
     receiverPostCode,
   );
@@ -141,12 +185,12 @@ export async function getWNOffers(
   const payload = {
     packages: [
       {
-        product_id: 2,
+        product_id: shipmentType.productId,
         weight: w,
-        length: Number(lengthCm) || 80,
-        width: Number(widthCm) || 60,
-        height: Number(heightCm) || 60,
-        non_standard: w > 31.5,
+        length: shipmentType.length,
+        width: shipmentType.width,
+        height: shipmentType.height,
+        non_standard: !shipmentType.isPallet && w > 31.5,
         description: "Silnik elektryczny",
         sender: {
           post_code: "87-152",
@@ -233,16 +277,17 @@ export async function createWNShipment(
   const pickupDate = tomorrow.toISOString().split("T")[0];
 
   const courier = courierId || WN_COURIER_ID;
+  const shipmentType = resolveWNShipmentType(weightKg);
 
   const orderPayload: any = {
     packages: [
       {
-        product_id: weightKg > 50 ? 3 : 2,
+        product_id: shipmentType.productId,
         weight: weightKg,
-        length: 80,
-        width: 60,
-        height: 60,
-        non_standard: weightKg > 31.5,
+        length: shipmentType.length,
+        width: shipmentType.width,
+        height: shipmentType.height,
+        non_standard: !shipmentType.isPallet && weightKg > 31.5,
         description: "Silnik elektryczny",
         courier_id: courier,
         pickup_date: pickupDate,
