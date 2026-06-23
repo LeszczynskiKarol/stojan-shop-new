@@ -57,6 +57,7 @@ async function createAllegroOffer(payload: any): Promise<any> {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/vnd.allegro.public.v1+json",
       Accept: "application/vnd.allegro.public.v1+json",
+      "User-Agent": allegroConfig.userAgent,
     },
     body: JSON.stringify(payload),
   });
@@ -91,6 +92,7 @@ async function refreshAllegroToken(
     headers: {
       Authorization: `Basic ${basicAuth}`,
       "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": allegroConfig.userAgent,
     },
     body: new URLSearchParams({
       grant_type: "refresh_token",
