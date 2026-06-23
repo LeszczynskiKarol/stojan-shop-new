@@ -8,21 +8,28 @@ import {
   WN_COURIER_ID,
   WN_SHIPPER,
   WN_PALLET_MIN_WEIGHT_KG,
-  WN_PALLET_DIMS,
+  WN_HALF_PALLET_DIMS,
+  WN_FULL_PALLET_DIMS,
   WN_PACKAGE_DIMS,
   WN_PRODUCT_PACKAGE,
   WN_PRODUCT_PALLET,
+  WNTypeKey,
 } from "../config/wysylajnami.config.js";
+
+export type { WNTypeKey };
 
 // ============================================
 // Shipment type resolution
 // ============================================
-// Single source of truth for pallet-vs-package decision, so the quoted offer
-// (getWNOffers) and the actually created shipment (createWNShipment) always
-// use the same product_id and dimensions. Heavy shipments must go as a pallet
-// (product_id = 3, half-pallet 80×60 footprint), otherwise the API treats them
-// as an oversized package and only returns the single expensive option.
+// Single source of truth for shipment type, so the quoted offer (getWNOffers)
+// and the actually created shipment (createWNShipment) always use the same
+// product_id and dimensions. The admin picks the type explicitly (package /
+// half-pallet / pallet); when omitted we fall back to weight (≥ threshold →
+// half-pallet). A "package" heavier than courier limits makes the API return
+// only the single expensive option (e.g. Ambro Express ~2224 zł), hence the
+// pallet distinction.
 export interface WNShipmentType {
+  type: WNTypeKey;
   productId: number;
   length: number;
   width: number;
@@ -32,16 +39,32 @@ export interface WNShipmentType {
 
 export function resolveWNShipmentType(
   weightKg: number,
-  override?: { length?: number; width?: number; height?: number },
+  opts?: {
+    type?: WNTypeKey;
+    length?: number;
+    width?: number;
+    height?: number;
+  },
 ): WNShipmentType {
   const w = Number(weightKg) || 0;
-  const isPallet = w >= WN_PALLET_MIN_WEIGHT_KG;
-  const dims = isPallet ? WN_PALLET_DIMS : WN_PACKAGE_DIMS;
+  // Explicit admin choice wins; otherwise auto-pick by weight.
+  const type: WNTypeKey =
+    opts?.type || (w >= WN_PALLET_MIN_WEIGHT_KG ? "half_pallet" : "package");
+
+  const base =
+    type === "pallet"
+      ? WN_FULL_PALLET_DIMS
+      : type === "half_pallet"
+        ? WN_HALF_PALLET_DIMS
+        : WN_PACKAGE_DIMS;
+  const isPallet = type !== "package";
+
   return {
+    type,
     productId: isPallet ? WN_PRODUCT_PALLET : WN_PRODUCT_PACKAGE,
-    length: Number(override?.length) || dims.length,
-    width: Number(override?.width) || dims.width,
-    height: Number(override?.height) || dims.height,
+    length: Number(opts?.length) || base.length,
+    width: Number(opts?.width) || base.width,
+    height: Number(opts?.height) || base.height,
     isPallet,
   };
 }
@@ -162,22 +185,27 @@ export async function isWNConnected(): Promise<boolean> {
 // ============================================
 export async function getWNOffers(
   weightKg: number,
-  receiverPostCode?: string,
-  lengthCm?: number,
-  widthCm?: number,
-  heightCm?: number,
+  opts?: {
+    receiverPostCode?: string;
+    type?: WNTypeKey;
+    length?: number;
+    width?: number;
+    height?: number;
+  },
 ): Promise<WNOffer[]> {
   const w = Number(weightKg);
+  const receiverPostCode = opts?.receiverPostCode;
   const shipmentType = resolveWNShipmentType(w, {
-    length: lengthCm,
-    width: widthCm,
-    height: heightCm,
+    type: opts?.type,
+    length: opts?.length,
+    width: opts?.width,
+    height: opts?.height,
   });
   console.log(
     "📦 WN getOffers request, weight:",
     w,
     "type:",
-    shipmentType.isPallet ? "paleta" : "paczka",
+    shipmentType.type,
     "receiver:",
     receiverPostCode,
   );
@@ -267,6 +295,12 @@ export async function createWNShipment(
   courierId?: number,
   insuranceValue?: number,
   codValue?: number,
+  shipmentTypeOpts?: {
+    type?: WNTypeKey;
+    length?: number;
+    width?: number;
+    height?: number;
+  },
 ): Promise<WNShipmentResult> {
   // Get next available pickup date
   const tomorrow = new Date();
@@ -277,7 +311,7 @@ export async function createWNShipment(
   const pickupDate = tomorrow.toISOString().split("T")[0];
 
   const courier = courierId || WN_COURIER_ID;
-  const shipmentType = resolveWNShipmentType(weightKg);
+  const shipmentType = resolveWNShipmentType(weightKg, shipmentTypeOpts);
 
   const orderPayload: any = {
     packages: [

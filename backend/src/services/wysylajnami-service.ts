@@ -11,6 +11,12 @@ import {
 export async function createWNShipmentFromOrder(
   orderId: string,
   courierId?: number,
+  shipmentTypeOpts?: {
+    type?: "package" | "half_pallet" | "pallet";
+    length?: number;
+    width?: number;
+    height?: number;
+  },
 ) {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return { success: false, error: "Zamówienie nie znalezione" };
@@ -60,6 +66,7 @@ export async function createWNShipmentFromOrder(
       courierId,
       Number(order.total), // insurance
       isCod ? Number(order.total) : undefined, // COD
+      shipmentTypeOpts,
     );
 
     // Download waybill and upload to S3

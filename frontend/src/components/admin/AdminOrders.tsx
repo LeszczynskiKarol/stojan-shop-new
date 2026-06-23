@@ -10,6 +10,19 @@ import { CancelOrderModal } from "./CancelOrderModal";
 
 const API = (import.meta as any).env?.PUBLIC_API_URL || "http://localhost:4000";
 
+// Wysylajnami shipment type (paczka / półpaleta / paleta)
+export type WNShipType = "package" | "half_pallet" | "pallet";
+
+// Default footprint height (cm) per shipment type — admin can override.
+const WN_DEFAULT_HEIGHT: Record<WNShipType, number> = {
+  package: 60,
+  half_pallet: 80,
+  pallet: 100,
+};
+
+// Pallet kicks in from this weight (mirror of backend WN_PALLET_MIN_WEIGHT_KG).
+const WN_PALLET_MIN_WEIGHT_KG = 37;
+
 // ============================================
 // Types (exported for child components)
 // ============================================
@@ -144,8 +157,11 @@ export function AdminOrders() {
   const [wnModal, setWnModal] = useState<{
     order: Order;
     offers: any[];
+    type: WNShipType;
+    height: number;
   } | null>(null);
   const [wnLoading, setWnLoading] = useState(false);
+  const [wnRefreshing, setWnRefreshing] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
@@ -207,6 +223,44 @@ export function AdminOrders() {
   const showToast = (msg: string, type: "ok" | "err" = "ok") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  // Fetch Wysylajnami offers for a given shipment type/height and (re)open modal.
+  const loadWnOffers = async (
+    order: Order,
+    type: WNShipType,
+    height: number,
+    mode: "open" | "refresh",
+  ) => {
+    const s = order.shipping as any;
+    const pc = s.differentShippingAddress
+      ? s.shippingPostalCode || s.postalCode
+      : s.postalCode;
+    if (mode === "refresh") setWnRefreshing(true);
+    try {
+      const offRes = await fetch(`${API}/api/admin/wysylajnami/offers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          weightKg: order.totalWeight,
+          postalCode: pc,
+          type,
+          height,
+        }),
+      });
+      const offJson = await offRes.json();
+      const offers = offJson.data?.offers || [];
+      if (!offers.length) {
+        showToast("Brak ofert Wysylajnami dla tego typu", "err");
+        if (mode === "open") return;
+      }
+      setWnModal({ order, offers, type, height });
+    } catch (err: any) {
+      showToast(err.message || "Błąd", "err");
+    } finally {
+      if (mode === "refresh") setWnRefreshing(false);
+    }
   };
 
   // Close status dropdowns on outside click
@@ -1382,36 +1436,18 @@ export function AdminOrders() {
                               📦 DHL
                             </button>
                             <button
-                              onClick={async () => {
-                                try {
-                                  const s = order.shipping as any;
-                                  const pc = s.differentShippingAddress
-                                    ? s.shippingPostalCode || s.postalCode
-                                    : s.postalCode;
-                                  const offRes = await fetch(
-                                    `${API}/api/admin/wysylajnami/offers`,
-                                    {
-                                      method: "POST",
-                                      headers: {
-                                        "Content-Type": "application/json",
-                                      },
-                                      credentials: "include",
-                                      body: JSON.stringify({
-                                        weightKg: order.totalWeight,
-                                        postalCode: pc,
-                                      }),
-                                    },
-                                  );
-                                  const offJson = await offRes.json();
-                                  const offers = offJson.data?.offers || [];
-                                  if (!offers.length) {
-                                    showToast("Brak ofert Wysylajnami", "err");
-                                    return;
-                                  }
-                                  setWnModal({ order, offers });
-                                } catch (err: any) {
-                                  showToast(err.message || "Błąd", "err");
-                                }
+                              onClick={() => {
+                                const defType: WNShipType =
+                                  Number(order.totalWeight) >=
+                                  WN_PALLET_MIN_WEIGHT_KG
+                                    ? "half_pallet"
+                                    : "package";
+                                loadWnOffers(
+                                  order,
+                                  defType,
+                                  WN_DEFAULT_HEIGHT[defType],
+                                  "open",
+                                );
                               }}
                               className="px-2 py-1 rounded bg-green-600 text-white text-xs"
                             >
@@ -1592,6 +1628,12 @@ export function AdminOrders() {
           orderNumber={wnModal.order.orderNumber}
           weight={Number(wnModal.order.totalWeight)}
           loading={wnLoading}
+          shipType={wnModal.type}
+          height={wnModal.height}
+          refreshing={wnRefreshing}
+          onTypeChange={(type, height) =>
+            loadWnOffers(wnModal.order, type, height, "refresh")
+          }
           onClose={() => setWnModal(null)}
           onSelect={async (offer) => {
             setWnLoading(true);
@@ -1602,7 +1644,11 @@ export function AdminOrders() {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   credentials: "include",
-                  body: JSON.stringify({ courierId: offer.courierId }),
+                  body: JSON.stringify({
+                    courierId: offer.courierId,
+                    type: wnModal.type,
+                    height: wnModal.height,
+                  }),
                 },
               );
               const json = await res.json();

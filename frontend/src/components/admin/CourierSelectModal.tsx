@@ -1,5 +1,5 @@
 // frontend/src/components/admin/CourierSelectModal.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const optionNames: Record<string, string> = {
   direct_delivery_only: "Do rąk własnych",
@@ -31,6 +31,20 @@ interface CourierOffer {
   options?: Array<{ name: string; price: number }>;
 }
 
+type WNShipType = "package" | "half_pallet" | "pallet";
+
+const SHIP_TYPE_LABELS: Record<WNShipType, string> = {
+  package: "Paczka",
+  half_pallet: "Półpaleta",
+  pallet: "Paleta",
+};
+
+const SHIP_TYPE_DEFAULT_HEIGHT: Record<WNShipType, number> = {
+  package: 60,
+  half_pallet: 80,
+  pallet: 100,
+};
+
 interface CourierSelectModalProps {
   offers: CourierOffer[];
   orderNumber: string;
@@ -38,6 +52,10 @@ interface CourierSelectModalProps {
   onSelect: (offer: CourierOffer) => void;
   onClose: () => void;
   loading?: boolean;
+  shipType?: WNShipType;
+  height?: number;
+  refreshing?: boolean;
+  onTypeChange?: (type: WNShipType, height: number) => void;
 }
 
 const courierBrands: Record<
@@ -74,10 +92,39 @@ export function CourierSelectModal({
   onSelect,
   onClose,
   loading,
+  shipType,
+  height,
+  refreshing,
+  onTypeChange,
 }: CourierSelectModalProps) {
   const [selected, setSelected] = useState<number | null>(null);
+  const [heightInput, setHeightInput] = useState(
+    String(height ?? SHIP_TYPE_DEFAULT_HEIGHT[shipType ?? "package"]),
+  );
   const sorted = [...offers].sort((a, b) => a.price - b.price);
   const cheapestId = sorted[0]?.courierId;
+
+  const currentType: WNShipType = shipType ?? "package";
+
+  // Keep the height field in sync when the parent switches type (which resets
+  // the height to that type's default).
+  useEffect(() => {
+    if (height != null) setHeightInput(String(height));
+  }, [height]);
+
+  const pickType = (t: WNShipType) => {
+    if (!onTypeChange || t === currentType) return;
+    setSelected(null); // offer list changes — clear stale selection
+    onTypeChange(t, SHIP_TYPE_DEFAULT_HEIGHT[t]);
+  };
+
+  const commitHeight = () => {
+    if (!onTypeChange) return;
+    const h = parseInt(heightInput);
+    if (!h || h === height) return;
+    setSelected(null);
+    onTypeChange(currentType, h);
+  };
 
   return (
     <>
@@ -154,6 +201,93 @@ export function CourierSelectModal({
             ✕
           </button>
         </div>
+
+        {/* Shipment type selector */}
+        {onTypeChange && (
+          <div
+            style={{
+              padding: "12px 24px",
+              borderBottom: "1px solid var(--border, #2d3348)",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ display: "flex", gap: "6px" }}>
+              {(["package", "half_pallet", "pallet"] as WNShipType[]).map(
+                (t) => {
+                  const active = t === currentType;
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => pickType(t)}
+                      disabled={refreshing}
+                      style={{
+                        padding: "7px 14px",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        cursor: refreshing ? "not-allowed" : "pointer",
+                        border: active
+                          ? "2px solid #16a34a"
+                          : "2px solid var(--border, #2d3348)",
+                        background: active ? "rgba(22,163,74,.15)" : "transparent",
+                        color: active ? "#16a34a" : "var(--text-muted, #8b8fa3)",
+                        transition: "all .15s ease",
+                      }}
+                    >
+                      {SHIP_TYPE_LABELS[t]}
+                    </button>
+                  );
+                },
+              )}
+            </div>
+
+            {currentType !== "package" && (
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontSize: "12px",
+                  color: "var(--text-muted, #8b8fa3)",
+                }}
+              >
+                Wys.
+                <input
+                  type="number"
+                  min={1}
+                  value={heightInput}
+                  disabled={refreshing}
+                  onChange={(e) => setHeightInput(e.target.value)}
+                  onBlur={commitHeight}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitHeight();
+                  }}
+                  style={{
+                    width: "64px",
+                    padding: "5px 8px",
+                    borderRadius: "6px",
+                    border: "1px solid var(--border, #2d3348)",
+                    background: "var(--bg, #0f1117)",
+                    color: "var(--text, #e4e6ef)",
+                    fontSize: "12px",
+                  }}
+                />
+                cm
+              </label>
+            )}
+
+            {refreshing && (
+              <span
+                style={{ fontSize: "11px", color: "var(--text-muted, #8b8fa3)" }}
+              >
+                ⏳ przeliczam…
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Courier cards */}
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>

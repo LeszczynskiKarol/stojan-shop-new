@@ -17,11 +17,19 @@ export const WN_PALLET_MIN_WEIGHT_KG = parseFloat(
   process.env.WN_PALLET_MIN_WEIGHT_KG || "37",
 );
 
-// Half-pallet (półpaleta) footprint used for pallet shipments, in cm.
-export const WN_PALLET_DIMS = {
-  length: parseInt(process.env.WN_PALLET_LENGTH_CM || "80"),
-  width: parseInt(process.env.WN_PALLET_WIDTH_CM || "60"),
-  height: parseInt(process.env.WN_PALLET_HEIGHT_CM || "80"),
+// Half-pallet (półpaleta) footprint, in cm. product_id = 3.
+export const WN_HALF_PALLET_DIMS = {
+  length: parseInt(process.env.WN_HALF_PALLET_LENGTH_CM || "80"),
+  width: parseInt(process.env.WN_HALF_PALLET_WIDTH_CM || "60"),
+  height: parseInt(process.env.WN_HALF_PALLET_HEIGHT_CM || "80"),
+};
+
+// Full euro-pallet footprint, in cm. product_id = 3 (same as half-pallet,
+// only the dimensions differ).
+export const WN_FULL_PALLET_DIMS = {
+  length: parseInt(process.env.WN_FULL_PALLET_LENGTH_CM || "120"),
+  width: parseInt(process.env.WN_FULL_PALLET_WIDTH_CM || "80"),
+  height: parseInt(process.env.WN_FULL_PALLET_HEIGHT_CM || "100"),
 };
 
 // Package dimensions fallback (used below the pallet threshold), in cm.
@@ -34,6 +42,9 @@ export const WN_PACKAGE_DIMS = {
 // product_id values in the wysylajnami API
 export const WN_PRODUCT_PACKAGE = 2; // paczka
 export const WN_PRODUCT_PALLET = 3; // paleta / półpaleta
+
+// Shipment type keys exposed to the admin selector.
+export type WNTypeKey = "package" | "half_pallet" | "pallet";
 
 // Shipper (same as FedEx/DHL)
 export const WN_SHIPPER = {
