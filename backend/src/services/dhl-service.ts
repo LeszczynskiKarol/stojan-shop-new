@@ -11,7 +11,12 @@ import {
   type DHLRecipient,
   type DHLPackage,
 } from "../lib/dhl-client.js";
-import { DHL_TRACKING_URL } from "../config/dhl.config.js";
+import {
+  DHL_TRACKING_URL,
+  DHL_PACKAGE_DIMS,
+  DHL_PALLET_DIMS,
+  DHL_PALLET_MIN_WEIGHT_KG,
+} from "../config/dhl.config.js";
 
 export async function createDHLShipmentFromOrder(orderId: string) {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
@@ -55,11 +60,20 @@ export async function createDHLShipmentFromOrder(orderId: string) {
 
   const totalWeight = Number(order.totalWeight) || 50;
 
+  const isPallet = totalWeight > DHL_PALLET_MIN_WEIGHT_KG;
+  const dims = isPallet ? DHL_PALLET_DIMS : DHL_PACKAGE_DIMS;
+
   const pkg: DHLPackage = {
-    type: totalWeight > 50 ? "PALLET" : "PACKAGE",
+    type: isPallet ? "PALLET" : "PACKAGE",
     weight: totalWeight,
+    width: dims.width,
+    height: dims.height,
+    length: dims.length,
     quantity: 1,
-    nonStandard: totalWeight > 31.5,
+    // Non-standard ("gabaryt") applies only to packages above the standard
+    // 31.5 kg limit; pallets are never non-standard. DHL requires the
+    // dimensions above whenever this flag is set.
+    nonStandard: !isPallet && totalWeight > 31.5,
   };
 
   try {
