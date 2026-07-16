@@ -39,6 +39,9 @@ hasEx             Boolean  @default(false)
 hasBreak          Boolean  @default(false)
 hasForeignCooling Boolean  @default(false)
 
+// Możliwe pozycje montażowe: podzbiór z B3, B34, B35, B14, B5
+mountings         String[] @default([])
+
 // Typ przekładni motoreduktora (tagowane ręcznie przez admina).
 // Wartości: 'walcowe-proste' | 'walcowe-plaskie' | 'walcowo-stozkowe' | null.
 // Dotyczy tylko produktów z kategorii motoreduktory; null = nieoznaczony.

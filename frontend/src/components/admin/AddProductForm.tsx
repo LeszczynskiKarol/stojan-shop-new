@@ -52,6 +52,7 @@ interface FormData {
   hasBreak: boolean;
   hasEx: boolean;
   hasForeignCooling: boolean;
+  mountings: string[];
   addToAllegro: boolean;
   allegroPrice: string;
   allegroModel: string;
@@ -78,6 +79,7 @@ const DEFAULT_FORM: FormData = {
   hasBreak: false,
   hasEx: false,
   hasForeignCooling: false,
+  mountings: [],
   addToAllegro: false,
   allegroPrice: "",
   allegroModel: "",
@@ -85,6 +87,8 @@ const DEFAULT_FORM: FormData = {
 };
 
 const STORAGE_KEY = "product_form_draft";
+
+const MOUNTING_OPTIONS = ["B3", "B34", "B35", "B14", "B5"];
 
 const ALLEGRO_CATEGORIES = [
   "silniki-elektryczne",
@@ -390,6 +394,7 @@ export default function AddProductForm() {
         hasBreak: form.hasBreak,
         hasEx: form.hasEx,
         hasForeignCooling: form.hasForeignCooling,
+        mountings: form.mountings,
         mainImage: mainImage || null,
         images: [mainImage, ...galleryImages].filter(Boolean),
         galleryImages,
@@ -749,6 +754,31 @@ export default function AddProductForm() {
             />
             Obce chłodzenie
           </label>
+        </div>
+
+        {/* Możliwy montaż */}
+        <div className="mt-5">
+          <span className={S.label}>Możliwy montaż</span>
+          <div className="mt-2 flex flex-wrap gap-6">
+            {MOUNTING_OPTIONS.map((m) => (
+              <label key={m} className={S.checkLabel}>
+                <input
+                  type="checkbox"
+                  checked={form.mountings.includes(m)}
+                  onChange={(e) =>
+                    set(
+                      "mountings",
+                      e.target.checked
+                        ? [...form.mountings, m]
+                        : form.mountings.filter((x) => x !== m),
+                    )
+                  }
+                  className={S.checkbox}
+                />
+                {m}
+              </label>
+            ))}
+          </div>
         </div>
 
         {/* Custom parameters */}

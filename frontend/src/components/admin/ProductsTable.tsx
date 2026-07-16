@@ -22,6 +22,7 @@ interface Product {
   hasBreak: boolean;
   hasForeignCooling: boolean;
   hasEx: boolean;
+  mountings: string[];
   startType: string | null;
   gearType: string | null;
   mainImage: string;
@@ -161,6 +162,8 @@ function textToHtml(text: string): string {
     .map((l) => `<p>${l}</p>`)
     .join("");
 }
+
+const MOUNTING_OPTIONS = ["B3", "B34", "B35", "B14", "B5"];
 
 const START_TYPE_OPTIONS = [
   "bezpośredni - 220/380V",
@@ -456,6 +459,7 @@ export function ProductsTable() {
           break;
         case "hasBreak":
         case "hasForeignCooling":
+        case "mountings":
           body[field] = value;
           break;
         case "categoryId":
@@ -508,6 +512,8 @@ export function ProductsTable() {
           if (body.hasBreak !== undefined) updated.hasBreak = body.hasBreak;
           if (body.hasForeignCooling !== undefined)
             updated.hasForeignCooling = body.hasForeignCooling;
+          if (body.mountings !== undefined)
+            updated.mountings = body.mountings;
           if (body.startType !== undefined) updated.startType = body.startType;
           if (body.gearType !== undefined) updated.gearType = body.gearType;
           if (body.weight !== undefined) updated.weight = body.weight;
@@ -1091,6 +1097,7 @@ export function ProductsTable() {
     { key: "legSpacing", label: "Rozstaw łap", width: "min-w-[110px]" },
     { key: "hasBreak", label: "Hamulec", width: "min-w-[80px]" },
     { key: "hasForeignCooling", label: "Obce chł.", width: "min-w-[80px]" },
+    { key: "mountings", label: "Montaż", width: "min-w-[200px]" },
     { key: "startType", label: "Rozruch", width: "min-w-[180px]" },
     { key: "gearType", label: "Typ przekładni (motoreduktory)", width: "min-w-[180px]" },
     { key: "customParameters", label: "Parametry", width: "min-w-[260px]" },
@@ -1452,6 +1459,41 @@ export function ProductsTable() {
             )}
           </div>
         );
+
+      case "mountings": {
+        const current = product.mountings || [];
+        return (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {MOUNTING_OPTIONS.map((m) => (
+              <label
+                key={m}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                  fontSize: 11,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={current.includes(m)}
+                  onChange={(e) =>
+                    updateField(
+                      product.id,
+                      "mountings",
+                      e.target.checked
+                        ? [...current, m]
+                        : current.filter((x) => x !== m),
+                    )
+                  }
+                />
+                {m}
+              </label>
+            ))}
+          </div>
+        );
+      }
 
       case "startType":
         return (

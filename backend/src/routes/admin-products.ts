@@ -25,6 +25,13 @@ function toNumber(val: any): number {
   return isNaN(n) ? 0 : n;
 }
 
+const ALLOWED_MOUNTINGS = ["B3", "B34", "B35", "B14", "B5"];
+
+function sanitizeMountings(val: any): string[] {
+  if (!Array.isArray(val)) return [];
+  return ALLOWED_MOUNTINGS.filter((m) => val.includes(m));
+}
+
 function mapProduct(p: any) {
   return {
     ...p,
@@ -314,6 +321,10 @@ export async function adminProductRoutes(app: FastifyInstance) {
         data.hasForeignCooling = Boolean(body.hasForeignCooling);
       if (body.hasEx !== undefined) data.hasEx = Boolean(body.hasEx);
 
+      // Możliwy montaż (B3, B34, B35, B14, B5)
+      if (body.mountings !== undefined)
+        data.mountings = sanitizeMountings(body.mountings);
+
       // JSON
       if (body.power !== undefined) data.power = body.power;
       if (body.rpm !== undefined) data.rpm = body.rpm;
@@ -495,6 +506,7 @@ export async function adminProductRoutes(app: FastifyInstance) {
         hasBreak: Boolean(body.hasBreak),
         hasEx: Boolean(body.hasEx),
         hasForeignCooling: Boolean(body.hasForeignCooling),
+        mountings: sanitizeMountings(body.mountings),
         mainImage: body.mainImage || null,
         images: body.images || [],
         galleryImages: body.galleryImages || [],

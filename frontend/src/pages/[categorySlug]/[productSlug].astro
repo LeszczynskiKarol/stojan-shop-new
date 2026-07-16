@@ -89,6 +89,7 @@ if (product.startType) specs.push(['Typ rozruchu', product.startType]);
 if (product.hasBreak) specs.push(['Hamulec', 'Tak']);
 if (product.hasForeignCooling) specs.push(['Obce chłodzenie', 'Tak']);
 if (product.hasEx) specs.push(['Wykonanie Ex', 'Tak']);
+if (product.mountings?.length) specs.push(['Możliwy montaż', product.mountings.join(', ')]);
 if (product.manufacturer && !['silnik', 'stojan'].includes(product.manufacturer.toLowerCase())) specs.push(['Producent', product.manufacturer]);
 
 const customParams = product.customParameters || [];

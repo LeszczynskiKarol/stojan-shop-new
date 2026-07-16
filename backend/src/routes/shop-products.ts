@@ -27,6 +27,7 @@ function mapProduct(p: any) {
     hasEx: p.hasEx,
     hasBreak: p.hasBreak,
     hasForeignCooling: p.hasForeignCooling,
+    mountings: p.mountings || [],
     startType: p.startType,
     mainImage: p.mainImage,
     galleryImages: p.galleryImages || [],
