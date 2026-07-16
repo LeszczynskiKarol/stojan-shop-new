@@ -57,12 +57,10 @@ export async function syncStockToAllegro(
 
   try {
     if (newStock <= 0) {
-      if (mp?.allegro?.active === false) {
-        log(`ℹ️ Offer ${allegroId} already ended, skipping`);
-        return;
-      }
-
-      // First set stock to 0, then end (deactivate) offer
+      // Always patch + end, even if local flag says the offer is already ended.
+      // The flag can drift from reality (offer reactivated on Allegro side),
+      // and both operations are idempotent — trusting the flag caused live
+      // offers to survive a sell-out in the shop.
       await patchOffer(allegroId, {
         stock: { available: 0, unit: "UNIT" },
       });
@@ -193,7 +191,7 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
     const events = await getOfferEvents({
       from: lastEventId || undefined,
       limit: 100,
-      type: ["OFFER_STOCK_CHANGED", "OFFER_ENDED"],
+      type: ["OFFER_STOCK_CHANGED", "OFFER_ENDED", "OFFER_ACTIVATED"],
     });
 
     if (!events?.offerEvents?.length) {
@@ -245,6 +243,51 @@ export async function pollAllegroEvents(): Promise<SyncResult> {
             });
             result.synced++;
           }
+        }
+
+        if (event.type === "OFFER_ACTIVATED") {
+          if (product.stock <= 0) {
+            // Offer went live on Allegro but shop (source of truth for stock)
+            // says 0 — end it again to prevent overselling.
+            log(
+              `⚠️ Allegro OFFER_ACTIVATED for "${product.name}" but shop stock is 0 — ending offer ${allegroOfferId} again`,
+            );
+            await patchOffer(allegroOfferId, {
+              stock: { available: 0, unit: "UNIT" },
+            });
+            await endOffer(allegroOfferId);
+            await prisma.product.update({
+              where: { id: product.id },
+              data: {
+                marketplaces: {
+                  ...mp,
+                  allegro: {
+                    ...mp.allegro,
+                    active: false,
+                    lastSyncAt: new Date().toISOString(),
+                  },
+                },
+              },
+            });
+          } else if (mp?.allegro?.active !== true) {
+            log(
+              `📥 Allegro OFFER_ACTIVATED: "${product.name}" — marking active`,
+            );
+            await prisma.product.update({
+              where: { id: product.id },
+              data: {
+                marketplaces: {
+                  ...mp,
+                  allegro: {
+                    ...mp.allegro,
+                    active: true,
+                    lastSyncAt: new Date().toISOString(),
+                  },
+                },
+              },
+            });
+          }
+          result.synced++;
         }
 
         if (event.type === "OFFER_ENDED") {
