@@ -218,7 +218,10 @@ export async function getWNOffers(
         length: shipmentType.length,
         width: shipmentType.width,
         height: shipmentType.height,
-        non_standard: !shipmentType.isPallet && w > 31.5,
+        // The WN API rejects the non_standard field on pallet products
+        // (product_id 3) with a bare 500 "failed to pass validation" —
+        // it may only be sent for packages.
+        ...(shipmentType.isPallet ? {} : { non_standard: w > 31.5 }),
         description: "Silnik elektryczny",
         sender: {
           post_code: "87-152",
@@ -321,7 +324,10 @@ export async function createWNShipment(
         length: shipmentType.length,
         width: shipmentType.width,
         height: shipmentType.height,
-        non_standard: !shipmentType.isPallet && weightKg > 31.5,
+        // Same as in getWNOffers: non_standard is rejected on pallets.
+        ...(shipmentType.isPallet
+          ? {}
+          : { non_standard: weightKg > 31.5 }),
         description: "Silnik elektryczny",
         courier_id: courier,
         pickup_date: pickupDate,

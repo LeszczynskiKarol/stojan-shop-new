@@ -407,14 +407,20 @@ export async function getDHLPrice(
           <accountNumber>${DHL_SAP}</accountNumber>
         </payment>
         <shipper>
+          <name>${escapeXml(DHL_SHIPPER.name)}</name>
           <country>PL</country>
           <postalCode>${shipperPostalClean}</postalCode>
           <city>${escapeXml(DHL_SHIPPER.city)}</city>
+          <street>${escapeXml(DHL_SHIPPER.street)}</street>
+          <houseNumber>${escapeXml(DHL_SHIPPER.houseNumber)}</houseNumber>
         </shipper>
         <receiver>
+          <name>Wycena</name>
           <country>PL</country>
           <postalCode>${receiverPostalClean}</postalCode>
           <city>${escapeXml(receiverCity)}</city>
+          <street>${escapeXml(receiverCity)}</street>
+          <houseNumber>1</houseNumber>
         </receiver>
         <service>
           <product>AH</product>
