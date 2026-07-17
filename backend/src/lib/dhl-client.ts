@@ -54,7 +54,12 @@ function authXml(): string {
 // ============================================
 async function soapCall(body: string, action: string): Promise<string> {
   const envelope = soapEnvelope(body, action);
-  console.log("DHL SOAP →", envelope.xml.substring(0, 500));
+  console.log(
+    "DHL SOAP →",
+    envelope.xml
+      .replace(/<password>.*?<\/password>/s, "<password>***</password>")
+      .substring(0, 500),
+  );
 
   const res = await fetch(DHL_WSDL_URL, {
     method: "POST",

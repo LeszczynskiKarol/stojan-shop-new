@@ -100,7 +100,6 @@ async function getToken(): Promise<string> {
   // Token valid 120 min, refresh at 100 min
   tokenExpiry = Date.now() + 100 * 60 * 1000;
   console.log("✅ Wysylajnami token obtained");
-  console.log("TOKEN:", cachedToken);
   return cachedToken;
 }
 
